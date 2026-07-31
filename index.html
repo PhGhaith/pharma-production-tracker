@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>نظام تتبع العملية الإنتاجية والحجر - معمل الأدوية</title>
+  
+  <!-- Fonts: Cairo & Outfit -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700;800;900&family=Outfit:wght@400;600;700&display=swap" rel="stylesheet">
+  
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  
+  <!-- Custom Styles -->
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div id="app" class="app-container">
+    
+    <!-- Top Header -->
+    <header class="navbar">
+      <div class="navbar-brand">
+        <div class="brand-logo">
+          <i data-lucide="factory"></i>
+        </div>
+        <div class="brand-text">
+          <h1>نظام تتبع الإنتاج والحجر</h1>
+          <span class="subtitle">إدارة الخطوط والمستودعات | Pharma Warehouse & Production Hub</span>
+        </div>
+      </div>
+      
+      <div class="navbar-actions">
+        <button id="btn-new-batch" class="btn btn-primary">
+          <i data-lucide="plus-circle"></i>
+          <span>إضافة تشغيلة جديدة (Batch)</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- Main Content Container -->
+    <main class="main-content">
+      
+      <!-- Dashboard Stats in Blisters & Weights -->
+      <section class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-icon icon-emerald">
+            <i data-lucide="boxes"></i>
+          </div>
+          <div class="stat-info">
+            <span class="stat-label">التشغيلات جارية التصنيع</span>
+            <h2 id="stat-active-batches">0</h2>
+            <span class="stat-desc">In-Process Batches</span>
+          </div>
+        </div>
+
+        <div class="stat-card">
+          <div class="stat-icon icon-amber">
+            <i data-lucide="warehouse"></i>
+          </div>
+          <div class="stat-info">
+            <span class="stat-label">ما يحتويه الحجر (وزن)</span>
+            <h2><span id="stat-quarantine-weight">0</span> <small>كغ</small></h2>
+            <span class="stat-desc">محتوى المستودع من كافة الأصناف</span>
+          </div>
+        </div>
+
+        <div class="stat-card">
+          <div class="stat-icon icon-cyan">
+            <i data-lucide="check-circle-2"></i>
+          </div>
+          <div class="stat-info">
+            <span class="stat-label">إجمالي الظروف المقبولة (PASS)</span>
+            <h2><span id="stat-pass-blisters">0</span> <small>ظرف</small></h2>
+            <span class="stat-desc">الظروف المطابقة الجاهزة</span>
+          </div>
+        </div>
+
+        <div class="stat-card">
+          <div class="stat-icon icon-rose">
+            <i data-lucide="alert-triangle"></i>
+          </div>
+          <div class="stat-info">
+            <span class="stat-label">إجمالي الظروف المرفوضة/إعادة تشغيل</span>
+            <h2><span id="stat-rework-blisters">0</span> <small>ظرف</small></h2>
+            <span class="stat-desc">ظروف بحاجة معالجة أو إعادة تشغيل</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- View Navigation Tabs (خطوط الإنتاج vs شاشة الحجر والمستودع) -->
+      <div class="view-nav-bar">
+        <button id="view-tab-production" class="view-tab active">
+          <i data-lucide="layout-grid"></i>
+          <span>خطوط الإنتاج والتشغيلات</span>
+        </button>
+        <button id="view-tab-quarantine" class="view-tab">
+          <i data-lucide="warehouse"></i>
+          <span>محتويات وشاشة الحجر (المستودع)</span>
+        </button>
+      </div>
+
+      <!-- VIEW 1: Production Batches Grid View -->
+      <div id="view-production-container">
+        <!-- Filter Controls Bar -->
+        <section class="controls-bar">
+          <div class="search-box">
+            <i data-lucide="search" class="search-icon"></i>
+            <input type="text" id="search-input" placeholder="ابحث باسم المنتج أو رقم الباتش (Batch No)...">
+          </div>
+
+          <div class="filter-tabs">
+            <button class="filter-tab active" data-form="all">الكل</button>
+            <button class="filter-tab" data-form="solid">أقراص صلبة</button>
+            <button class="filter-tab" data-form="capsule">كبسول</button>
+            <button class="filter-tab" data-form="suppository">تحاميل</button>
+            <button class="filter-tab" data-form="cream">كريمات ومراهم</button>
+          </div>
+        </section>
+
+        <!-- Batches Grid Section -->
+        <section class="batches-section">
+          <div class="section-header">
+            <h3>قائمة التشغيلات الحالية بالخطوط (<span id="batches-count">0</span>)</h3>
+            <span class="live-badge"><i data-lucide="activity"></i> تحديث ميداني مباشر</span>
+          </div>
+          <div id="batches-grid" class="batches-grid">
+            <!-- Batches cards injected dynamically -->
+          </div>
+        </section>
+      </div>
+
+      <!-- VIEW 2: Quarantine Inventory Dedicated View -->
+      <div id="view-quarantine-container" class="hidden">
+        <section class="quarantine-section">
+          <div class="section-header">
+            <div>
+              <h3><i data-lucide="warehouse" style="color: var(--amber);"></i> شاشة محتويات الحجر والمستودع</h3>
+              <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 0.2rem;">
+                عرض تفصيلي للكميات المقبولة (أخضر) والمرفوضة (أحمر) لكل منتج داخل الحجر.
+              </p>
+            </div>
+          </div>
+
+          <div class="quarantine-grid" id="quarantine-grid">
+            <!-- Quarantine items injected dynamically -->
+          </div>
+        </section>
+      </div>
+
+    </main>
+
+    <!-- Modal: New Batch Creation -->
+    <div id="modal-new-batch" class="modal-overlay hidden">
+      <div class="modal-card">
+        <div class="modal-header">
+          <div class="modal-title">
+            <i data-lucide="folder-plus"></i>
+            <div>
+              <h3>إدخال تشغيلة جديدة (New Batch)</h3>
+              <p>مدخلات مدير الإنتاج والمستودعات للتتبع الميداني</p>
+            </div>
+          </div>
+          <button class="btn-close-modal" id="close-new-batch-modal">&times;</button>
+        </div>
+        
+        <form id="form-new-batch" class="modal-body">
+          <div class="form-grid">
+            <div class="form-group">
+              <label for="input-product-name">اسم المنتج الصيدلاني *</label>
+              <input type="text" id="input-product-name" placeholder="مثال: سيتامول 500 ملغ" required>
+            </div>
+
+            <div class="form-group">
+              <label for="input-batch-no">رقم الباتش (Batch Number) *</label>
+              <input type="text" id="input-batch-no" placeholder="مثال: B-2026-889" required>
+            </div>
+
+            <div class="form-group">
+              <label for="input-pharma-form">الشكل الصيدلاني *</label>
+              <select id="input-pharma-form" required>
+                <option value="solid">أقراص صلبة (Tablets)</option>
+                <option value="capsule">كبسول (Capsules)</option>
+                <option value="suppository">تحاميل صيدلانية (Suppositories)</option>
+                <option value="cream">كريمات ومراهم (Creams/Ointments)</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label for="input-is-coated">حالة التلبيس بالفيلم *</label>
+              <select id="input-is-coated" required>
+                <option value="true">ملبس بالفيلم (Film Coated)</option>
+                <option value="false" selected>غير ملبس بالفيلم (Uncoated)</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label for="input-batch-weight">الوزن الكلي للباتش (كغ) *</label>
+              <input type="number" step="0.01" id="input-batch-weight" placeholder="مثال: 100" required>
+            </div>
+
+            <div class="form-group">
+              <label for="input-lots-count">عدد اللوتات/التشغيلات الفرعية (Lots) *</label>
+              <input type="number" min="1" id="input-lots-count" placeholder="مثال: 5" value="1" required>
+            </div>
+
+            <div class="form-group" id="group-pre-coating-weight">
+              <label for="input-pre-coating-weight" id="label-pre-coating-weight">وزن المضغوطة/الوحدة (ملغ mg) *</label>
+              <input type="number" step="0.1" id="input-pre-coating-weight" placeholder="مثال: 95" required>
+            </div>
+
+            <div class="form-group hidden" id="group-post-coating-weight">
+              <label for="input-post-coating-weight">وزن المضغوطة بعد التلبيس (ملغ mg) *</label>
+              <input type="number" step="0.1" id="input-post-coating-weight" placeholder="مثال: 140">
+            </div>
+
+            <div class="form-group">
+              <label for="input-units-per-blister">عدد المضغوطات بالظرف (البليستر) *</label>
+              <input type="number" id="input-units-per-blister" placeholder="مثال: 10" required>
+            </div>
+
+            <div class="form-group">
+              <label for="input-start-date">تاريخ بداية الفاعلية *</label>
+              <input type="date" id="input-start-date" required>
+            </div>
+
+            <div class="form-group">
+              <label for="input-exp-date">تاريخ نهاية الفاعلية *</label>
+              <input type="date" id="input-exp-date" required>
+            </div>
+          </div>
+
+          <!-- Live Math Conversion Box -->
+          <div class="math-preview-box">
+            <div class="math-preview-title">
+              <i data-lucide="calculator"></i>
+              <span>نتيجة التوزيع والحساب الرياضي للباتش:</span>
+            </div>
+            <div class="math-preview-results">
+              <div class="math-item">
+                <span>وزن اللوت الواحد (Single Lot):</span>
+                <strong id="preview-lot-weight">0 كغ/لوت</strong>
+              </div>
+              <div class="math-item">
+                <span>عدد المضغوطات الكلي:</span>
+                <strong id="preview-total-tablets">0 مضغوطة</strong>
+              </div>
+              <div class="math-item highlight">
+                <span>إجمالي البليسترات/الظروف المتوقعة:</span>
+                <strong id="preview-total-blisters">0 ظرف/بليستر</strong>
+              </div>
+            </div>
+          </div>
+
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" id="cancel-new-batch-modal">إلغاء</button>
+            <button type="submit" class="btn btn-primary">
+              <i data-lucide="save"></i>
+              <span>حفظ وإطلاق التشغيلة للإنتاج</span>
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Modal: Batch Detail & Stage Progress Tracker -->
+    <div id="modal-batch-detail" class="modal-overlay hidden">
+      <div class="modal-card modal-large">
+        <div class="modal-header">
+          <div class="modal-title">
+            <i data-lucide="git-commit"></i>
+            <div>
+              <h3 id="detail-product-name">اسم المنتج</h3>
+              <p>رقم الباتش: <span id="detail-batch-no" class="code-badge">#</span> | الشكل: <span id="detail-form-name">-</span></p>
+            </div>
+          </div>
+          <button class="btn-close-modal" id="close-batch-detail-modal">&times;</button>
+        </div>
+
+        <div class="modal-body">
+          <!-- Product Meta Header -->
+          <div class="detail-meta-grid">
+            <div class="meta-card">
+              <span class="meta-label">الوزن الإجمالي</span>
+              <strong id="detail-total-weight">0 كغ</strong>
+            </div>
+            <div class="meta-card highlight">
+              <span class="meta-label">تقسيم اللوتات</span>
+              <strong id="detail-lots-info">0 لوت</strong>
+            </div>
+            <div class="meta-card">
+              <span class="meta-label">حالة التلبيس</span>
+              <strong id="detail-coating-status">-</strong>
+            </div>
+            <div class="meta-card">
+              <span class="meta-label">وزن المضغوطة</span>
+              <strong id="detail-tablet-weights">0 ملغ</strong>
+            </div>
+            <div class="meta-card">
+              <span class="meta-label">المضغوطات بالظرف</span>
+              <strong id="detail-units-per-blister">0 وحدة</strong>
+            </div>
+            <div class="meta-card highlight">
+              <span class="meta-label">إجمالي البليسترات الكلية</span>
+              <strong id="detail-total-blisters">0 ظرف</strong>
+            </div>
+          </div>
+
+          <!-- Workflow Stages Timeline -->
+          <div class="workflow-section">
+            <h4><i data-lucide="route"></i> مسار العملية الإنتاجية الحالية</h4>
+            <div id="stages-timeline" class="stages-timeline">
+              <!-- Rendered dynamically -->
+            </div>
+          </div>
+
+          <!-- Active Stage Progress Logger Box with Partial Accepted/Rejected Inputs -->
+          <div class="stage-logger-box">
+            <div class="logger-header">
+              <i data-lucide="sliders"></i>
+              <h4>تحديث وتنسيق إنجاز مرحلة: <span id="log-stage-name" class="accent-text">-</span></h4>
+            </div>
+
+            <div class="logger-grid">
+              <div class="logger-info-card">
+                <span>الكيلوغرامات الإجمالية للمرحلة:</span>
+                <strong id="log-stage-total-kg">0 كغ</strong>
+                <small id="log-stage-total-blisters">(0 لوت / 0 ظرف)</small>
+              </div>
+
+              <div class="logger-info-card success">
+                <span>الكميات والظروف المقبولة (PASS):</span>
+                <strong id="log-stage-accepted-kg" style="color: var(--emerald);">0 كغ</strong>
+                <small id="log-stage-accepted-blisters" style="color: var(--emerald);">(0 ظرف مقبول)</small>
+              </div>
+
+              <div class="logger-info-card warning">
+                <span>الكميات والظروف المرفوضة/إعادة تشغيل:</span>
+                <strong id="log-stage-rejected-kg" style="color: var(--rose);">0 كغ</strong>
+                <small id="log-stage-rejected-blisters" style="color: var(--rose);">(0 ظرف مرفوض)</small>
+              </div>
+            </div>
+
+            <form id="form-update-stage" class="logger-form">
+              <div class="form-grid">
+                <div class="form-group">
+                  <label for="input-log-accepted-kg" style="color: var(--emerald);">الكمية المقبولة/المطابقة المضافة (كغ) *</label>
+                  <input type="number" step="0.1" id="input-log-accepted-kg" placeholder="مثال: 18 كغ مقبول" required>
+                </div>
+                <div class="form-group">
+                  <label for="input-log-rejected-kg" style="color: var(--rose);">الكمية المرفوضة/إعادة تشغيل (كغ) *</label>
+                  <input type="number" step="0.1" id="input-log-rejected-kg" placeholder="مثال: 2 كغ مرفوض" value="0" required>
+                </div>
+              </div>
+
+              <div style="margin-top: 1rem; text-align: left;">
+                <button type="submit" class="btn btn-success">
+                  <i data-lucide="check-circle-2"></i>
+                  <span>تسجيل الإنجاز وتحديث الحجر</span>
+                </button>
+              </div>
+              <small class="help-text" id="log-conversion-hint">ستقوم المنظومة بتحويل الأوزان المقبولة والمرفوضة إلى أعداد ظروف ولوتات فعلية فوراً.</small>
+            </form>
+          </div>
+
+          <!-- History Section -->
+          <div class="history-section">
+            <h4><i data-lucide="history"></i> سجل العمليات والملاحظات الميدانية</h4>
+            <div id="stage-history-list" class="history-list">
+              <!-- Logs injected dynamically -->
+            </div>
+          </div>
+        </div>
+
+        <div class="modal-footer space-between">
+          <button type="button" class="btn btn-danger" id="btn-delete-batch">
+            <i data-lucide="trash-2"></i>
+            <span>إلغاء وحذف هذه التشغيلة</span>
+          </button>
+          <button type="button" class="btn btn-secondary" id="close-detail-btn">إغلاق الشاشة</button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Scripts -->
+  <script src="pharmaMath.js"></script>
+  <script src="mockData.js"></script>
+  <script src="app.js"></script>
+  <script>
+    lucide.createIcons();
+  </script>
+</body>
+</html>
