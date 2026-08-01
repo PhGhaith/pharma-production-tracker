@@ -14,7 +14,7 @@
   <script src="https://unpkg.com/lucide@latest"></script>
 
   <!-- Custom Styles with cache-busting -->
-  <link rel="stylesheet" href="styles.css?v=8.0">
+  <link rel="stylesheet" href="styles.css?v=9.0">
 </head>
 <body>
   <div id="app" class="app-container">
@@ -36,6 +36,19 @@
           <span class="sync-dot active"></span>
           <span id="sync-text">مزامنة سحابية لحظية 🟢</span>
         </div>
+
+        <!-- Backup & Restore Buttons -->
+        <button id="btn-export-backup" class="btn btn-secondary" style="border-color: var(--amber); color: var(--amber);" title="تنزيل وتصدير كافة البيانات التي قمت بتعبئتها">
+          <i data-lucide="download"></i>
+          <span>تصدير نسخة احتياطية</span>
+        </button>
+
+        <button id="btn-import-backup" class="btn btn-secondary" style="border-color: var(--cyan); color: var(--cyan);" title="استرجاع كافة البيانات والتشغيلات المعبأة بنقرة واحدة">
+          <i data-lucide="upload"></i>
+          <span>استرجاع نسخة احتياطية</span>
+        </button>
+        <input type="file" id="input-backup-file" accept=".json" class="hidden">
+
         <button id="btn-new-batch" class="btn btn-primary">
           <i data-lucide="plus-circle"></i>
           <span>إضافة تشغيلة جديدة (Batch)</span>
@@ -408,9 +421,9 @@
   </div>
 
   <!-- Scripts with cache-busting timestamp -->
-  <script src="pharmaMath.js?v=8.0"></script>
-  <script src="mockData.js?v=8.0"></script>
-  <script src="app.js?v=8.0"></script>
+  <script src="pharmaMath.js?v=9.0"></script>
+  <script src="mockData.js?v=9.0"></script>
+  <script src="app.js?v=9.0"></script>
   <script>
     lucide.createIcons();
   </script>

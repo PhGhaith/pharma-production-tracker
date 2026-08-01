@@ -1,10 +1,22 @@
 /**
  * Main Application Logic for Pharma Production Tracker & Quarantine Inventory
- * Equipped with Stage Progress Preservation Engine (Prevents Zero-Reset Bug)
+ * Master Data Safety Engine with Auto-Recovery & Backup/Restore JSON Support
  */
 
 (function () {
-  const LOCAL_STORAGE_KEY = 'pharma_production_batches_cloud_v8';
+  const MASTER_STORAGE_KEY = 'pharma_production_batches_master_v1';
+  const PREVIOUS_STORAGE_KEYS = [
+    'pharma_production_batches_cloud_v8',
+    'pharma_production_batches_cloud_v7',
+    'pharma_production_batches_cloud_v6',
+    'pharma_production_batches_cloud_v5',
+    'pharma_production_batches_cloud_v4',
+    'pharma_production_batches_cloud_v3',
+    'pharma_production_batches_cloud_v2',
+    'pharma_production_batches_cloud_v1',
+    'pharma_production_batches_v1'
+  ];
+
   const CLOUD_API_ENDPOINT = 'https://jsonblob.com/api/jsonBlob/019fbcfc-d91b-763f-b994-cef4a06d8216';
 
   // Application State
@@ -23,6 +35,11 @@
   const elStatPassBlisters = document.getElementById('stat-pass-blisters');
   const elStatReworkBlisters = document.getElementById('stat-rework-blisters');
   const syncText = document.getElementById('sync-text');
+
+  // Backup & Restore Controls
+  const btnExportBackup = document.getElementById('btn-export-backup');
+  const btnImportBackup = document.getElementById('btn-import-backup');
+  const inputBackupFile = document.getElementById('input-backup-file');
 
   // Navigation Tabs
   const viewTabProduction = document.getElementById('view-tab-production');
@@ -120,7 +137,7 @@
     setupEventListeners();
     renderApp();
 
-    // Start Unified Cloud Sync Engine
+    // Start Unified Multi-User Cloud Engine
     syncFromCloud();
     setInterval(syncFromCloud, 8000);
 
@@ -129,32 +146,101 @@
     });
   }
 
+  /**
+   * Auto-Recover User Data across all previous version keys!
+   */
   function loadBatchesLocal() {
-    const saved = localStorage.getItem(LOCAL_STORAGE_KEY);
-    if (saved) {
+    // 1. Try master key
+    const masterSaved = localStorage.getItem(MASTER_STORAGE_KEY);
+    if (masterSaved) {
       try {
-        const parsed = JSON.parse(saved);
+        const parsed = JSON.parse(masterSaved);
         if (Array.isArray(parsed) && parsed.length > 0) {
           batches = parsed;
           return;
         }
-      } catch (e) {
-        // fallback
-      }
+      } catch (e) {}
     }
+
+    // 2. Scan and aggregate all previous version keys to prevent data loss
+    const recoveredMap = new Map();
+    PREVIOUS_STORAGE_KEYS.forEach(key => {
+      const prevData = localStorage.getItem(key);
+      if (prevData) {
+        try {
+          const parsedArr = JSON.parse(prevData);
+          if (Array.isArray(parsedArr)) {
+            parsedArr.forEach(b => {
+              if (b && b.id) {
+                if (!recoveredMap.has(String(b.id))) {
+                  recoveredMap.set(String(b.id), b);
+                }
+              }
+            });
+          }
+        } catch (e) {}
+      }
+    });
+
+    if (recoveredMap.size > 0) {
+      batches = Array.from(recoveredMap.values());
+      localStorage.setItem(MASTER_STORAGE_KEY, JSON.stringify(batches));
+      return;
+    }
+
     batches = [...window.DEFAULT_BATCHES];
   }
 
   function saveBatches(triggerCloudUpload = true) {
-    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(batches));
+    localStorage.setItem(MASTER_STORAGE_KEY, JSON.stringify(batches));
     if (triggerCloudUpload) {
       pushToCloud();
     }
   }
 
   /**
+   * Export Backup JSON File
+   */
+  function exportBackupData() {
+    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(batches, null, 2));
+    const downloadAnchor = document.createElement('a');
+    downloadAnchor.setAttribute("href", dataStr);
+    const dateStamp = new Date().toISOString().split('T')[0];
+    downloadAnchor.setAttribute("download", `pharma_production_backup_${dateStamp}.json`);
+    document.body.appendChild(downloadAnchor);
+    downloadAnchor.click();
+    downloadAnchor.remove();
+  }
+
+  /**
+   * Import Backup JSON File
+   */
+  function importBackupData(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = function (evt) {
+      try {
+        const importedData = JSON.parse(evt.target.result);
+        if (Array.isArray(importedData)) {
+          batches = importedData;
+          saveBatches(true);
+          renderApp();
+          alert(`تم استرجاع النسخة الاحتياطية بنجاح! تم تحميل (${batches.length}) تشغيلة صيدلانية وتحديث السحابة فوراً.`);
+        } else {
+          alert('تنسيق ملف النسخة الاحتياطية غير صحيح.');
+        }
+      } catch (err) {
+        alert('حدث خطأ أثناء قراءة ملف النسخة الاحتياطية.');
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = '';
+  }
+
+  /**
    * Resilient Cloud Engine with Stage-Progress Preservation
-   * Prevents any stage achievement from being overwritten back to zero by stale cloud responses
    */
   async function syncFromCloud() {
     if (isSavingToCloud) return;
@@ -190,7 +276,7 @@
             if (!localBatch) {
               batchMap.set(key, cloudBatch);
             } else {
-              // Smart Stage Progress Preservation: Higher doneKg or logs count wins!
+              // Smart Stage Progress Preservation
               if (Array.isArray(localBatch.stages) && Array.isArray(cloudBatch.stages)) {
                 localBatch.stages.forEach((localSt, idx) => {
                   const cloudSt = cloudBatch.stages[idx];
@@ -206,7 +292,6 @@
                 });
               }
 
-              // Compare logs count
               const localLogs = localBatch.logs || [];
               const cloudLogs = cloudBatch.logs || [];
               if (localLogs.length > cloudLogs.length) {
@@ -224,7 +309,7 @@
           if (currentHash !== lastSyncHash) {
             lastSyncHash = currentHash;
             batches = mergedBatches;
-            localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(batches));
+            localStorage.setItem(MASTER_STORAGE_KEY, JSON.stringify(batches));
             renderApp();
 
             if (activeBatchId) {
@@ -253,7 +338,7 @@
   async function pushToCloud() {
     isSavingToCloud = true;
     lastSyncHash = JSON.stringify(batches);
-    if (syncText) syncText.textContent = 'جاري حفظ الإنجاز ومزامنة السحابة...';
+    if (syncText) syncText.textContent = 'جاري حفظ البيانات ومزامنة كافة الأجهزة...';
 
     try {
       const response = await fetch(CLOUD_API_ENDPOINT, {
@@ -536,6 +621,10 @@
   }
 
   function setupEventListeners() {
+    if (btnExportBackup) btnExportBackup.addEventListener('click', exportBackupData);
+    if (btnImportBackup) btnImportBackup.addEventListener('click', () => inputBackupFile.click());
+    if (inputBackupFile) inputBackupFile.addEventListener('change', importBackupData);
+
     if (viewTabProduction) {
       viewTabProduction.addEventListener('click', () => {
         viewTabProduction.classList.add('active');
@@ -839,16 +928,13 @@
     });
   }
 
-  /**
-   * Select Stage & Lock currentStageIndex to prevent resetting
-   */
   function selectStage(index) {
     activeStageIndex = index;
     isEditCorrectionMode = false;
     const batch = batches.find(b => b && String(b.id) === String(activeBatchId));
     if (batch) {
       batch.currentStageIndex = index;
-      saveBatches(true); // Save & Push to Cloud
+      saveBatches(true);
       renderWorkflowTimeline(batch);
       renderStageLogger(batch);
     }
@@ -972,7 +1058,7 @@
       return;
     }
 
-    // NORMAL INCREMENTAL ADDITION MODE: Allow flexible logging up to total weight
+    // NORMAL INCREMENTAL ADDITION MODE
     let addAcceptedKg = 0;
     let addRejectedKg = 0;
     let addAcceptedBlisters = 0;
@@ -1029,7 +1115,7 @@
         `تسجيل إنجاز بمرحلة [${stage.name}]: (${addAcceptedKg} كغ مقبول = ${PharmaMath.formatNumber(addAcceptedBlisters)} ظرف) و (${addRejectedKg} كغ مرفوض = ${PharmaMath.formatNumber(addRejectedBlisters)} ظرف).`
     });
 
-    saveBatches(true); // Save locally & push immediately to cloud
+    saveBatches(true);
     renderWorkflowTimeline(batch);
     renderStageLogger(batch);
     renderHistoryList(batch);
