@@ -1,11 +1,11 @@
 /**
  * Main Application Logic for Pharma Production Tracker & Quarantine Inventory
- * Multi-User Cloud Engine with Decimal Lots Count Support (2 Decimal Places)
+ * Multi-User Unified Cloud Engine (Single Source of Truth across All Devices)
  */
 
 (function () {
-  const LOCAL_STORAGE_KEY = 'pharma_production_batches_cloud_v5';
-  const CLOUD_API_ENDPOINT = 'https://jsonblob.com/api/jsonBlob/019fbc28-a28d-7950-a713-30c7bf9b6628';
+  const LOCAL_STORAGE_KEY = 'pharma_production_batches_cloud_v6';
+  const CLOUD_API_ENDPOINT = 'https://jsonblob.com/api/jsonBlob/019fbce3-b976-727c-8c2a-8efc3fa301b6';
 
   // Application State
   let batches = [];
@@ -120,9 +120,13 @@
     setupEventListeners();
     renderApp();
 
-    // Start Rate-Limit Aware Cloud Engine (10 seconds poll)
+    // Start Unified Multi-User Cloud Engine
     syncFromCloud();
-    setInterval(syncFromCloud, 10000);
+    setInterval(syncFromCloud, 6000);
+
+    window.addEventListener('focus', () => {
+      syncFromCloud();
+    });
   }
 
   function loadBatchesLocal() {
@@ -148,6 +152,10 @@
     }
   }
 
+  /**
+   * Unified Single-Source-of-Truth Cloud Sync Engine
+   * Ensures all connected devices have 100% identical data integration
+   */
   async function syncFromCloud() {
     if (isSavingToCloud) return;
 
@@ -165,33 +173,11 @@
       if (response.ok) {
         const cloudData = await response.json();
         if (Array.isArray(cloudData)) {
-          const batchMap = new Map();
-
-          batches.forEach(b => {
-            if (b && b.id) batchMap.set(String(b.id), b);
-          });
-
-          cloudData.forEach(b => {
-            if (b && b.id) {
-              const existing = batchMap.get(String(b.id));
-              if (!existing) {
-                batchMap.set(String(b.id), b);
-              } else {
-                const existingLogsCount = (existing.logs || []).length;
-                const cloudLogsCount = (b.logs || []).length;
-                if (cloudLogsCount >= existingLogsCount) {
-                  batchMap.set(String(b.id), b);
-                }
-              }
-            }
-          });
-
-          const mergedBatches = Array.from(batchMap.values());
-          const currentHash = JSON.stringify(mergedBatches);
+          const currentHash = JSON.stringify(cloudData);
 
           if (currentHash !== lastSyncHash) {
             lastSyncHash = currentHash;
-            batches = mergedBatches;
+            batches = cloudData;
             localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(batches));
             renderApp();
 
@@ -206,7 +192,7 @@
               }
             }
           }
-          if (syncText) syncText.textContent = 'مزامنة لحظية مباشرة بين الأجهزة (متصل 🟢)';
+          if (syncText) syncText.textContent = 'متصل بالسحابة الشفافة الموحدة 🟢 (متزامن بين الأجهزة)';
         }
       }
     } catch (e) {
@@ -217,7 +203,7 @@
   async function pushToCloud() {
     isSavingToCloud = true;
     lastSyncHash = JSON.stringify(batches);
-    if (syncText) syncText.textContent = 'جاري رفع التعديلات للسحابة...';
+    if (syncText) syncText.textContent = 'جاري مزامنة باقي الأجهزة السحابية...';
 
     try {
       const response = await fetch(CLOUD_API_ENDPOINT, {
@@ -230,7 +216,7 @@
       });
 
       if (response.ok) {
-        if (syncText) syncText.textContent = 'مزامنة لحظية مباشرة بين الأجهزة (متصل 🟢)';
+        if (syncText) syncText.textContent = 'متصل بالسحابة الشفافة الموحدة 🟢 (متزامن بين الأجهزة)';
       } else {
         if (syncText) syncText.textContent = 'محفوظ محلياً (سيتم المزامنة عند الجاهزية)';
       }
@@ -635,7 +621,6 @@
     const formType = inputPharmaForm.value;
     const isCoated = inputIsCoated.value === 'true';
     
-    // Distinct Workflow Stages: Weighing is separated from Preparation
     let stagesConfig = [];
     if (formType === 'solid') {
       stagesConfig = [
@@ -814,9 +799,6 @@
     }
   }
 
-  /**
-   * Render Stage Logger with Dynamic Input & Correction Editing Mode
-   */
   function renderStageLogger(batch) {
     if (!batch || !Array.isArray(batch.stages)) return;
     const stage = batch.stages[activeStageIndex] || batch.stages[0];
@@ -886,7 +868,6 @@
     const isBlisterStage = stage.id === 'blistering';
 
     if (isEditCorrectionMode) {
-      // CORRECTION & EDIT MODE
       let newAccKg = 0;
       let newRejKg = 0;
       let newAccBlisters = 0;
