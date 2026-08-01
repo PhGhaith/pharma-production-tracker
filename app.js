@@ -1,13 +1,13 @@
 /**
  * Main Application Logic for Pharma Production Tracker & Quarantine Inventory
- * Multi-User Real-Time Cloud Sync Engine with Loose ID String Coercion
+ * Unlimited Batches Multi-User Cloud Engine with Race-Condition Protection
  */
 
 (function () {
-  const LOCAL_STORAGE_KEY = 'pharma_production_batches_cloud_v3';
+  const LOCAL_STORAGE_KEY = 'pharma_production_batches_cloud_v4';
   const CLOUD_API_ENDPOINT = 'https://jsonblob.com/api/jsonBlob/019fbc28-a28d-7950-a713-30c7bf9b6628';
 
-  // Application State
+  // Application State (Unlimited Batches Capacity)
   let batches = [];
   let currentFormFilter = 'all';
   let searchQuery = '';
@@ -15,6 +15,7 @@
   let activeStageIndex = 0;
   let lastSyncHash = '';
   let isSavingToCloud = false;
+  let lastUserActionTime = 0;
 
   // DOM Elements
   const elStatActiveBatches = document.getElementById('stat-active-batches');
@@ -131,12 +132,17 @@
   }
 
   function saveBatches(triggerCloudUpload = true) {
+    lastUserActionTime = Date.now();
     localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(batches));
     if (triggerCloudUpload) {
       pushToCloud();
     }
   }
 
+  /**
+   * Real-Time Multi-User Cloud Sync Engine with Smart ID Merging
+   * Prevents newly created batches from disappearing during cloud sync
+   */
   async function syncFromCloud() {
     if (isSavingToCloud) return;
 
@@ -149,12 +155,33 @@
       if (response.ok) {
         const cloudData = await response.json();
         if (Array.isArray(cloudData)) {
-          const currentHash = JSON.stringify(cloudData);
+          // Smart ID Merging to protect newly added batches
+          const batchMap = new Map();
+
+          // Add cloud items first
+          cloudData.forEach(b => {
+            if (b && b.id) batchMap.set(String(b.id), b);
+          });
+
+          // If local action occurred within last 8 seconds, keep local items
+          if (Date.now() - lastUserActionTime < 8000) {
+            batches.forEach(b => {
+              if (b && b.id) {
+                // Keep local updated batch
+                batchMap.set(String(b.id), b);
+              }
+            });
+          }
+
+          const mergedBatches = Array.from(batchMap.values());
+          const currentHash = JSON.stringify(mergedBatches);
+
           if (currentHash !== lastSyncHash) {
             lastSyncHash = currentHash;
-            batches = cloudData;
+            batches = mergedBatches;
             localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(batches));
             renderApp();
+
             if (activeBatchId) {
               const activeBatch = batches.find(b => b && String(b.id) === String(activeBatchId));
               if (activeBatch) {
@@ -655,7 +682,6 @@
 
   function openBatchDetail(batchId) {
     activeBatchId = batchId;
-    // Loose ID String Coercion to support numeric/string batch IDs seamlessly!
     const batch = batches.find(b => b && String(b.id) === String(batchId));
     if (!batch || !Array.isArray(batch.stages) || batch.stages.length === 0) return;
 
@@ -779,7 +805,6 @@
 
     const prevStage = (activeStageIndex > 0 && batch.stages[activeStageIndex - 1]) ? batch.stages[activeStageIndex - 1] : null;
     const prevDoneKg = prevStage ? prevStage.doneKg : batch.totalWeightKg;
-    const currentDoneKg = stage.doneKg;
 
     const stageAccKg = stage.acceptedKg || 0;
     const stageRejKg = stage.rejectedKg || 0;
