@@ -1,11 +1,11 @@
 /**
  * Main Application Logic for Pharma Production Tracker & Quarantine Inventory
- * Multi-User Unified Cloud Engine (Single Source of Truth across All Devices)
+ * Equipped with Stage Selection Locking & Resilient Cloud Persistence Engine
  */
 
 (function () {
-  const LOCAL_STORAGE_KEY = 'pharma_production_batches_cloud_v6';
-  const CLOUD_API_ENDPOINT = 'https://jsonblob.com/api/jsonBlob/019fbce3-b976-727c-8c2a-8efc3fa301b6';
+  const LOCAL_STORAGE_KEY = 'pharma_production_batches_cloud_v7';
+  const CLOUD_API_ENDPOINT = 'https://jsonblob.com/api/jsonBlob/019fbcfc-d91b-763f-b994-cef4a06d8216';
 
   // Application State
   let batches = [];
@@ -122,7 +122,7 @@
 
     // Start Unified Multi-User Cloud Engine
     syncFromCloud();
-    setInterval(syncFromCloud, 6000);
+    setInterval(syncFromCloud, 8000);
 
     window.addEventListener('focus', () => {
       syncFromCloud();
@@ -153,8 +153,7 @@
   }
 
   /**
-   * Unified Single-Source-of-Truth Cloud Sync Engine
-   * Ensures all connected devices have 100% identical data integration
+   * Resilient Cloud Engine with ID-Preserving Merge & No Size Cap
    */
   async function syncFromCloud() {
     if (isSavingToCloud) return;
@@ -166,18 +165,49 @@
       });
 
       if (response.status === 429) {
-        if (syncText) syncText.textContent = 'مزامنة لحظية مباشرة (متصل 🟢)';
+        if (syncText) syncText.textContent = 'مزامنة محليّة وسحابية (متصل 🟢)';
         return;
       }
 
       if (response.ok) {
         const cloudData = await response.json();
         if (Array.isArray(cloudData)) {
-          const currentHash = JSON.stringify(cloudData);
+          // Union merge by ID: Ensure local new items are preserved and pushed if missing from cloud
+          const batchMap = new Map();
+          let needsPush = false;
+
+          // Add local items first
+          batches.forEach(b => {
+            if (b && b.id) batchMap.set(String(b.id), b);
+          });
+
+          // Override/merge with cloud items
+          cloudData.forEach(b => {
+            if (b && b.id) {
+              const existing = batchMap.get(String(b.id));
+              if (!existing) {
+                batchMap.set(String(b.id), b);
+              } else {
+                const existingLogsCount = (existing.logs || []).length;
+                const cloudLogsCount = (b.logs || []).length;
+                if (cloudLogsCount >= existingLogsCount) {
+                  batchMap.set(String(b.id), b);
+                }
+              }
+            }
+          });
+
+          // Check if local had new batches not in cloud yet
+          if (batchMap.size > cloudData.length) {
+            needsPush = true;
+          }
+
+          const mergedBatches = Array.from(batchMap.values());
+          const currentHash = JSON.stringify(mergedBatches);
 
           if (currentHash !== lastSyncHash) {
             lastSyncHash = currentHash;
-            batches = cloudData;
+            batches = mergedBatches;
             localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(batches));
             renderApp();
 
@@ -191,8 +221,12 @@
                 closeBatchDetailModal();
               }
             }
+
+            if (needsPush) {
+              pushToCloud();
+            }
           }
-          if (syncText) syncText.textContent = 'متصل بالسحابة الشفافة الموحدة 🟢 (متزامن بين الأجهزة)';
+          if (syncText) syncText.textContent = 'مزامنة لحظية مباشرة بين الأجهزة (متصل 🟢)';
         }
       }
     } catch (e) {
@@ -203,7 +237,7 @@
   async function pushToCloud() {
     isSavingToCloud = true;
     lastSyncHash = JSON.stringify(batches);
-    if (syncText) syncText.textContent = 'جاري مزامنة باقي الأجهزة السحابية...';
+    if (syncText) syncText.textContent = 'جاري مزامنة السحابة وكافة الأجهزة...';
 
     try {
       const response = await fetch(CLOUD_API_ENDPOINT, {
@@ -216,7 +250,7 @@
       });
 
       if (response.ok) {
-        if (syncText) syncText.textContent = 'متصل بالسحابة الشفافة الموحدة 🟢 (متزامن بين الأجهزة)';
+        if (syncText) syncText.textContent = 'مزامنة لحظية مباشرة بين الأجهزة (متصل 🟢)';
       } else {
         if (syncText) syncText.textContent = 'محفوظ محلياً (سيتم المزامنة عند الجاهزية)';
       }
@@ -789,11 +823,17 @@
     });
   }
 
+  /**
+   * Select Stage and PERSIST currentStageIndex on batch object
+   * Ensures the user's selected stage is remembered and NEVER reset back to stage 0!
+   */
   function selectStage(index) {
     activeStageIndex = index;
     isEditCorrectionMode = false;
     const batch = batches.find(b => b && String(b.id) === String(activeBatchId));
     if (batch) {
+      batch.currentStageIndex = index;
+      saveBatches(false); // Save locally
       renderWorkflowTimeline(batch);
       renderStageLogger(batch);
     }
@@ -917,7 +957,7 @@
       return;
     }
 
-    // NORMAL INCREMENTAL ADDITION MODE
+    // NORMAL INCREMENTAL ADDITION MODE: Allow flexible logging up to total weight
     let addAcceptedKg = 0;
     let addRejectedKg = 0;
     let addAcceptedBlisters = 0;
@@ -947,12 +987,10 @@
       return;
     }
 
-    const prevStage = (activeStageIndex > 0 && batch.stages[activeStageIndex - 1]) ? batch.stages[activeStageIndex - 1] : null;
-    const prevDoneKg = prevStage ? prevStage.doneKg : batch.totalWeightKg;
-    const maxAddableKg = Math.max(0, prevDoneKg - stage.doneKg);
+    const maxAddableKg = Math.max(0, batch.totalWeightKg - stage.doneKg);
 
     if (addTotalKg > (maxAddableKg + 0.05)) {
-      alert(`الكمية المتاحة كحد أقصى في الحجر/المرحلة السابقة هي ${maxAddableKg.toFixed(2)} كغ.`);
+      alert(`الكمية المتاحة كحد أقصى لهذه المرحلة هي ${maxAddableKg.toFixed(2)} كغ.`);
       return;
     }
 
@@ -966,9 +1004,7 @@
       stage.status = 'in_progress';
     }
 
-    if (stage.doneKg > 0 && batch.currentStageIndex < activeStageIndex) {
-      batch.currentStageIndex = activeStageIndex;
-    }
+    batch.currentStageIndex = activeStageIndex;
 
     if (!Array.isArray(batch.logs)) batch.logs = [];
     batch.logs.unshift({
