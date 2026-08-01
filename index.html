@@ -14,7 +14,7 @@
   <script src="https://unpkg.com/lucide@latest"></script>
 
   <!-- Custom Styles with cache-busting -->
-  <link rel="stylesheet" href="styles.css?v=3.0">
+  <link rel="stylesheet" href="styles.css?v=4.0">
 </head>
 <body>
   <div id="app" class="app-container">
@@ -330,11 +330,17 @@
             </div>
           </div>
 
-          <!-- Active Stage Progress Logger Box with Dynamic Input Mode (Kg or Blister Count) -->
+          <!-- Active Stage Progress Logger Box with Dynamic Correction & Editing Mode -->
           <div class="stage-logger-box">
-            <div class="logger-header">
-              <i data-lucide="sliders"></i>
-              <h4>تحديث وتنسيق إنجاز مرحلة: <span id="log-stage-name" class="accent-text">-</span></h4>
+            <div class="logger-header" style="justify-content: space-between;">
+              <div style="display: flex; align-items: center; gap: 0.5rem;">
+                <i data-lucide="sliders"></i>
+                <h4>تحديث إنجاز مرحلة: <span id="log-stage-name" class="accent-text">-</span></h4>
+              </div>
+              <button type="button" class="btn btn-secondary btn-sm" id="btn-toggle-edit-mode" style="border-color: var(--amber); color: var(--amber);">
+                <i data-lucide="edit-3"></i>
+                <span id="edit-mode-btn-text">تعديل وتصحيح الإنجاز الحالي</span>
+              </button>
             </div>
 
             <div class="logger-grid">
@@ -369,11 +375,12 @@
                 </div>
               </div>
 
-              <div style="margin-top: 1rem; text-align: left;">
-                <button type="submit" class="btn btn-success">
+              <div style="margin-top: 1rem; display: flex; gap: 1rem; align-items: center;">
+                <button type="submit" class="btn btn-success" id="btn-submit-stage-log">
                   <i data-lucide="check-circle-2"></i>
-                  <span>تسجيل الإنجاز وتحديث الحجر</span>
+                  <span id="submit-stage-btn-text">تسجيل الإنجاز وتحديث الحجر</span>
                 </button>
+                <button type="button" class="btn btn-secondary hidden" id="btn-cancel-edit-mode">إلغاء التعديل</button>
               </div>
               <small class="help-text" id="log-conversion-hint">ستقوم المنظومة بالتحويل الرياضي التلقائي وتحديث كافة أجهزة المعمل.</small>
             </form>
@@ -401,9 +408,9 @@
   </div>
 
   <!-- Scripts with cache-busting timestamp -->
-  <script src="pharmaMath.js?v=3.0"></script>
-  <script src="mockData.js?v=3.0"></script>
-  <script src="app.js?v=3.0"></script>
+  <script src="pharmaMath.js?v=4.0"></script>
+  <script src="mockData.js?v=4.0"></script>
+  <script src="app.js?v=4.0"></script>
   <script>
     lucide.createIcons();
   </script>
