@@ -1,6 +1,6 @@
 /**
  * Main Application Logic for Pharma Production Tracker & Quarantine Inventory
- * Multi-User Real-Time Cloud Sync Engine with Distinct Weighing/Prep & Blistering Count Input Mode
+ * Multi-User Real-Time Cloud Sync Engine with Robust Defensive Error Handling
  */
 
 (function () {
@@ -213,8 +213,11 @@
     let totalReworkBlisters = 0;
 
     batches.forEach(b => {
-      const currentStage = b.stages[b.currentStageIndex];
-      const prevDone = b.currentStageIndex > 0 ? b.stages[b.currentStageIndex - 1].doneKg : b.totalWeightKg;
+      if (!b || !Array.isArray(b.stages) || b.stages.length === 0) return;
+      
+      const stIndex = (b.currentStageIndex !== undefined && b.currentStageIndex >= 0 && b.currentStageIndex < b.stages.length) ? b.currentStageIndex : 0;
+      const currentStage = b.stages[stIndex];
+      const prevDone = (stIndex > 0 && b.stages[stIndex - 1]) ? b.stages[stIndex - 1].doneKg : b.totalWeightKg;
       const currentDone = currentStage ? currentStage.doneKg : 0;
       quarantineWeight += Math.max(0, prevDone - currentDone);
 
@@ -232,21 +235,23 @@
       totalReworkBlisters += mathRejected.totalBlisters;
     });
 
-    elStatActiveBatches.textContent = totalBatches;
-    elStatQuarantineWeight.textContent = PharmaMath.formatNumber(quarantineWeight);
-    elStatPassBlisters.textContent = PharmaMath.formatNumber(totalPassBlisters);
-    elStatReworkBlisters.textContent = PharmaMath.formatNumber(totalReworkBlisters);
+    if (elStatActiveBatches) elStatActiveBatches.textContent = totalBatches;
+    if (elStatQuarantineWeight) elStatQuarantineWeight.textContent = PharmaMath.formatNumber(quarantineWeight);
+    if (elStatPassBlisters) elStatPassBlisters.textContent = PharmaMath.formatNumber(totalPassBlisters);
+    if (elStatReworkBlisters) elStatReworkBlisters.textContent = PharmaMath.formatNumber(totalReworkBlisters);
   }
 
   function renderBatchesGrid() {
     let filtered = batches.filter(b => {
+      if (!b) return false;
       const matchForm = currentFormFilter === 'all' || b.pharmaForm === currentFormFilter;
-      const matchSearch = b.productName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                          b.batchNo.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchSearch = (b.productName || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+                          (b.batchNo || '').toLowerCase().includes(searchQuery.toLowerCase());
       return matchForm && matchSearch;
     });
 
-    elBatchesCount.textContent = filtered.length;
+    if (elBatchesCount) elBatchesCount.textContent = filtered.length;
+    if (!elBatchesGrid) return;
     elBatchesGrid.innerHTML = '';
 
     if (filtered.length === 0) {
@@ -260,7 +265,8 @@
     }
 
     filtered.forEach(batch => {
-      const currentStage = batch.stages[batch.currentStageIndex] || batch.stages[0];
+      const stIndex = (batch.currentStageIndex !== undefined && batch.currentStageIndex >= 0 && batch.currentStageIndex < batch.stages.length) ? batch.currentStageIndex : 0;
+      const currentStage = batch.stages[stIndex] || batch.stages[0];
       const doneKg = currentStage ? currentStage.doneKg : 0;
       const progressPercent = Math.min(100, Math.round((doneKg / batch.totalWeightKg) * 100));
 
@@ -299,7 +305,7 @@
             <span class="batch-code"># ${batch.batchNo} (${batch.lotsCount || 1} لوت / ${lotWeightKg} كغ للوت)</span>
           </div>
           <div class="header-right-actions">
-            <span class="pharma-badge ${batch.pharmaForm}">${batch.pharmaFormLabel || FORM_LABELS_MAP[batch.pharmaForm]}</span>
+            <span class="pharma-badge ${batch.pharmaForm}">${batch.pharmaFormLabel || FORM_LABELS_MAP[batch.pharmaForm] || '-'}</span>
             <button class="btn-icon-delete" title="إلغاء وحذف الباتش" onclick="event.stopPropagation(); deleteBatch('${batch.id}');">
               <i data-lucide="trash-2"></i>
             </button>
@@ -344,6 +350,7 @@
   }
 
   function renderQuarantineView() {
+    if (!elQuarantineGrid) return;
     elQuarantineGrid.innerHTML = '';
 
     if (batches.length === 0) {
@@ -356,8 +363,10 @@
     }
 
     batches.forEach(batch => {
-      const currentStage = batch.stages[batch.currentStageIndex];
-      const prevDoneKg = batch.currentStageIndex > 0 ? batch.stages[batch.currentStageIndex - 1].doneKg : batch.totalWeightKg;
+      if (!batch || !Array.isArray(batch.stages) || batch.stages.length === 0) return;
+      const stIndex = (batch.currentStageIndex !== undefined && batch.currentStageIndex >= 0 && batch.currentStageIndex < batch.stages.length) ? batch.currentStageIndex : 0;
+      const currentStage = batch.stages[stIndex];
+      const prevDoneKg = (stIndex > 0 && batch.stages[stIndex - 1]) ? batch.stages[stIndex - 1].doneKg : batch.totalWeightKg;
       const currentDoneKg = currentStage ? currentStage.doneKg : 0;
       const remKgInQuarantine = Math.max(0, prevDoneKg - currentDoneKg);
 
@@ -407,7 +416,7 @@
             <h4>${batch.productName}</h4>
             <span class="batch-code"># ${batch.batchNo} ${batch.priorBatchNo ? `(منقول من #${batch.priorBatchNo})` : ''}</span>
           </div>
-          <span class="pharma-badge ${batch.pharmaForm}">${batch.pharmaFormLabel}</span>
+          <span class="pharma-badge ${batch.pharmaForm}">${batch.pharmaFormLabel || '-'}</span>
         </div>
 
         <div class="q-material-state-pill">
@@ -448,20 +457,24 @@
   }
 
   function setupEventListeners() {
-    viewTabProduction.addEventListener('click', () => {
-      viewTabProduction.classList.add('active');
-      viewTabQuarantine.classList.remove('active');
-      viewProductionContainer.classList.remove('hidden');
-      viewQuarantineContainer.classList.add('hidden');
-    });
+    if (viewTabProduction) {
+      viewTabProduction.addEventListener('click', () => {
+        viewTabProduction.classList.add('active');
+        if (viewTabQuarantine) viewTabQuarantine.classList.remove('active');
+        if (viewProductionContainer) viewProductionContainer.classList.remove('hidden');
+        if (viewQuarantineContainer) viewQuarantineContainer.classList.add('hidden');
+      });
+    }
 
-    viewTabQuarantine.addEventListener('click', () => {
-      viewTabQuarantine.classList.add('active');
-      viewTabProduction.classList.remove('active');
-      viewQuarantineContainer.classList.remove('hidden');
-      viewProductionContainer.classList.add('hidden');
-      renderQuarantineView();
-    });
+    if (viewTabQuarantine) {
+      viewTabQuarantine.addEventListener('click', () => {
+        viewTabQuarantine.classList.add('active');
+        if (viewTabProduction) viewTabProduction.classList.remove('active');
+        if (viewQuarantineContainer) viewQuarantineContainer.classList.remove('hidden');
+        if (viewProductionContainer) viewProductionContainer.classList.add('hidden');
+        renderQuarantineView();
+      });
+    }
 
     elFilterTabs.forEach(tab => {
       tab.addEventListener('click', (e) => {
@@ -472,32 +485,36 @@
       });
     });
 
-    elSearchInput.addEventListener('input', (e) => {
-      searchQuery = e.target.value.trim();
-      renderBatchesGrid();
-    });
+    if (elSearchInput) {
+      elSearchInput.addEventListener('input', (e) => {
+        searchQuery = e.target.value.trim();
+        renderBatchesGrid();
+      });
+    }
 
-    elBtnNewBatch.addEventListener('click', openNewBatchModal);
-    elCloseNewBatchModal.addEventListener('click', closeNewBatchModal);
-    elCancelNewBatchModal.addEventListener('click', closeNewBatchModal);
+    if (elBtnNewBatch) elBtnNewBatch.addEventListener('click', openNewBatchModal);
+    if (elCloseNewBatchModal) elCloseNewBatchModal.addEventListener('click', closeNewBatchModal);
+    if (elCancelNewBatchModal) elCancelNewBatchModal.addEventListener('click', closeNewBatchModal);
 
-    inputIsCoated.addEventListener('change', toggleCoatingFields);
-    inputPharmaForm.addEventListener('change', toggleCoatingFields);
+    if (inputIsCoated) inputIsCoated.addEventListener('change', toggleCoatingFields);
+    if (inputPharmaForm) inputPharmaForm.addEventListener('change', toggleCoatingFields);
 
     [inputBatchWeight, inputLotsCount, inputPreCoatingWeight, inputPostCoatingWeight, inputUnitsPerBlister].forEach(el => {
-      el.addEventListener('input', updateNewBatchMathPreview);
+      if (el) el.addEventListener('input', updateNewBatchMathPreview);
     });
 
-    elFormNewBatch.addEventListener('submit', handleNewBatchSubmit);
+    if (elFormNewBatch) elFormNewBatch.addEventListener('submit', handleNewBatchSubmit);
 
-    elCloseBatchDetailModal.addEventListener('click', closeBatchDetailModal);
-    elCloseDetailBtn.addEventListener('click', closeBatchDetailModal);
+    if (elCloseBatchDetailModal) elCloseBatchDetailModal.addEventListener('click', closeBatchDetailModal);
+    if (elCloseDetailBtn) elCloseDetailBtn.addEventListener('click', closeBatchDetailModal);
     
-    btnDeleteBatch.addEventListener('click', () => {
-      if (activeBatchId) deleteBatch(activeBatchId);
-    });
+    if (btnDeleteBatch) {
+      btnDeleteBatch.addEventListener('click', () => {
+        if (activeBatchId) deleteBatch(activeBatchId);
+      });
+    }
 
-    formUpdateStage.addEventListener('submit', handleUpdateStageSubmit);
+    if (formUpdateStage) formUpdateStage.addEventListener('submit', handleUpdateStageSubmit);
   }
 
   function toggleCoatingFields() {
@@ -505,13 +522,13 @@
     const isSolid = inputPharmaForm.value === 'solid';
 
     if (isSolid && isCoated) {
-      groupPostCoatingWeight.classList.remove('hidden');
-      inputPostCoatingWeight.required = true;
-      labelPreCoatingWeight.textContent = 'وزن المضغوطة قبل التلبيس (ملغ mg) *';
+      if (groupPostCoatingWeight) groupPostCoatingWeight.classList.remove('hidden');
+      if (inputPostCoatingWeight) inputPostCoatingWeight.required = true;
+      if (labelPreCoatingWeight) labelPreCoatingWeight.textContent = 'وزن المضغوطة قبل التلبيس (ملغ mg) *';
     } else {
-      groupPostCoatingWeight.classList.add('hidden');
-      inputPostCoatingWeight.required = false;
-      labelPreCoatingWeight.textContent = 'وزن المضغوطة/الوحدة (ملغ mg) *';
+      if (groupPostCoatingWeight) groupPostCoatingWeight.classList.add('hidden');
+      if (inputPostCoatingWeight) inputPostCoatingWeight.required = false;
+      if (labelPreCoatingWeight) labelPreCoatingWeight.textContent = 'وزن المضغوطة/الوحدة (ملغ mg) *';
     }
 
     updateNewBatchMathPreview();
@@ -526,28 +543,28 @@
     const uPerB = parseInt(inputUnitsPerBlister.value, 10) || 1;
 
     const res = PharmaMath.calculateTotals(wKg, isCoated, preMg, postMg, uPerB, lCount);
-    previewLotWeight.textContent = `${res.lotWeightKg.toFixed(1)} كغ/لوت`;
-    previewTotalTablets.textContent = `${PharmaMath.formatNumber(res.totalTablets)} مضغوطة`;
-    previewTotalBlisters.textContent = `${PharmaMath.formatNumber(res.totalBlisters)} ظرف/بليستر`;
+    if (previewLotWeight) previewLotWeight.textContent = `${res.lotWeightKg.toFixed(1)} كغ/لوت`;
+    if (previewTotalTablets) previewTotalTablets.textContent = `${PharmaMath.formatNumber(res.totalTablets)} مضغوطة`;
+    if (previewTotalBlisters) previewTotalBlisters.textContent = `${PharmaMath.formatNumber(res.totalBlisters)} ظرف/بليستر`;
   }
 
   function openNewBatchModal() {
-    elFormNewBatch.reset();
-    inputIsCoated.value = 'false';
-    inputLotsCount.value = '1';
+    if (elFormNewBatch) elFormNewBatch.reset();
+    if (inputIsCoated) inputIsCoated.value = 'false';
+    if (inputLotsCount) inputLotsCount.value = '1';
     toggleCoatingFields();
 
     const today = new Date().toISOString().split('T')[0];
     const threeYearsLater = new Date();
     threeYearsLater.setFullYear(threeYearsLater.getFullYear() + 3);
-    inputStartDate.value = today;
-    inputExpDate.value = threeYearsLater.toISOString().split('T')[0];
+    if (inputStartDate) inputStartDate.value = today;
+    if (inputExpDate) inputExpDate.value = threeYearsLater.toISOString().split('T')[0];
 
-    elModalNewBatch.classList.remove('hidden');
+    if (elModalNewBatch) elModalNewBatch.classList.remove('hidden');
   }
 
   function closeNewBatchModal() {
-    elModalNewBatch.classList.add('hidden');
+    if (elModalNewBatch) elModalNewBatch.classList.add('hidden');
   }
 
   function handleNewBatchSubmit(e) {
@@ -601,8 +618,8 @@
     const preMg = parseFloat(inputPreCoatingWeight.value);
     const postMg = isCoated ? parseFloat(inputPostCoatingWeight.value) : preMg;
     const lCount = parseInt(inputLotsCount.value, 10) || 1;
-    const priorBatch = inputPriorBatchNo.value.trim();
-    const carryKg = parseFloat(inputCarryOverKg.value) || 0;
+    const priorBatch = inputPriorBatchNo ? inputPriorBatchNo.value.trim() : '';
+    const carryKg = inputCarryOverKg ? (parseFloat(inputCarryOverKg.value) || 0) : 0;
 
     const newBatch = {
       id: 'batch-' + Date.now(),
@@ -638,27 +655,29 @@
 
   function openBatchDetail(batchId) {
     activeBatchId = batchId;
-    const batch = batches.find(b => b.id === batchId);
-    if (!batch) return;
+    const batch = batches.find(b => b && b.id === batchId);
+    if (!batch || !Array.isArray(batch.stages) || batch.stages.length === 0) return;
 
-    activeStageIndex = batch.currentStageIndex;
+    activeStageIndex = (batch.currentStageIndex !== undefined && batch.currentStageIndex >= 0 && batch.currentStageIndex < batch.stages.length) ? batch.currentStageIndex : 0;
 
-    detailProductName.textContent = batch.productName;
-    detailBatchNo.textContent = batch.batchNo;
-    detailFormName.textContent = batch.pharmaFormLabel || FORM_LABELS_MAP[batch.pharmaForm];
-    detailTotalWeight.textContent = `${batch.totalWeightKg} كغ`;
+    if (detailProductName) detailProductName.textContent = batch.productName;
+    if (detailBatchNo) detailBatchNo.textContent = batch.batchNo;
+    if (detailFormName) detailFormName.textContent = batch.pharmaFormLabel || FORM_LABELS_MAP[batch.pharmaForm] || '-';
+    if (detailTotalWeight) detailTotalWeight.textContent = `${batch.totalWeightKg} كغ`;
 
     const lotWeight = (batch.totalWeightKg / (batch.lotsCount || 1)).toFixed(1);
-    detailLotsInfo.textContent = `${batch.lotsCount || 1} لوت (${lotWeight} كغ/لوت)`;
+    if (detailLotsInfo) detailLotsInfo.textContent = `${batch.lotsCount || 1} لوت (${lotWeight} كغ/لوت)`;
 
-    detailPriorBatchInfo.textContent = batch.priorBatchNo ? `#${batch.priorBatchNo} (${batch.carryOverKg} كغ)` : 'لا يوجد (باتش حديث)';
+    if (detailPriorBatchInfo) detailPriorBatchInfo.textContent = batch.priorBatchNo ? `#${batch.priorBatchNo} (${batch.carryOverKg} كغ)` : 'لا يوجد (باتش حديث)';
 
-    detailCoatingStatus.textContent = batch.isCoated ? 'ملبس بالفيلم' : 'غير ملبس';
-    detailTabletWeights.textContent = batch.isCoated ? 
-      `قبل: ${batch.preCoatingMg} ملغ | بعد: ${batch.postCoatingMg} ملغ` : 
-      `${batch.preCoatingMg || batch.unitWeightMg || 0} ملغ`;
+    if (detailCoatingStatus) detailCoatingStatus.textContent = batch.isCoated ? 'ملبس بالفيلم' : 'غير ملبس';
+    if (detailTabletWeights) {
+      detailTabletWeights.textContent = batch.isCoated ? 
+        `قبل: ${batch.preCoatingMg} ملغ | بعد: ${batch.postCoatingMg} ملغ` : 
+        `${batch.preCoatingMg || batch.unitWeightMg || 0} ملغ`;
+    }
 
-    detailUnitsPerBlister.textContent = `${batch.unitsPerBlister} وحدة`;
+    if (detailUnitsPerBlister) detailUnitsPerBlister.textContent = `${batch.unitsPerBlister} وحدة`;
 
     const mathTotal = PharmaMath.calculateTotals(
       batch.totalWeightKg,
@@ -669,27 +688,27 @@
       batch.lotsCount
     );
 
-    detailTotalBlisters.textContent = `${PharmaMath.formatNumber(mathTotal.totalBlisters)} ظرف`;
+    if (detailTotalBlisters) detailTotalBlisters.textContent = `${PharmaMath.formatNumber(mathTotal.totalBlisters)} ظرف`;
 
     renderWorkflowTimeline(batch);
     renderStageLogger(batch);
     renderHistoryList(batch);
 
-    elModalBatchDetail.classList.remove('hidden');
+    if (elModalBatchDetail) elModalBatchDetail.classList.remove('hidden');
     if (window.lucide) window.lucide.createIcons();
   }
 
   function closeBatchDetailModal() {
-    elModalBatchDetail.classList.add('hidden');
+    if (elModalBatchDetail) elModalBatchDetail.classList.add('hidden');
     activeBatchId = null;
   }
 
   window.deleteBatch = function(batchId) {
-    const batch = batches.find(b => b.id === batchId);
+    const batch = batches.find(b => b && b.id === batchId);
     const batchName = batch ? batch.productName : '';
     
     if (confirm(`هل أنت تأكد من إلغاء وحذف تشغيلة المنتج [${batchName}] نهائياً من خط الإنتاج والحجر؟`)) {
-      batches = batches.filter(b => b.id !== batchId);
+      batches = batches.filter(b => b && b.id !== batchId);
       saveBatches();
       if (activeBatchId === batchId) {
         closeBatchDetailModal();
@@ -699,6 +718,7 @@
   };
 
   function renderWorkflowTimeline(batch) {
+    if (!stagesTimeline || !batch || !Array.isArray(batch.stages)) return;
     stagesTimeline.innerHTML = '';
 
     batch.stages.forEach((stage, idx) => {
@@ -721,7 +741,7 @@
 
   function selectStage(index) {
     activeStageIndex = index;
-    const batch = batches.find(b => b.id === activeBatchId);
+    const batch = batches.find(b => b && b.id === activeBatchId);
     if (batch) {
       renderWorkflowTimeline(batch);
       renderStageLogger(batch);
@@ -734,30 +754,31 @@
    * In all other stages, inputs are Weight in Kg.
    */
   function renderStageLogger(batch) {
-    const stage = batch.stages[activeStageIndex];
+    if (!batch || !Array.isArray(batch.stages)) return;
+    const stage = batch.stages[activeStageIndex] || batch.stages[0];
     if (!stage) return;
 
-    logStageName.textContent = stage.name;
+    if (logStageName) logStageName.textContent = stage.name;
 
     const isBlisterStage = stage.id === 'blistering';
 
     if (isBlisterStage) {
-      labelLogAccepted.textContent = 'عدد الظروف/البليسترات المقبولة المضافة (ظرف PASS) *';
-      labelLogRejected.textContent = 'عدد الظروف المرفوضة/إعادة تشغيل (ظرف REJECTED) *';
-      inputLogAcceptedKg.placeholder = 'مثال: 500 ظرف مقبول';
-      inputLogRejectedKg.placeholder = 'مثال: 10 ظروف مرفوضة';
-      logConversionHint.textContent = 'مرحلة البليستر: يتم إدخال عدد الظروف مباشرة وتقوم المنظومة بتحويلها تلقائياً إلى الوزن المقابل بالكيلوغرام وتحديث أجهزة المعمل.';
+      if (labelLogAccepted) labelLogAccepted.textContent = 'عدد الظروف/البليسترات المقبولة المضافة (ظرف PASS) *';
+      if (labelLogRejected) labelLogRejected.textContent = 'عدد الظروف المرفوضة/إعادة تشغيل (ظرف REJECTED) *';
+      if (inputLogAcceptedKg) inputLogAcceptedKg.placeholder = 'مثال: 500 ظرف مقبول';
+      if (inputLogRejectedKg) inputLogRejectedKg.placeholder = 'مثال: 10 ظروف مرفوضة';
+      if (logConversionHint) logConversionHint.textContent = 'مرحلة البليستر: يتم إدخال عدد الظروف مباشرة وتقوم المنظومة بتحويلها تلقائياً إلى الوزن المقابل بالكيلوغرام وتحديث أجهزة المعمل.';
     } else {
-      labelLogAccepted.textContent = 'الكمية المقبولة/المطابقة المضافة (كغ) *';
-      labelLogRejected.textContent = 'الكمية المرفوضة/إعادة تشغيل (كغ) *';
-      inputLogAcceptedKg.placeholder = 'مثال: 18 كغ مقبول';
-      inputLogRejectedKg.placeholder = 'مثال: 2 كغ مرفوض';
-      logConversionHint.textContent = 'يتم إدخال الوزن بالكيلوغرام وتقوم المنظومة بتحويلها تلقائياً إلى أعداد ظروف ولوتات وتحديث كافة أجهزة المعمل.';
+      if (labelLogAccepted) labelLogAccepted.textContent = 'الكمية المقبولة/المطابقة المضافة (كغ) *';
+      if (labelLogRejected) labelLogRejected.textContent = 'الكمية المرفوضة/إعادة تشغيل (كغ) *';
+      if (inputLogAcceptedKg) inputLogAcceptedKg.placeholder = 'مثال: 18 كغ مقبول';
+      if (inputLogRejectedKg) inputLogRejectedKg.placeholder = 'مثال: 2 كغ مرفوض';
+      if (logConversionHint) logConversionHint.textContent = 'يتم إدخال الوزن بالكيلوغرام وتقوم المنظومة بتحويلها تلقائياً إلى أعداد ظروف ولوتات وتحديث كافة أجهزة المعمل.';
     }
 
-    const prevDoneKg = activeStageIndex > 0 ? batch.stages[activeStageIndex - 1].doneKg : batch.totalWeightKg;
+    const prevStage = (activeStageIndex > 0 && batch.stages[activeStageIndex - 1]) ? batch.stages[activeStageIndex - 1] : null;
+    const prevDoneKg = prevStage ? prevStage.doneKg : batch.totalWeightKg;
     const currentDoneKg = stage.doneKg;
-    const remKgInQuarantine = Math.max(0, prevDoneKg - currentDoneKg);
 
     const stageAccKg = stage.acceptedKg || 0;
     const stageRejKg = stage.rejectedKg || 0;
@@ -766,25 +787,26 @@
     const accMath = PharmaMath.kgToBlistersAndLots(stageAccKg, batch.isCoated, batch.preCoatingMg, batch.postCoatingMg, batch.unitsPerBlister, batch.totalWeightKg, batch.lotsCount);
     const rejMath = PharmaMath.kgToBlistersAndLots(stageRejKg, batch.isCoated, batch.preCoatingMg, batch.postCoatingMg, batch.unitsPerBlister, batch.totalWeightKg, batch.lotsCount);
 
-    logStageTotalKg.textContent = `${batch.totalWeightKg} كغ`;
-    logStageTotalBlisters.textContent = `(${totalMath.equivalentLots} لوت | ${PharmaMath.formatNumber(totalMath.totalBlisters)} ظرف)`;
+    if (logStageTotalKg) logStageTotalKg.textContent = `${batch.totalWeightKg} كغ`;
+    if (logStageTotalBlisters) logStageTotalBlisters.textContent = `(${totalMath.equivalentLots} لوت | ${PharmaMath.formatNumber(totalMath.totalBlisters)} ظرف)`;
 
-    logStageAcceptedKg.textContent = `${stageAccKg} كغ`;
-    logStageAcceptedBlisters.textContent = `(${PharmaMath.formatNumber(accMath.totalBlisters)} ظرف مقبول)`;
+    if (logStageAcceptedKg) logStageAcceptedKg.textContent = `${stageAccKg} كغ`;
+    if (logStageAcceptedBlisters) logStageAcceptedBlisters.textContent = `(${PharmaMath.formatNumber(accMath.totalBlisters)} ظرف مقبول)`;
 
-    logStageRejectedKg.textContent = `${stageRejKg} كغ`;
-    logStageRejectedBlisters.textContent = `(${PharmaMath.formatNumber(rejMath.totalBlisters)} ظرف مرفوض/إعادة تشغيل)`;
+    if (logStageRejectedKg) logStageRejectedKg.textContent = `${stageRejKg} كغ`;
+    if (logStageRejectedBlisters) logStageRejectedBlisters.textContent = `(${PharmaMath.formatNumber(rejMath.totalBlisters)} ظرف مرفوض/إعادة تشغيل)`;
 
-    inputLogAcceptedKg.value = '';
-    inputLogRejectedKg.value = '0';
+    if (inputLogAcceptedKg) inputLogAcceptedKg.value = '';
+    if (inputLogRejectedKg) inputLogRejectedKg.value = '0';
   }
 
   function handleUpdateStageSubmit(e) {
     e.preventDefault();
-    const batch = batches.find(b => b.id === activeBatchId);
-    if (!batch) return;
+    const batch = batches.find(b => b && b.id === activeBatchId);
+    if (!batch || !Array.isArray(batch.stages)) return;
 
     const stage = batch.stages[activeStageIndex];
+    if (!stage) return;
     const isBlisterStage = stage.id === 'blistering';
 
     let addAcceptedKg = 0;
@@ -818,10 +840,11 @@
       return;
     }
 
-    const prevDoneKg = activeStageIndex > 0 ? batch.stages[activeStageIndex - 1].doneKg : batch.totalWeightKg;
+    const prevStage = (activeStageIndex > 0 && batch.stages[activeStageIndex - 1]) ? batch.stages[activeStageIndex - 1] : null;
+    const prevDoneKg = prevStage ? prevStage.doneKg : batch.totalWeightKg;
     const maxAddableKg = Math.max(0, prevDoneKg - stage.doneKg);
 
-    if (addTotalKg > (maxAddableKg + 0.01)) { // Allow minor rounding float difference
+    if (addTotalKg > (maxAddableKg + 0.05)) { // Allow minor rounding float difference
       alert(`الكمية المتاحة كحد أقصى في الحجر/المرحلة السابقة هي ${maxAddableKg.toFixed(2)} كغ.`);
       return;
     }
@@ -840,6 +863,7 @@
       batch.currentStageIndex = activeStageIndex;
     }
 
+    if (!Array.isArray(batch.logs)) batch.logs = [];
     batch.logs.unshift({
       time: new Date().toLocaleString('ar-EG'),
       text: isBlisterStage ?
@@ -855,8 +879,9 @@
   }
 
   function renderHistoryList(batch) {
+    if (!stageHistoryList || !batch) return;
     stageHistoryList.innerHTML = '';
-    if (!batch.logs || batch.logs.length === 0) {
+    if (!Array.isArray(batch.logs) || batch.logs.length === 0) {
       stageHistoryList.innerHTML = '<p class="text-dim">لا توجد سجلات بعد.</p>';
       return;
     }
@@ -866,7 +891,7 @@
       item.className = 'history-item';
       item.innerHTML = `
         <span>${log.text}</span>
-        <span class="time">${log.time}</span>
+        <span class="time">${log.time || ''}</span>
       `;
       stageHistoryList.appendChild(item);
     });
