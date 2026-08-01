@@ -1,23 +1,27 @@
 /**
  * Main Application Logic for Pharma Production Tracker & Quarantine Inventory
- * Supports Partial Accepted & Rejected Quantities per Batch (No whole-batch tagging)
+ * Equipped with Multi-User Live Cloud Sync Engine (JSONBlob Shared Cloud Store)
  */
 
 (function () {
-  const STORAGE_KEY = 'pharma_production_batches_v6';
+  const LOCAL_STORAGE_KEY = 'pharma_production_batches_cloud_v2';
+  const CLOUD_API_ENDPOINT = 'https://jsonblob.com/api/jsonBlob/019fbc28-a28d-7950-a713-30c7bf9b6628';
 
-  // State
+  // Application State
   let batches = [];
   let currentFormFilter = 'all';
   let searchQuery = '';
   let activeBatchId = null;
   let activeStageIndex = 0;
+  let lastSyncHash = '';
+  let isSavingToCloud = false;
 
   // DOM Elements
   const elStatActiveBatches = document.getElementById('stat-active-batches');
   const elStatQuarantineWeight = document.getElementById('stat-quarantine-weight');
   const elStatPassBlisters = document.getElementById('stat-pass-blisters');
   const elStatReworkBlisters = document.getElementById('stat-rework-blisters');
+  const syncText = document.getElementById('sync-text');
 
   // Navigation Tabs
   const viewTabProduction = document.getElementById('view-tab-production');
@@ -98,13 +102,17 @@
   };
 
   function init() {
-    loadBatches();
+    loadBatchesLocal();
     setupEventListeners();
     renderApp();
+
+    // Start Live Multi-User Cloud Sync Engine
+    syncFromCloud();
+    setInterval(syncFromCloud, 2500); // Check for remote updates from other users every 2.5 seconds
   }
 
-  function loadBatches() {
-    const saved = localStorage.getItem(STORAGE_KEY);
+  function loadBatchesLocal() {
+    const saved = localStorage.getItem(LOCAL_STORAGE_KEY);
     if (saved) {
       try {
         batches = JSON.parse(saved);
@@ -113,12 +121,79 @@
       }
     } else {
       batches = [...window.DEFAULT_BATCHES];
-      saveBatches();
     }
   }
 
-  function saveBatches() {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(batches));
+  function saveBatches(triggerCloudUpload = true) {
+    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(batches));
+    if (triggerCloudUpload) {
+      pushToCloud();
+    }
+  }
+
+  /**
+   * Real-Time Multi-User Cloud Sync Engine
+   */
+  async function syncFromCloud() {
+    if (isSavingToCloud) return;
+
+    try {
+      const response = await fetch(CLOUD_API_ENDPOINT, {
+        method: 'GET',
+        headers: { 'Accept': 'application/json' }
+      });
+
+      if (response.ok) {
+        const cloudData = await response.json();
+        if (Array.isArray(cloudData)) {
+          const currentHash = JSON.stringify(cloudData);
+          if (currentHash !== lastSyncHash) {
+            lastSyncHash = currentHash;
+            batches = cloudData;
+            localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(batches));
+            renderApp();
+            if (activeBatchId) {
+              const activeBatch = batches.find(b => b.id === activeBatchId);
+              if (activeBatch) {
+                renderWorkflowTimeline(activeBatch);
+                renderStageLogger(activeBatch);
+                renderHistoryList(activeBatch);
+              } else {
+                closeBatchDetailModal();
+              }
+            }
+          }
+          if (syncText) syncText.textContent = 'مزامنة لحظية مباشرة بين الأجهزة (متصل 🟢)';
+        }
+      }
+    } catch (e) {
+      if (syncText) syncText.textContent = 'مزامنة محليّة';
+    }
+  }
+
+  async function pushToCloud() {
+    isSavingToCloud = true;
+    lastSyncHash = JSON.stringify(batches);
+    if (syncText) syncText.textContent = 'جاري رفع التعديلات للسحابة...';
+
+    try {
+      const response = await fetch(CLOUD_API_ENDPOINT, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify(batches)
+      });
+
+      if (response.ok) {
+        if (syncText) syncText.textContent = 'مزامنة لحظية مباشرة بين الأجهزة (متصل 🟢)';
+      }
+    } catch (e) {
+      if (syncText) syncText.textContent = 'محفوظ محلياً';
+    } finally {
+      isSavingToCloud = false;
+    }
   }
 
   function renderApp() {
@@ -128,9 +203,6 @@
     if (window.lucide) window.lucide.createIcons();
   }
 
-  /**
-   * Render Top Dashboard Stats calculating accepted and rejected blisters per batch
-   */
   function renderStats() {
     let totalBatches = batches.length;
     let quarantineWeight = 0;
@@ -143,7 +215,6 @@
       const currentDone = currentStage ? currentStage.doneKg : 0;
       quarantineWeight += Math.max(0, prevDone - currentDone);
 
-      // Sum accepted and rejected kg across all stages
       let bAcceptedKg = 0;
       let bRejectedKg = 0;
       b.stages.forEach(st => {
@@ -263,9 +334,6 @@
     });
   }
 
-  /**
-   * Render Dedicated Quarantine Inventory View with Accepted vs Rejected Quantities
-   */
   function renderQuarantineView() {
     elQuarantineGrid.innerHTML = '';
 
@@ -304,7 +372,6 @@
         materialState = 'مستحلب كريم بالحجر (بحاجة تعبئة أنابيب)';
       }
 
-      // Calculate cumulative accepted & rejected kg for this batch
       let accKgTotal = 0;
       let rejKgTotal = 0;
       batch.stages.forEach(s => {

@@ -13,6 +13,10 @@
   <!-- Lucide Icons -->
   <script src="https://unpkg.com/lucide@latest"></script>
   
+  <!-- Firebase Cloud SDKs for Multi-User Live Sync -->
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+
   <!-- Custom Styles -->
   <link rel="stylesheet" href="styles.css">
 </head>
@@ -32,6 +36,10 @@
       </div>
       
       <div class="navbar-actions">
+        <div class="cloud-sync-status" id="cloud-sync-indicator" title="حالة المزامنة السحابية المباشرة بين الأجهزة">
+          <span class="sync-dot active"></span>
+          <span id="sync-text">مزامنة سحابية لحظية</span>
+        </div>
         <button id="btn-new-batch" class="btn btn-primary">
           <i data-lucide="plus-circle"></i>
           <span>إضافة تشغيلة جديدة (Batch)</span>
@@ -71,9 +79,9 @@
             <i data-lucide="check-circle-2"></i>
           </div>
           <div class="stat-info">
-            <span class="stat-label">إجمالي الظروف المقبولة (PASS)</span>
+            <span class="stat-label">ظروف مطابقة (PASS)</span>
             <h2><span id="stat-pass-blisters">0</span> <small>ظرف</small></h2>
-            <span class="stat-desc">الظروف المطابقة الجاهزة</span>
+            <span class="stat-desc">كمية الظروف المقرة والمطابقة</span>
           </div>
         </div>
 
@@ -82,7 +90,7 @@
             <i data-lucide="alert-triangle"></i>
           </div>
           <div class="stat-info">
-            <span class="stat-label">إجمالي الظروف المرفوضة/إعادة تشغيل</span>
+            <span class="stat-label">ظروف غير مطابقة / إعادة تشغيل</span>
             <h2><span id="stat-rework-blisters">0</span> <small>ظرف</small></h2>
             <span class="stat-desc">ظروف بحاجة معالجة أو إعادة تشغيل</span>
           </div>
@@ -123,7 +131,7 @@
         <section class="batches-section">
           <div class="section-header">
             <h3>قائمة التشغيلات الحالية بالخطوط (<span id="batches-count">0</span>)</h3>
-            <span class="live-badge"><i data-lucide="activity"></i> تحديث ميداني مباشر</span>
+            <span class="live-badge"><i data-lucide="wifi"></i> مزامنة متعددة المستخدمين لحظياً</span>
           </div>
           <div id="batches-grid" class="batches-grid">
             <!-- Batches cards injected dynamically -->
@@ -138,7 +146,7 @@
             <div>
               <h3><i data-lucide="warehouse" style="color: var(--amber);"></i> شاشة محتويات الحجر والمستودع</h3>
               <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 0.2rem;">
-                عرض تفصيلي للكميات المقبولة (أخضر) والمرفوضة (أحمر) لكل منتج داخل الحجر.
+                عرض شامل لجميع الأصناف والمواد الموجودة داخل الحجر وحالتها الفيزيائية وجودتها (PASS / REJECTED بالظروف).
               </p>
             </div>
           </div>
@@ -360,7 +368,7 @@
                   <span>تسجيل الإنجاز وتحديث الحجر</span>
                 </button>
               </div>
-              <small class="help-text" id="log-conversion-hint">ستقوم المنظومة بتحويل الأوزان المقبولة والمرفوضة إلى أعداد ظروف ولوتات فعلية فوراً.</small>
+              <small class="help-text" id="log-conversion-hint">ستقوم المنظومة بتحويل الأوزان المقبولة والمرفوضة إلى أعداد ظروف ولوتات فعلية فوراً وتحديث جميع أجهزة الموظفين.</small>
             </form>
           </div>
 

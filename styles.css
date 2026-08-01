@@ -97,6 +97,39 @@ body {
   font-family: 'Outfit', var(--font-family);
 }
 
+.navbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+}
+
+.cloud-sync-status {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: rgba(16, 185, 129, 0.1);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  padding: 0.4rem 0.85rem;
+  border-radius: 20px;
+  font-size: 0.8rem;
+  color: var(--emerald);
+}
+
+.sync-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: var(--emerald);
+  box-shadow: 0 0 8px var(--emerald);
+  animation: pulse-green 2s infinite;
+}
+
+@keyframes pulse-green {
+  0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
+  70% { transform: scale(1.1); box-shadow: 0 0 0 6px rgba(16, 185, 129, 0); }
+  100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+}
+
 /* Buttons */
 .btn {
   display: inline-flex;
@@ -232,7 +265,7 @@ body {
   color: var(--text-dim);
 }
 
-/* View Navigation Bar (Production vs Quarantine) */
+/* View Navigation Bar */
 .view-nav-bar {
   display: flex;
   gap: 1rem;
@@ -534,7 +567,7 @@ body {
   color: var(--text-main);
 }
 
-/* Quality Status Badges (Green PASS vs Red REJECTED) */
+/* Quality Status Badges */
 .quality-badge {
   padding: 0.25rem 0.85rem;
   border-radius: 20px;
@@ -566,29 +599,6 @@ body {
   border-radius: var(--radius-lg);
   padding: 1.75rem;
 }
-
-.quarantine-filter-tabs {
-  display: flex;
-  gap: 0.5rem;
-}
-
-.q-filter-btn {
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid var(--border-color);
-  color: var(--text-muted);
-  padding: 0.4rem 1rem;
-  border-radius: var(--radius-md);
-  font-family: var(--font-family);
-  font-size: 0.85rem;
-  font-weight: 700;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.q-filter-btn:hover { background: rgba(255, 255, 255, 0.1); color: #fff; }
-.q-filter-btn.active { background: rgba(245, 158, 11, 0.15); border-color: rgba(245, 158, 11, 0.4); color: var(--amber); }
-.q-filter-btn.green.active { background: rgba(16, 185, 129, 0.15); border-color: rgba(16, 185, 129, 0.4); color: var(--emerald); }
-.q-filter-btn.red.active { background: rgba(244, 63, 94, 0.15); border-color: rgba(244, 63, 94, 0.4); color: var(--rose); }
 
 .quarantine-grid {
   display: grid;
@@ -652,7 +662,7 @@ body {
 
 .q-item-footer {
   display: flex;
-  justify-content: space-between;
+  justify-content: flex-end;
   align-items: center;
   border-top: 1px solid var(--border-color);
   padding-top: 0.75rem;
@@ -747,24 +757,6 @@ body {
   display: flex;
   flex-direction: column;
   gap: 1.5rem;
-}
-
-/* Quality Banner inside Detail Modal */
-.quality-control-banner {
-  background: rgba(0, 0, 0, 0.25);
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-md);
-  padding: 0.85rem 1.25rem;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.quality-status-text {
-  display: flex;
-  align-items: center;
-  gap: 0.85rem;
-  font-size: 0.9rem;
 }
 
 /* Form Styles */
@@ -1033,21 +1025,11 @@ body {
 }
 
 .logger-info-card.success { border-color: rgba(16, 185, 129, 0.4); }
-.logger-info-card.warning { border-color: rgba(245, 158, 11, 0.4); }
+.logger-info-card.warning { border-color: rgba(244, 63, 94, 0.4); }
 
 .logger-info-card span { font-size: 0.75rem; color: var(--text-muted); }
 .logger-info-card strong { font-size: 1.1rem; color: #fff; }
 .logger-info-card small { font-size: 0.75rem; color: var(--cyan); }
-
-.input-with-button {
-  display: flex;
-  gap: 0.75rem;
-  margin-top: 0.5rem;
-}
-
-.input-with-button input {
-  flex: 1;
-}
 
 .help-text {
   font-size: 0.75rem;
