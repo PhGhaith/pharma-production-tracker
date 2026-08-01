@@ -1,10 +1,10 @@
 /**
  * Main Application Logic for Pharma Production Tracker & Quarantine Inventory
- * Equipped with Stage Selection Locking & Resilient Cloud Persistence Engine
+ * Equipped with Stage Progress Preservation Engine (Prevents Zero-Reset Bug)
  */
 
 (function () {
-  const LOCAL_STORAGE_KEY = 'pharma_production_batches_cloud_v7';
+  const LOCAL_STORAGE_KEY = 'pharma_production_batches_cloud_v8';
   const CLOUD_API_ENDPOINT = 'https://jsonblob.com/api/jsonBlob/019fbcfc-d91b-763f-b994-cef4a06d8216';
 
   // Application State
@@ -120,7 +120,7 @@
     setupEventListeners();
     renderApp();
 
-    // Start Unified Multi-User Cloud Engine
+    // Start Unified Cloud Sync Engine
     syncFromCloud();
     setInterval(syncFromCloud, 8000);
 
@@ -153,7 +153,8 @@
   }
 
   /**
-   * Resilient Cloud Engine with ID-Preserving Merge & No Size Cap
+   * Resilient Cloud Engine with Stage-Progress Preservation
+   * Prevents any stage achievement from being overwritten back to zero by stale cloud responses
    */
   async function syncFromCloud() {
     if (isSavingToCloud) return;
@@ -172,35 +173,50 @@
       if (response.ok) {
         const cloudData = await response.json();
         if (Array.isArray(cloudData)) {
-          // Union merge by ID: Ensure local new items are preserved and pushed if missing from cloud
           const batchMap = new Map();
           let needsPush = false;
 
-          // Add local items first
+          // Local batches first
           batches.forEach(b => {
-            if (b && b.id) batchMap.set(String(b.id), b);
+            if (b && b.id) batchMap.set(String(b.id), JSON.parse(JSON.stringify(b)));
           });
 
-          // Override/merge with cloud items
-          cloudData.forEach(b => {
-            if (b && b.id) {
-              const existing = batchMap.get(String(b.id));
-              if (!existing) {
-                batchMap.set(String(b.id), b);
-              } else {
-                const existingLogsCount = (existing.logs || []).length;
-                const cloudLogsCount = (b.logs || []).length;
-                if (cloudLogsCount >= existingLogsCount) {
-                  batchMap.set(String(b.id), b);
-                }
+          // Merge cloud batches with smart stage preservation
+          cloudData.forEach(cloudBatch => {
+            if (!cloudBatch || !cloudBatch.id) return;
+            const key = String(cloudBatch.id);
+            const localBatch = batchMap.get(key);
+
+            if (!localBatch) {
+              batchMap.set(key, cloudBatch);
+            } else {
+              // Smart Stage Progress Preservation: Higher doneKg or logs count wins!
+              if (Array.isArray(localBatch.stages) && Array.isArray(cloudBatch.stages)) {
+                localBatch.stages.forEach((localSt, idx) => {
+                  const cloudSt = cloudBatch.stages[idx];
+                  if (cloudSt) {
+                    if ((localSt.doneKg || 0) > (cloudSt.doneKg || 0)) {
+                      cloudSt.doneKg = localSt.doneKg;
+                      cloudSt.acceptedKg = localSt.acceptedKg;
+                      cloudSt.rejectedKg = localSt.rejectedKg;
+                      cloudSt.status = localSt.status;
+                      needsPush = true;
+                    }
+                  }
+                });
               }
+
+              // Compare logs count
+              const localLogs = localBatch.logs || [];
+              const cloudLogs = cloudBatch.logs || [];
+              if (localLogs.length > cloudLogs.length) {
+                cloudBatch.logs = localLogs;
+                needsPush = true;
+              }
+
+              batchMap.set(key, cloudBatch);
             }
           });
-
-          // Check if local had new batches not in cloud yet
-          if (batchMap.size > cloudData.length) {
-            needsPush = true;
-          }
 
           const mergedBatches = Array.from(batchMap.values());
           const currentHash = JSON.stringify(mergedBatches);
@@ -237,7 +253,7 @@
   async function pushToCloud() {
     isSavingToCloud = true;
     lastSyncHash = JSON.stringify(batches);
-    if (syncText) syncText.textContent = 'جاري مزامنة السحابة وكافة الأجهزة...';
+    if (syncText) syncText.textContent = 'جاري حفظ الإنجاز ومزامنة السحابة...';
 
     try {
       const response = await fetch(CLOUD_API_ENDPOINT, {
@@ -824,8 +840,7 @@
   }
 
   /**
-   * Select Stage and PERSIST currentStageIndex on batch object
-   * Ensures the user's selected stage is remembered and NEVER reset back to stage 0!
+   * Select Stage & Lock currentStageIndex to prevent resetting
    */
   function selectStage(index) {
     activeStageIndex = index;
@@ -833,7 +848,7 @@
     const batch = batches.find(b => b && String(b.id) === String(activeBatchId));
     if (batch) {
       batch.currentStageIndex = index;
-      saveBatches(false); // Save locally
+      saveBatches(true); // Save & Push to Cloud
       renderWorkflowTimeline(batch);
       renderStageLogger(batch);
     }
@@ -949,7 +964,7 @@
       });
 
       isEditCorrectionMode = false;
-      saveBatches();
+      saveBatches(true);
       renderWorkflowTimeline(batch);
       renderStageLogger(batch);
       renderHistoryList(batch);
@@ -1014,7 +1029,7 @@
         `تسجيل إنجاز بمرحلة [${stage.name}]: (${addAcceptedKg} كغ مقبول = ${PharmaMath.formatNumber(addAcceptedBlisters)} ظرف) و (${addRejectedKg} كغ مرفوض = ${PharmaMath.formatNumber(addRejectedBlisters)} ظرف).`
     });
 
-    saveBatches();
+    saveBatches(true); // Save locally & push immediately to cloud
     renderWorkflowTimeline(batch);
     renderStageLogger(batch);
     renderHistoryList(batch);
