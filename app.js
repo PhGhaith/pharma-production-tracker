@@ -1,23 +1,11 @@
 /**
  * Main Application Logic for Pharma Production Tracker & Quarantine Inventory
- * Master Data Safety Engine with Auto-Recovery & Backup/Restore JSON Support
+ * Pure Single Source of Truth Cloud Engine (100% Real-Time Data Integration Across All Users)
  */
 
 (function () {
   const MASTER_STORAGE_KEY = 'pharma_production_batches_master_v1';
-  const PREVIOUS_STORAGE_KEYS = [
-    'pharma_production_batches_cloud_v8',
-    'pharma_production_batches_cloud_v7',
-    'pharma_production_batches_cloud_v6',
-    'pharma_production_batches_cloud_v5',
-    'pharma_production_batches_cloud_v4',
-    'pharma_production_batches_cloud_v3',
-    'pharma_production_batches_cloud_v2',
-    'pharma_production_batches_cloud_v1',
-    'pharma_production_batches_v1'
-  ];
-
-  const CLOUD_API_ENDPOINT = 'https://jsonblob.com/api/jsonBlob/019fbcfc-d91b-763f-b994-cef4a06d8216';
+  const CLOUD_API_ENDPOINT = 'https://jsonblob.com/api/jsonBlob/019fbd4f-e4fb-7718-89a0-2dbca17ce9d3';
 
   // Application State
   let batches = [];
@@ -137,20 +125,16 @@
     setupEventListeners();
     renderApp();
 
-    // Start Unified Multi-User Cloud Engine
+    // Start Pure Cloud Integration Engine (Sync every 4 seconds)
     syncFromCloud();
-    setInterval(syncFromCloud, 8000);
+    setInterval(syncFromCloud, 4000);
 
     window.addEventListener('focus', () => {
       syncFromCloud();
     });
   }
 
-  /**
-   * Auto-Recover User Data across all previous version keys!
-   */
   function loadBatchesLocal() {
-    // 1. Try master key
     const masterSaved = localStorage.getItem(MASTER_STORAGE_KEY);
     if (masterSaved) {
       try {
@@ -161,33 +145,6 @@
         }
       } catch (e) {}
     }
-
-    // 2. Scan and aggregate all previous version keys to prevent data loss
-    const recoveredMap = new Map();
-    PREVIOUS_STORAGE_KEYS.forEach(key => {
-      const prevData = localStorage.getItem(key);
-      if (prevData) {
-        try {
-          const parsedArr = JSON.parse(prevData);
-          if (Array.isArray(parsedArr)) {
-            parsedArr.forEach(b => {
-              if (b && b.id) {
-                if (!recoveredMap.has(String(b.id))) {
-                  recoveredMap.set(String(b.id), b);
-                }
-              }
-            });
-          }
-        } catch (e) {}
-      }
-    });
-
-    if (recoveredMap.size > 0) {
-      batches = Array.from(recoveredMap.values());
-      localStorage.setItem(MASTER_STORAGE_KEY, JSON.stringify(batches));
-      return;
-    }
-
     batches = [...window.DEFAULT_BATCHES];
   }
 
@@ -198,9 +155,6 @@
     }
   }
 
-  /**
-   * Export Backup JSON File
-   */
   function exportBackupData() {
     const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(batches, null, 2));
     const downloadAnchor = document.createElement('a');
@@ -212,9 +166,6 @@
     downloadAnchor.remove();
   }
 
-  /**
-   * Import Backup JSON File
-   */
   function importBackupData(e) {
     const file = e.target.files[0];
     if (!file) return;
@@ -227,7 +178,7 @@
           batches = importedData;
           saveBatches(true);
           renderApp();
-          alert(`تم استرجاع النسخة الاحتياطية بنجاح! تم تحميل (${batches.length}) تشغيلة صيدلانية وتحديث السحابة فوراً.`);
+          alert(`تم استرجاع النسخة الاحتياطية بنجاح! تم تحميل (${batches.length}) تشغيلة صيدلانية وتحديث كافة أجهزة الأفراد فوراً.`);
         } else {
           alert('تنسيق ملف النسخة الاحتياطية غير صحيح.');
         }
@@ -240,7 +191,8 @@
   }
 
   /**
-   * Resilient Cloud Engine with Stage-Progress Preservation
+   * Pure Single Source of Truth Cloud Engine
+   * Ensures 100% identical data integration across ALL users & devices
    */
   async function syncFromCloud() {
     if (isSavingToCloud) return;
@@ -251,64 +203,14 @@
         headers: { 'Accept': 'application/json' }
       });
 
-      if (response.status === 429) {
-        if (syncText) syncText.textContent = 'مزامنة محليّة وسحابية (متصل 🟢)';
-        return;
-      }
-
       if (response.ok) {
         const cloudData = await response.json();
         if (Array.isArray(cloudData)) {
-          const batchMap = new Map();
-          let needsPush = false;
-
-          // Local batches first
-          batches.forEach(b => {
-            if (b && b.id) batchMap.set(String(b.id), JSON.parse(JSON.stringify(b)));
-          });
-
-          // Merge cloud batches with smart stage preservation
-          cloudData.forEach(cloudBatch => {
-            if (!cloudBatch || !cloudBatch.id) return;
-            const key = String(cloudBatch.id);
-            const localBatch = batchMap.get(key);
-
-            if (!localBatch) {
-              batchMap.set(key, cloudBatch);
-            } else {
-              // Smart Stage Progress Preservation
-              if (Array.isArray(localBatch.stages) && Array.isArray(cloudBatch.stages)) {
-                localBatch.stages.forEach((localSt, idx) => {
-                  const cloudSt = cloudBatch.stages[idx];
-                  if (cloudSt) {
-                    if ((localSt.doneKg || 0) > (cloudSt.doneKg || 0)) {
-                      cloudSt.doneKg = localSt.doneKg;
-                      cloudSt.acceptedKg = localSt.acceptedKg;
-                      cloudSt.rejectedKg = localSt.rejectedKg;
-                      cloudSt.status = localSt.status;
-                      needsPush = true;
-                    }
-                  }
-                });
-              }
-
-              const localLogs = localBatch.logs || [];
-              const cloudLogs = cloudBatch.logs || [];
-              if (localLogs.length > cloudLogs.length) {
-                cloudBatch.logs = localLogs;
-                needsPush = true;
-              }
-
-              batchMap.set(key, cloudBatch);
-            }
-          });
-
-          const mergedBatches = Array.from(batchMap.values());
-          const currentHash = JSON.stringify(mergedBatches);
+          const currentHash = JSON.stringify(cloudData);
 
           if (currentHash !== lastSyncHash) {
             lastSyncHash = currentHash;
-            batches = mergedBatches;
+            batches = cloudData;
             localStorage.setItem(MASTER_STORAGE_KEY, JSON.stringify(batches));
             renderApp();
 
@@ -322,12 +224,8 @@
                 closeBatchDetailModal();
               }
             }
-
-            if (needsPush) {
-              pushToCloud();
-            }
           }
-          if (syncText) syncText.textContent = 'مزامنة لحظية مباشرة بين الأجهزة (متصل 🟢)';
+          if (syncText) syncText.textContent = 'متصل بالسحابة الموحدة 🟢 (تكامل تام بين جميع الأشخاص)';
         }
       }
     } catch (e) {
@@ -338,7 +236,7 @@
   async function pushToCloud() {
     isSavingToCloud = true;
     lastSyncHash = JSON.stringify(batches);
-    if (syncText) syncText.textContent = 'جاري حفظ البيانات ومزامنة كافة الأجهزة...';
+    if (syncText) syncText.textContent = 'جاري التحديث وتكامل البيانات مع جميع المستخدمين...';
 
     try {
       const response = await fetch(CLOUD_API_ENDPOINT, {
@@ -351,7 +249,7 @@
       });
 
       if (response.ok) {
-        if (syncText) syncText.textContent = 'مزامنة لحظية مباشرة بين الأجهزة (متصل 🟢)';
+        if (syncText) syncText.textContent = 'متصل بالسحابة الموحدة 🟢 (تكامل تام بين جميع الأشخاص)';
       } else {
         if (syncText) syncText.textContent = 'محفوظ محلياً (سيتم المزامنة عند الجاهزية)';
       }
@@ -834,7 +732,7 @@
     };
 
     batches.unshift(newBatch);
-    saveBatches();
+    saveBatches(true);
     closeNewBatchModal();
     renderApp();
   }
@@ -898,7 +796,7 @@
     
     if (confirm(`هل أنت تأكد من إلغاء وحذف تشغيلة المنتج [${batchName}] نهائياً من خط الإنتاج والحجر؟`)) {
       batches = batches.filter(b => b && String(b.id) !== String(batchId));
-      saveBatches();
+      saveBatches(true);
       if (String(activeBatchId) === String(batchId)) {
         closeBatchDetailModal();
       }
