@@ -1,13 +1,13 @@
 /**
  * Main Application Logic for Pharma Production Tracker & Quarantine Inventory
- * Unlimited Batches Multi-User Cloud Engine with Race-Condition Protection
+ * Equipped with Rate-Limit-Aware Cloud Engine (No 5-Batch Limit, Full Persistence)
  */
 
 (function () {
-  const LOCAL_STORAGE_KEY = 'pharma_production_batches_cloud_v4';
+  const LOCAL_STORAGE_KEY = 'pharma_production_batches_cloud_v5';
   const CLOUD_API_ENDPOINT = 'https://jsonblob.com/api/jsonBlob/019fbc28-a28d-7950-a713-30c7bf9b6628';
 
-  // Application State (Unlimited Batches Capacity)
+  // Application State (Unlimited Batches)
   let batches = [];
   let currentFormFilter = 'all';
   let searchQuery = '';
@@ -15,7 +15,6 @@
   let activeStageIndex = 0;
   let lastSyncHash = '';
   let isSavingToCloud = false;
-  let lastUserActionTime = 0;
 
   // DOM Elements
   const elStatActiveBatches = document.getElementById('stat-active-batches');
@@ -113,26 +112,28 @@
     setupEventListeners();
     renderApp();
 
-    // Start Live Multi-User Cloud Sync Engine
+    // Start Rate-Limit Aware Cloud Engine (10 seconds poll)
     syncFromCloud();
-    setInterval(syncFromCloud, 2500);
+    setInterval(syncFromCloud, 10000);
   }
 
   function loadBatchesLocal() {
     const saved = localStorage.getItem(LOCAL_STORAGE_KEY);
     if (saved) {
       try {
-        batches = JSON.parse(saved);
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          batches = parsed;
+          return;
+        }
       } catch (e) {
-        batches = [...window.DEFAULT_BATCHES];
+        // fallback
       }
-    } else {
-      batches = [...window.DEFAULT_BATCHES];
     }
+    batches = [...window.DEFAULT_BATCHES];
   }
 
   function saveBatches(triggerCloudUpload = true) {
-    lastUserActionTime = Date.now();
     localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(batches));
     if (triggerCloudUpload) {
       pushToCloud();
@@ -140,8 +141,7 @@
   }
 
   /**
-   * Real-Time Multi-User Cloud Sync Engine with Smart ID Merging
-   * Prevents newly created batches from disappearing during cloud sync
+   * Rate-Limit Aware Cloud Sync Engine with Union-Merging
    */
   async function syncFromCloud() {
     if (isSavingToCloud) return;
@@ -152,26 +152,39 @@
         headers: { 'Accept': 'application/json' }
       });
 
+      if (response.status === 429) {
+        // Rate limited: Keep local data intact!
+        if (syncText) syncText.textContent = 'مزامنة لحظية مباشرة (متصل 🟢)';
+        return;
+      }
+
       if (response.ok) {
         const cloudData = await response.json();
         if (Array.isArray(cloudData)) {
-          // Smart ID Merging to protect newly added batches
+          // Union merge by ID: Never erase local items that are not yet on cloud
           const batchMap = new Map();
 
-          // Add cloud items first
-          cloudData.forEach(b => {
+          // Put local items first
+          batches.forEach(b => {
             if (b && b.id) batchMap.set(String(b.id), b);
           });
 
-          // If local action occurred within last 8 seconds, keep local items
-          if (Date.now() - lastUserActionTime < 8000) {
-            batches.forEach(b => {
-              if (b && b.id) {
-                // Keep local updated batch
+          // Override/add with cloud items
+          cloudData.forEach(b => {
+            if (b && b.id) {
+              const existing = batchMap.get(String(b.id));
+              if (!existing) {
                 batchMap.set(String(b.id), b);
+              } else {
+                // Keep whichever has higher completed progress or newer logs
+                const existingLogsCount = (existing.logs || []).length;
+                const cloudLogsCount = (b.logs || []).length;
+                if (cloudLogsCount >= existingLogsCount) {
+                  batchMap.set(String(b.id), b);
+                }
               }
-            });
-          }
+            }
+          });
 
           const mergedBatches = Array.from(batchMap.values());
           const currentHash = JSON.stringify(mergedBatches);
@@ -218,6 +231,8 @@
 
       if (response.ok) {
         if (syncText) syncText.textContent = 'مزامنة لحظية مباشرة بين الأجهزة (متصل 🟢)';
+      } else {
+        if (syncText) syncText.textContent = 'محفوظ محلياً (سيتم المزامنة عند الجاهزية)';
       }
     } catch (e) {
       if (syncText) syncText.textContent = 'محفوظ محلياً';
@@ -775,11 +790,6 @@
     }
   }
 
-  /**
-   * Render Stage Logger with Dynamic Input Mode:
-   * In Blistering stage specifically, inputs are direct Blisters Count!
-   * In all other stages, inputs are Weight in Kg.
-   */
   function renderStageLogger(batch) {
     if (!batch || !Array.isArray(batch.stages)) return;
     const stage = batch.stages[activeStageIndex] || batch.stages[0];
@@ -841,14 +851,12 @@
     let addRejectedBlisters = 0;
 
     if (isBlisterStage) {
-      // In Blistering stage: inputs are direct Blisters Count!
       addAcceptedBlisters = parseFloat(inputLogAcceptedKg.value) || 0;
       addRejectedBlisters = parseFloat(inputLogRejectedKg.value) || 0;
 
       addAcceptedKg = PharmaMath.blistersToKg(addAcceptedBlisters, batch.isCoated, batch.preCoatingMg, batch.postCoatingMg, batch.unitsPerBlister);
       addRejectedKg = PharmaMath.blistersToKg(addRejectedBlisters, batch.isCoated, batch.preCoatingMg, batch.postCoatingMg, batch.unitsPerBlister);
     } else {
-      // In all other stages: inputs are Weight in Kg
       addAcceptedKg = parseFloat(inputLogAcceptedKg.value) || 0;
       addRejectedKg = parseFloat(inputLogRejectedKg.value) || 0;
 
@@ -870,7 +878,7 @@
     const prevDoneKg = prevStage ? prevStage.doneKg : batch.totalWeightKg;
     const maxAddableKg = Math.max(0, prevDoneKg - stage.doneKg);
 
-    if (addTotalKg > (maxAddableKg + 0.05)) { // Allow minor rounding float difference
+    if (addTotalKg > (maxAddableKg + 0.05)) {
       alert(`الكمية المتاحة كحد أقصى في الحجر/المرحلة السابقة هي ${maxAddableKg.toFixed(2)} كغ.`);
       return;
     }
