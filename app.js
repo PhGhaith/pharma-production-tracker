@@ -1,6 +1,6 @@
 /**
  * Main Application Logic for Pharma Production Tracker & Quarantine Inventory
- * Multi-User Real-Time Cloud Sync Engine with Robust Defensive Error Handling
+ * Multi-User Real-Time Cloud Sync Engine with Loose ID String Coercion
  */
 
 (function () {
@@ -156,7 +156,7 @@
             localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(batches));
             renderApp();
             if (activeBatchId) {
-              const activeBatch = batches.find(b => b.id === activeBatchId);
+              const activeBatch = batches.find(b => b && String(b.id) === String(activeBatchId));
               if (activeBatch) {
                 renderWorkflowTimeline(activeBatch);
                 renderStageLogger(activeBatch);
@@ -655,7 +655,8 @@
 
   function openBatchDetail(batchId) {
     activeBatchId = batchId;
-    const batch = batches.find(b => b && b.id === batchId);
+    // Loose ID String Coercion to support numeric/string batch IDs seamlessly!
+    const batch = batches.find(b => b && String(b.id) === String(batchId));
     if (!batch || !Array.isArray(batch.stages) || batch.stages.length === 0) return;
 
     activeStageIndex = (batch.currentStageIndex !== undefined && batch.currentStageIndex >= 0 && batch.currentStageIndex < batch.stages.length) ? batch.currentStageIndex : 0;
@@ -704,13 +705,13 @@
   }
 
   window.deleteBatch = function(batchId) {
-    const batch = batches.find(b => b && b.id === batchId);
+    const batch = batches.find(b => b && String(b.id) === String(batchId));
     const batchName = batch ? batch.productName : '';
     
     if (confirm(`هل أنت تأكد من إلغاء وحذف تشغيلة المنتج [${batchName}] نهائياً من خط الإنتاج والحجر؟`)) {
-      batches = batches.filter(b => b && b.id !== batchId);
+      batches = batches.filter(b => b && String(b.id) !== String(batchId));
       saveBatches();
-      if (activeBatchId === batchId) {
+      if (String(activeBatchId) === String(batchId)) {
         closeBatchDetailModal();
       }
       renderApp();
@@ -741,7 +742,7 @@
 
   function selectStage(index) {
     activeStageIndex = index;
-    const batch = batches.find(b => b && b.id === activeBatchId);
+    const batch = batches.find(b => b && String(b.id) === String(activeBatchId));
     if (batch) {
       renderWorkflowTimeline(batch);
       renderStageLogger(batch);
@@ -802,7 +803,7 @@
 
   function handleUpdateStageSubmit(e) {
     e.preventDefault();
-    const batch = batches.find(b => b && b.id === activeBatchId);
+    const batch = batches.find(b => b && String(b.id) === String(activeBatchId));
     if (!batch || !Array.isArray(batch.stages)) return;
 
     const stage = batch.stages[activeStageIndex];
