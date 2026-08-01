@@ -1,30 +1,25 @@
 /**
- * PharmaMath Utility Module
- * Handles Unit Conversion Math between Batch Weight (Kg),
- * Film Coating Status (Is Coated), Tablet Weights (mg),
- * Lots Count (عدد اللوتات/التشغيلات الفرعية), and Blister Counts.
+ * PharmaMath - Core Calculation Engine for Pharmaceutical Batches
  */
 
-window.PharmaMath = {
+const PharmaMath = {
   /**
-   * Calculates Total Tablets, Total Blisters, and Lot Weight.
-   * @param {number} weightKg - Total batch weight in Kilograms
-   * @param {boolean} isCoated - Whether product is film coated
-   * @param {number} preCoatingMg - Weight before coating (or single unit weight)
-   * @param {number} postCoatingMg - Weight after coating (used if isCoated is true)
-   * @param {number} unitsPerBlister - Count of units per blister
-   * @param {number} lotsCount - Total lots count in batch
-   * @returns {{ totalTablets: number, totalBlisters: number, lotWeightKg: number }}
+   * Calculates total dosage units, total blisters, and lot weights
    */
-  calculateTotals(weightKg, isCoated, preCoatingMg, postCoatingMg, unitsPerBlister, lotsCount) {
-    const wKg = parseFloat(weightKg) || 0;
+  calculateTotals: function (totalWeightKg, isCoated, preCoatingMg, postCoatingMg, unitsPerBlister, lotsCount = 1) {
+    const wKg = parseFloat(totalWeightKg) || 0;
     const preMg = parseFloat(preCoatingMg) || 0;
     const postMg = isCoated ? (parseFloat(postCoatingMg) || preMg) : preMg;
     const uPerBlister = parseInt(unitsPerBlister, 10) || 1;
     const lCount = parseInt(lotsCount, 10) || 1;
 
     if (wKg <= 0 || postMg <= 0 || uPerBlister <= 0) {
-      return { totalTablets: 0, totalBlisters: 0, lotWeightKg: 0 };
+      return {
+        lotWeightKg: 0,
+        totalTablets: 0,
+        totalBlisters: 0,
+        unitWeightMgUsed: postMg
+      };
     }
 
     const totalWeightMg = wKg * 1000000;
@@ -32,30 +27,60 @@ window.PharmaMath = {
     const totalBlisters = Math.floor(totalTablets / uPerBlister);
     const lotWeightKg = wKg / lCount;
 
-    return { totalTablets, totalBlisters, lotWeightKg };
-  },
-
-  /**
-   * Calculates Equivalent Blisters and Lots for a slice of weight (Kg)
-   */
-  kgToBlistersAndLots(kg, isCoated, preCoatingMg, postCoatingMg, unitsPerBlister, totalBatchKg, lotsCount) {
-    const res = this.calculateTotals(kg, isCoated, preCoatingMg, postCoatingMg, unitsPerBlister, lotsCount);
-    const lCount = parseInt(lotsCount, 10) || 1;
-    const lotWeightKg = (parseFloat(totalBatchKg) || 1) / lCount;
-    const equivalentLots = lotWeightKg > 0 ? (parseFloat(kg) || 0) / lotWeightKg : 0;
-
     return {
-      totalTablets: res.totalTablets,
-      totalBlisters: res.totalBlisters,
-      equivalentLots: parseFloat(equivalentLots.toFixed(2))
+      lotWeightKg,
+      totalTablets,
+      totalBlisters,
+      unitWeightMgUsed: postMg
     };
   },
 
   /**
-   * Formats numbers with localized Arabic format
+   * Converts Kg to equivalent Blisters and Lots
    */
-  formatNumber(num) {
+  kgToBlistersAndLots: function (kgProgress, isCoated, preCoatingMg, postCoatingMg, unitsPerBlister, totalBatchWeightKg, totalLotsCount = 1) {
+    const pKg = parseFloat(kgProgress) || 0;
+    const totals = this.calculateTotals(pKg, isCoated, preCoatingMg, postCoatingMg, unitsPerBlister, 1);
+    
+    const lotWeight = (parseFloat(totalBatchWeightKg) || 1) / (parseInt(totalLotsCount, 10) || 1);
+    const equivalentLots = (pKg / lotWeight).toFixed(2);
+
+    return {
+      equivalentLots: parseFloat(equivalentLots),
+      totalBlisters: totals.totalBlisters,
+      totalTablets: totals.totalTablets
+    };
+  },
+
+  /**
+   * Converts Blisters Count back to equivalent Weight in Kg (specifically for Blistering stage)
+   */
+  blistersToKg: function (blistersCount, isCoated, preCoatingMg, postCoatingMg, unitsPerBlister) {
+    const bCount = parseFloat(blistersCount) || 0;
+    const preMg = parseFloat(preCoatingMg) || 0;
+    const postMg = isCoated ? (parseFloat(postCoatingMg) || preMg) : preMg;
+    const uPerBlister = parseInt(unitsPerBlister, 10) || 1;
+
+    if (bCount <= 0 || postMg <= 0 || uPerBlister <= 0) {
+      return 0;
+    }
+
+    const totalUnits = bCount * uPerBlister;
+    const totalMg = totalUnits * postMg;
+    const weightKg = totalMg / 1000000;
+
+    return parseFloat(weightKg.toFixed(3));
+  },
+
+  /**
+   * Formats numbers with commas
+   */
+  formatNumber: function (num) {
     if (isNaN(num)) return '0';
-    return Math.round(num).toLocaleString('ar-EG');
+    return num.toLocaleString('ar-EG');
   }
 };
+
+if (typeof window !== 'undefined') {
+  window.PharmaMath = PharmaMath;
+}

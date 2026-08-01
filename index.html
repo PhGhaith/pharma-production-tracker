@@ -12,13 +12,9 @@
   
   <!-- Lucide Icons -->
   <script src="https://unpkg.com/lucide@latest"></script>
-  
-  <!-- Firebase Cloud SDKs for Multi-User Live Sync -->
-  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 
-  <!-- Custom Styles -->
-  <link rel="stylesheet" href="styles.css">
+  <!-- Custom Styles with cache-busting -->
+  <link rel="stylesheet" href="styles.css?v=3.0">
 </head>
 <body>
   <div id="app" class="app-container">
@@ -38,7 +34,7 @@
       <div class="navbar-actions">
         <div class="cloud-sync-status" id="cloud-sync-indicator" title="حالة المزامنة السحابية المباشرة بين الأجهزة">
           <span class="sync-dot active"></span>
-          <span id="sync-text">مزامنة سحابية لحظية</span>
+          <span id="sync-text">مزامنة سحابية لحظية 🟢</span>
         </div>
         <button id="btn-new-batch" class="btn btn-primary">
           <i data-lucide="plus-circle"></i>
@@ -213,6 +209,17 @@
               <input type="number" min="1" id="input-lots-count" placeholder="مثال: 5" value="1" required>
             </div>
 
+            <!-- Prior Batch Carry-Over Section -->
+            <div class="form-group">
+              <label for="input-prior-batch-no">رقم الباتش السابق المنقول منه (إن وجد)</label>
+              <input type="text" id="input-prior-batch-no" placeholder="مثال: B-2026-802">
+            </div>
+
+            <div class="form-group">
+              <label for="input-carry-over-kg">الكمية المنقولة من الباتش السابق (كغ)</label>
+              <input type="number" step="0.1" id="input-carry-over-kg" placeholder="مثال: 4.5 كغ">
+            </div>
+
             <div class="form-group" id="group-pre-coating-weight">
               <label for="input-pre-coating-weight" id="label-pre-coating-weight">وزن المضغوطة/الوحدة (ملغ mg) *</label>
               <input type="number" step="0.1" id="input-pre-coating-weight" placeholder="مثال: 95" required>
@@ -298,16 +305,16 @@
               <strong id="detail-lots-info">0 لوت</strong>
             </div>
             <div class="meta-card">
+              <span class="meta-label">الباتش السابق المنقول منه</span>
+              <strong id="detail-prior-batch-info">-</strong>
+            </div>
+            <div class="meta-card">
               <span class="meta-label">حالة التلبيس</span>
               <strong id="detail-coating-status">-</strong>
             </div>
             <div class="meta-card">
               <span class="meta-label">وزن المضغوطة</span>
               <strong id="detail-tablet-weights">0 ملغ</strong>
-            </div>
-            <div class="meta-card">
-              <span class="meta-label">المضغوطات بالظرف</span>
-              <strong id="detail-units-per-blister">0 وحدة</strong>
             </div>
             <div class="meta-card highlight">
               <span class="meta-label">إجمالي البليسترات الكلية</span>
@@ -323,7 +330,7 @@
             </div>
           </div>
 
-          <!-- Active Stage Progress Logger Box with Partial Accepted/Rejected Inputs -->
+          <!-- Active Stage Progress Logger Box with Dynamic Input Mode (Kg or Blister Count) -->
           <div class="stage-logger-box">
             <div class="logger-header">
               <i data-lucide="sliders"></i>
@@ -353,11 +360,11 @@
             <form id="form-update-stage" class="logger-form">
               <div class="form-grid">
                 <div class="form-group">
-                  <label for="input-log-accepted-kg" style="color: var(--emerald);">الكمية المقبولة/المطابقة المضافة (كغ) *</label>
+                  <label for="input-log-accepted-kg" id="label-log-accepted" style="color: var(--emerald);">الكمية المقبولة/المطابقة المضافة *</label>
                   <input type="number" step="0.1" id="input-log-accepted-kg" placeholder="مثال: 18 كغ مقبول" required>
                 </div>
                 <div class="form-group">
-                  <label for="input-log-rejected-kg" style="color: var(--rose);">الكمية المرفوضة/إعادة تشغيل (كغ) *</label>
+                  <label for="input-log-rejected-kg" id="label-log-rejected" style="color: var(--rose);">الكمية المرفوضة/إعادة تشغيل *</label>
                   <input type="number" step="0.1" id="input-log-rejected-kg" placeholder="مثال: 2 كغ مرفوض" value="0" required>
                 </div>
               </div>
@@ -368,7 +375,7 @@
                   <span>تسجيل الإنجاز وتحديث الحجر</span>
                 </button>
               </div>
-              <small class="help-text" id="log-conversion-hint">ستقوم المنظومة بتحويل الأوزان المقبولة والمرفوضة إلى أعداد ظروف ولوتات فعلية فوراً وتحديث جميع أجهزة الموظفين.</small>
+              <small class="help-text" id="log-conversion-hint">ستقوم المنظومة بالتحويل الرياضي التلقائي وتحديث كافة أجهزة المعمل.</small>
             </form>
           </div>
 
@@ -393,10 +400,10 @@
 
   </div>
 
-  <!-- Scripts -->
-  <script src="pharmaMath.js"></script>
-  <script src="mockData.js"></script>
-  <script src="app.js"></script>
+  <!-- Scripts with cache-busting timestamp -->
+  <script src="pharmaMath.js?v=3.0"></script>
+  <script src="mockData.js?v=3.0"></script>
+  <script src="app.js?v=3.0"></script>
   <script>
     lucide.createIcons();
   </script>

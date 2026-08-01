@@ -1,10 +1,10 @@
 /**
  * Main Application Logic for Pharma Production Tracker & Quarantine Inventory
- * Equipped with Multi-User Live Cloud Sync Engine (JSONBlob Shared Cloud Store)
+ * Multi-User Real-Time Cloud Sync Engine with Distinct Weighing/Prep & Blistering Count Input Mode
  */
 
 (function () {
-  const LOCAL_STORAGE_KEY = 'pharma_production_batches_cloud_v2';
+  const LOCAL_STORAGE_KEY = 'pharma_production_batches_cloud_v3';
   const CLOUD_API_ENDPOINT = 'https://jsonblob.com/api/jsonBlob/019fbc28-a28d-7950-a713-30c7bf9b6628';
 
   // Application State
@@ -50,6 +50,8 @@
   const inputIsCoated = document.getElementById('input-is-coated');
   const inputBatchWeight = document.getElementById('input-batch-weight');
   const inputLotsCount = document.getElementById('input-lots-count');
+  const inputPriorBatchNo = document.getElementById('input-prior-batch-no');
+  const inputCarryOverKg = document.getElementById('input-carry-over-kg');
   const inputPreCoatingWeight = document.getElementById('input-pre-coating-weight');
   const inputPostCoatingWeight = document.getElementById('input-post-coating-weight');
   const groupPostCoatingWeight = document.getElementById('group-post-coating-weight');
@@ -74,6 +76,7 @@
   const detailFormName = document.getElementById('detail-form-name');
   const detailTotalWeight = document.getElementById('detail-total-weight');
   const detailLotsInfo = document.getElementById('detail-lots-info');
+  const detailPriorBatchInfo = document.getElementById('detail-prior-batch-info');
   const detailCoatingStatus = document.getElementById('detail-coating-status');
   const detailTabletWeights = document.getElementById('detail-tablet-weights');
   const detailUnitsPerBlister = document.getElementById('detail-units-per-blister');
@@ -90,8 +93,11 @@
   const logStageRejectedBlisters = document.getElementById('log-stage-rejected-blisters');
 
   const formUpdateStage = document.getElementById('form-update-stage');
+  const labelLogAccepted = document.getElementById('label-log-accepted');
+  const labelLogRejected = document.getElementById('label-log-rejected');
   const inputLogAcceptedKg = document.getElementById('input-log-accepted-kg');
   const inputLogRejectedKg = document.getElementById('input-log-rejected-kg');
+  const logConversionHint = document.getElementById('log-conversion-hint');
   const stageHistoryList = document.getElementById('stage-history-list');
 
   const FORM_LABELS_MAP = {
@@ -108,7 +114,7 @@
 
     // Start Live Multi-User Cloud Sync Engine
     syncFromCloud();
-    setInterval(syncFromCloud, 2500); // Check for remote updates from other users every 2.5 seconds
+    setInterval(syncFromCloud, 2500);
   }
 
   function loadBatchesLocal() {
@@ -131,9 +137,6 @@
     }
   }
 
-  /**
-   * Real-Time Multi-User Cloud Sync Engine
-   */
   async function syncFromCloud() {
     if (isSavingToCloud) return;
 
@@ -303,6 +306,12 @@
           </div>
         </div>
 
+        ${batch.priorBatchNo ? `
+          <div class="batch-card-weights-pill" style="background: rgba(245, 158, 11, 0.1); border: 1px dashed rgba(245, 158, 11, 0.3); color: var(--amber);">
+            <span>منقول من باتش سابق: <strong>#${batch.priorBatchNo} (${batch.carryOverKg} كغ)</strong></span>
+          </div>
+        ` : ''}
+
         <div class="batch-card-weights-pill">
           <span>التلبيس: <strong>${batch.isCoated ? 'ملبس بالفيلم' : 'غير ملبس'}</strong></span>
           <span>وزن الوحدة: <strong>${batch.isCoated ? batch.postCoatingMg + ' ملغ' : batch.preCoatingMg + ' ملغ'}</strong></span>
@@ -352,9 +361,13 @@
       const currentDoneKg = currentStage ? currentStage.doneKg : 0;
       const remKgInQuarantine = Math.max(0, prevDoneKg - currentDoneKg);
 
-      let materialState = 'مساحيق وبودرة جاهزة للضغط/التعبئة';
+      let materialState = 'مساحيق وبودرة بالحجر';
       if (batch.pharmaForm === 'solid') {
-        if (currentStage.id === 'compression' && batch.isCoated) {
+        if (currentStage.id === 'weighing') {
+          materialState = 'مواد خام جاري وزنها ميدانياً';
+        } else if (currentStage.id === 'preparation') {
+          materialState = 'مساحيق وبودرة ممزوجة (جاهزة للضغط)';
+        } else if (currentStage.id === 'compression' && batch.isCoated) {
           materialState = 'مضغوطات نواتية (بحاجة تلبيس بالفيلم)';
         } else if (currentStage.id === 'compression' && !batch.isCoated) {
           materialState = 'مضغوطات غير ملبسة (بحاجة بليستر/تغليف)';
@@ -364,7 +377,9 @@
           materialState = 'بليسترات ومنتج شبه مكتمل بالتغليف';
         }
       } else if (batch.pharmaForm === 'capsule') {
-        if (currentStage.id === 'filling') materialState = 'كبسولات معبأة (بحاجة بليستر وتغليف)';
+        if (currentStage.id === 'weighing') materialState = 'مواد خام جاري وزنها للمصادقة';
+        else if (currentStage.id === 'preparation') materialState = 'خليط كبسول جاف بالحجر (جاهز للتعبئة)';
+        else if (currentStage.id === 'filling') materialState = 'كبسولات معبأة (بحاجة بليستر وتغليف)';
         else if (currentStage.id === 'blistering') materialState = 'بليسترات كبسول جاهزة للتعبئة النهائية';
       } else if (batch.pharmaForm === 'suppository') {
         materialState = 'تحاميل مسكوبة بالحجر (بحاجة تغليف وترميز)';
@@ -390,7 +405,7 @@
         <div class="q-item-header">
           <div class="q-item-title">
             <h4>${batch.productName}</h4>
-            <span class="batch-code"># ${batch.batchNo}</span>
+            <span class="batch-code"># ${batch.batchNo} ${batch.priorBatchNo ? `(منقول من #${batch.priorBatchNo})` : ''}</span>
           </div>
           <span class="pharma-badge ${batch.pharmaForm}">${batch.pharmaFormLabel}</span>
         </div>
@@ -541,29 +556,34 @@
     const formType = inputPharmaForm.value;
     const isCoated = inputIsCoated.value === 'true';
     
+    // Distinct Workflow Stages: Weighing is separated from Preparation
     let stagesConfig = [];
     if (formType === 'solid') {
       stagesConfig = [
-        { id: 'weighing', name: 'الوزن الميداني والتحضير' },
+        { id: 'weighing', name: 'الوزن الميداني للمواد الخام' },
+        { id: 'preparation', name: 'التحضير والمزج المبدئي' },
         { id: 'compression', name: 'الضغط (Compression)' }
       ];
       if (isCoated) {
         stagesConfig.push({ id: 'coating', name: 'التلبيس بالفيلم (Film Coating)' });
       }
-      stagesConfig.push({ id: 'blistering', name: 'البليستر والتغليف' });
+      stagesConfig.push({ id: 'blistering', name: 'البليستر والتغليف النهائي' });
     } else if (formType === 'capsule') {
       stagesConfig = [
-        { id: 'weighing', name: 'الوزن والتحضير' },
+        { id: 'weighing', name: 'الوزن الميداني للمواصفات' },
+        { id: 'preparation', name: 'التحضير والمزج الجاف' },
         { id: 'filling', name: 'تعبئة الكبسول' },
-        { id: 'blistering', name: 'البليستر والتغليف' }
+        { id: 'blistering', name: 'البليستر والتغليف النهائي' }
       ];
     } else if (formType === 'suppository') {
       stagesConfig = [
+        { id: 'weighing', name: 'الوزن الميداني للمواد' },
         { id: 'preparation', name: 'التحضير والتذويب' },
         { id: 'filling', name: 'تعبئة وسكب التحاميل' }
       ];
     } else {
       stagesConfig = [
+        { id: 'weighing', name: 'الوزن الميداني للمواد' },
         { id: 'preparation', name: 'التحضير والمزج' },
         { id: 'filling', name: 'تعبئة الأنابيب والظروف' }
       ];
@@ -581,6 +601,8 @@
     const preMg = parseFloat(inputPreCoatingWeight.value);
     const postMg = isCoated ? parseFloat(inputPostCoatingWeight.value) : preMg;
     const lCount = parseInt(inputLotsCount.value, 10) || 1;
+    const priorBatch = inputPriorBatchNo.value.trim();
+    const carryKg = parseFloat(inputCarryOverKg.value) || 0;
 
     const newBatch = {
       id: 'batch-' + Date.now(),
@@ -591,6 +613,8 @@
       isCoated: isCoated,
       totalWeightKg: parseFloat(inputBatchWeight.value),
       lotsCount: lCount,
+      priorBatchNo: priorBatch,
+      carryOverKg: carryKg,
       preCoatingMg: preMg,
       postCoatingMg: postMg,
       unitsPerBlister: parseInt(inputUnitsPerBlister.value, 10),
@@ -601,7 +625,7 @@
       logs: [
         {
           time: new Date().toLocaleString('ar-EG'),
-          text: `إنشاء الباتش (${inputBatchWeight.value} كغ / ${lCount} لوتات، ${isCoated ? 'ملبس بالفيلم' : 'غير ملبس'}).`
+          text: `إنشاء الباتش (${inputBatchWeight.value} كغ / ${lCount} لوتات، ${isCoated ? 'ملبس بالفيلم' : 'غير ملبس'})${priorBatch ? ` - منقول من باتش سابق #${priorBatch} (${carryKg} كغ).` : '.'}`
         }
       ]
     };
@@ -626,6 +650,8 @@
 
     const lotWeight = (batch.totalWeightKg / (batch.lotsCount || 1)).toFixed(1);
     detailLotsInfo.textContent = `${batch.lotsCount || 1} لوت (${lotWeight} كغ/لوت)`;
+
+    detailPriorBatchInfo.textContent = batch.priorBatchNo ? `#${batch.priorBatchNo} (${batch.carryOverKg} كغ)` : 'لا يوجد (باتش حديث)';
 
     detailCoatingStatus.textContent = batch.isCoated ? 'ملبس بالفيلم' : 'غير ملبس';
     detailTabletWeights.textContent = batch.isCoated ? 
@@ -702,11 +728,32 @@
     }
   }
 
+  /**
+   * Render Stage Logger with Dynamic Input Mode:
+   * In Blistering stage specifically, inputs are direct Blisters Count!
+   * In all other stages, inputs are Weight in Kg.
+   */
   function renderStageLogger(batch) {
     const stage = batch.stages[activeStageIndex];
     if (!stage) return;
 
     logStageName.textContent = stage.name;
+
+    const isBlisterStage = stage.id === 'blistering';
+
+    if (isBlisterStage) {
+      labelLogAccepted.textContent = 'عدد الظروف/البليسترات المقبولة المضافة (ظرف PASS) *';
+      labelLogRejected.textContent = 'عدد الظروف المرفوضة/إعادة تشغيل (ظرف REJECTED) *';
+      inputLogAcceptedKg.placeholder = 'مثال: 500 ظرف مقبول';
+      inputLogRejectedKg.placeholder = 'مثال: 10 ظروف مرفوضة';
+      logConversionHint.textContent = 'مرحلة البليستر: يتم إدخال عدد الظروف مباشرة وتقوم المنظومة بتحويلها تلقائياً إلى الوزن المقابل بالكيلوغرام وتحديث أجهزة المعمل.';
+    } else {
+      labelLogAccepted.textContent = 'الكمية المقبولة/المطابقة المضافة (كغ) *';
+      labelLogRejected.textContent = 'الكمية المرفوضة/إعادة تشغيل (كغ) *';
+      inputLogAcceptedKg.placeholder = 'مثال: 18 كغ مقبول';
+      inputLogRejectedKg.placeholder = 'مثال: 2 كغ مرفوض';
+      logConversionHint.textContent = 'يتم إدخال الوزن بالكيلوغرام وتقوم المنظومة بتحويلها تلقائياً إلى أعداد ظروف ولوتات وتحديث كافة أجهزة المعمل.';
+    }
 
     const prevDoneKg = activeStageIndex > 0 ? batch.stages[activeStageIndex - 1].doneKg : batch.totalWeightKg;
     const currentDoneKg = stage.doneKg;
@@ -737,21 +784,45 @@
     const batch = batches.find(b => b.id === activeBatchId);
     if (!batch) return;
 
-    const addAcceptedKg = parseFloat(inputLogAcceptedKg.value) || 0;
-    const addRejectedKg = parseFloat(inputLogRejectedKg.value) || 0;
+    const stage = batch.stages[activeStageIndex];
+    const isBlisterStage = stage.id === 'blistering';
+
+    let addAcceptedKg = 0;
+    let addRejectedKg = 0;
+    let addAcceptedBlisters = 0;
+    let addRejectedBlisters = 0;
+
+    if (isBlisterStage) {
+      // In Blistering stage: inputs are direct Blisters Count!
+      addAcceptedBlisters = parseFloat(inputLogAcceptedKg.value) || 0;
+      addRejectedBlisters = parseFloat(inputLogRejectedKg.value) || 0;
+
+      addAcceptedKg = PharmaMath.blistersToKg(addAcceptedBlisters, batch.isCoated, batch.preCoatingMg, batch.postCoatingMg, batch.unitsPerBlister);
+      addRejectedKg = PharmaMath.blistersToKg(addRejectedBlisters, batch.isCoated, batch.preCoatingMg, batch.postCoatingMg, batch.unitsPerBlister);
+    } else {
+      // In all other stages: inputs are Weight in Kg
+      addAcceptedKg = parseFloat(inputLogAcceptedKg.value) || 0;
+      addRejectedKg = parseFloat(inputLogRejectedKg.value) || 0;
+
+      const accMath = PharmaMath.kgToBlistersAndLots(addAcceptedKg, batch.isCoated, batch.preCoatingMg, batch.postCoatingMg, batch.unitsPerBlister, batch.totalWeightKg, batch.lotsCount);
+      const rejMath = PharmaMath.kgToBlistersAndLots(addRejectedKg, batch.isCoated, batch.preCoatingMg, batch.postCoatingMg, batch.unitsPerBlister, batch.totalWeightKg, batch.lotsCount);
+
+      addAcceptedBlisters = accMath.totalBlisters;
+      addRejectedBlisters = rejMath.totalBlisters;
+    }
+
     const addTotalKg = addAcceptedKg + addRejectedKg;
 
-    if (addTotalKg <= 0) {
+    if (addTotalKg <= 0 && addAcceptedBlisters <= 0 && addRejectedBlisters <= 0) {
       alert('يرجى إدخال كمية مقبولة أو مرفوضة أكبر من صفر.');
       return;
     }
 
-    const stage = batch.stages[activeStageIndex];
     const prevDoneKg = activeStageIndex > 0 ? batch.stages[activeStageIndex - 1].doneKg : batch.totalWeightKg;
     const maxAddableKg = Math.max(0, prevDoneKg - stage.doneKg);
 
-    if (addTotalKg > maxAddableKg) {
-      alert(`الكمية المتاحة كحد أقصى في الحجر/المرحلة السابقة هي ${maxAddableKg} كغ.`);
+    if (addTotalKg > (maxAddableKg + 0.01)) { // Allow minor rounding float difference
+      alert(`الكمية المتاحة كحد أقصى في الحجر/المرحلة السابقة هي ${maxAddableKg.toFixed(2)} كغ.`);
       return;
     }
 
@@ -769,12 +840,11 @@
       batch.currentStageIndex = activeStageIndex;
     }
 
-    const accMath = PharmaMath.kgToBlistersAndLots(addAcceptedKg, batch.isCoated, batch.preCoatingMg, batch.postCoatingMg, batch.unitsPerBlister, batch.totalWeightKg, batch.lotsCount);
-    const rejMath = PharmaMath.kgToBlistersAndLots(addRejectedKg, batch.isCoated, batch.preCoatingMg, batch.postCoatingMg, batch.unitsPerBlister, batch.totalWeightKg, batch.lotsCount);
-
     batch.logs.unshift({
       time: new Date().toLocaleString('ar-EG'),
-      text: `تسجيل إنجاز بمرحلة [${stage.name}]: (${addAcceptedKg} كغ مقبول = ${PharmaMath.formatNumber(accMath.totalBlisters)} ظرف) و (${addRejectedKg} كغ مرفوض = ${PharmaMath.formatNumber(rejMath.totalBlisters)} ظرف).`
+      text: isBlisterStage ?
+        `تسجيل إنجاز بالبليستر: (${addAcceptedBlisters} ظرف مقبول = ${addAcceptedKg} كغ) و (${addRejectedBlisters} ظرف مرفوض = ${addRejectedKg} كغ).` :
+        `تسجيل إنجاز بمرحلة [${stage.name}]: (${addAcceptedKg} كغ مقبول = ${PharmaMath.formatNumber(addAcceptedBlisters)} ظرف) و (${addRejectedKg} كغ مرفوض = ${PharmaMath.formatNumber(addRejectedBlisters)} ظرف).`
     });
 
     saveBatches();
