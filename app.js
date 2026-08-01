@@ -1,6 +1,6 @@
 /**
  * Main Application Logic for Pharma Production Tracker & Quarantine Inventory
- * Multi-User Cloud Engine with Full Stage Progress Correction & Editing Support
+ * Multi-User Cloud Engine with Decimal Lots Count Support (2 Decimal Places)
  */
 
 (function () {
@@ -331,7 +331,8 @@
         batch.lotsCount
       );
 
-      const lotWeightKg = (batch.totalWeightKg / (batch.lotsCount || 1)).toFixed(1);
+      const lCountVal = parseFloat(batch.lotsCount) || 1;
+      const lotWeightKg = (batch.totalWeightKg / lCountVal).toFixed(2);
 
       const card = document.createElement('div');
       card.className = 'batch-card';
@@ -344,7 +345,7 @@
         <div class="batch-card-header">
           <div class="batch-title">
             <h4>${batch.productName}</h4>
-            <span class="batch-code"># ${batch.batchNo} (${batch.lotsCount || 1} لوت / ${lotWeightKg} كغ للوت)</span>
+            <span class="batch-code"># ${batch.batchNo} (${lCountVal.toFixed(2)} لوت / ${lotWeightKg} كغ للوت)</span>
           </div>
           <div class="header-right-actions">
             <span class="pharma-badge ${batch.pharmaForm}">${batch.pharmaFormLabel || FORM_LABELS_MAP[batch.pharmaForm] || '-'}</span>
@@ -376,7 +377,7 @@
           </div>
 
           <div class="stage-weight-details">
-            <span>المنجز: ${doneKg} كغ (${mathDone.equivalentLots} لوت | ${PharmaMath.formatNumber(mathDone.totalBlisters)} ظرف)</span>
+            <span>المنجز: ${doneKg} كغ (${mathDone.equivalentLots.toFixed(2)} لوت | ${PharmaMath.formatNumber(mathDone.totalBlisters)} ظرف)</span>
             <span>إجمالي الباتش: ${batch.totalWeightKg} كغ</span>
           </div>
         </div>
@@ -468,7 +469,7 @@
         <div class="q-item-body">
           <div class="q-info-field">
             <span>الوزن المتبقي بالحجر:</span>
-            <strong>${remKgInQuarantine} كغ (${qMathRem.equivalentLots} لوت)</strong>
+            <strong>${remKgInQuarantine} كغ (${qMathRem.equivalentLots.toFixed(2)} لوت)</strong>
           </div>
 
           <div class="q-info-field">
@@ -597,14 +598,14 @@
 
   function updateNewBatchMathPreview() {
     const wKg = parseFloat(inputBatchWeight.value) || 0;
-    const lCount = parseInt(inputLotsCount.value, 10) || 1;
+    const lCount = parseFloat(inputLotsCount.value) || 1;
     const isCoated = inputIsCoated.value === 'true';
     const preMg = parseFloat(inputPreCoatingWeight.value) || 0;
     const postMg = parseFloat(inputPostCoatingWeight.value) || 0;
     const uPerB = parseInt(inputUnitsPerBlister.value, 10) || 1;
 
     const res = PharmaMath.calculateTotals(wKg, isCoated, preMg, postMg, uPerB, lCount);
-    if (previewLotWeight) previewLotWeight.textContent = `${res.lotWeightKg.toFixed(1)} كغ/لوت`;
+    if (previewLotWeight) previewLotWeight.textContent = `${res.lotWeightKg.toFixed(2)} كغ/لوت`;
     if (previewTotalTablets) previewTotalTablets.textContent = `${PharmaMath.formatNumber(res.totalTablets)} مضغوطة`;
     if (previewTotalBlisters) previewTotalBlisters.textContent = `${PharmaMath.formatNumber(res.totalBlisters)} ظرف/بليستر`;
   }
@@ -634,6 +635,7 @@
     const formType = inputPharmaForm.value;
     const isCoated = inputIsCoated.value === 'true';
     
+    // Distinct Workflow Stages: Weighing is separated from Preparation
     let stagesConfig = [];
     if (formType === 'solid') {
       stagesConfig = [
@@ -677,7 +679,7 @@
 
     const preMg = parseFloat(inputPreCoatingWeight.value);
     const postMg = isCoated ? parseFloat(inputPostCoatingWeight.value) : preMg;
-    const lCount = parseInt(inputLotsCount.value, 10) || 1;
+    const lCount = parseFloat(inputLotsCount.value) || 1;
     const priorBatch = inputPriorBatchNo ? inputPriorBatchNo.value.trim() : '';
     const carryKg = inputCarryOverKg ? (parseFloat(inputCarryOverKg.value) || 0) : 0;
 
@@ -702,7 +704,7 @@
       logs: [
         {
           time: new Date().toLocaleString('ar-EG'),
-          text: `إنشاء الباتش (${inputBatchWeight.value} كغ / ${lCount} لوتات، ${isCoated ? 'ملبس بالفيلم' : 'غير ملبس'})${priorBatch ? ` - منقول من باتش سابق #${priorBatch} (${carryKg} كغ).` : '.'}`
+          text: `إنشاء الباتش (${inputBatchWeight.value} كغ / ${lCount.toFixed(2)} لوتات، ${isCoated ? 'ملبس بالفيلم' : 'غير ملبس'})${priorBatch ? ` - منقول من باتش سابق #${priorBatch} (${carryKg} كغ).` : '.'}`
         }
       ]
     };
@@ -726,8 +728,9 @@
     if (detailFormName) detailFormName.textContent = batch.pharmaFormLabel || FORM_LABELS_MAP[batch.pharmaForm] || '-';
     if (detailTotalWeight) detailTotalWeight.textContent = `${batch.totalWeightKg} كغ`;
 
-    const lotWeight = (batch.totalWeightKg / (batch.lotsCount || 1)).toFixed(1);
-    if (detailLotsInfo) detailLotsInfo.textContent = `${batch.lotsCount || 1} لوت (${lotWeight} كغ/لوت)`;
+    const lCountVal = parseFloat(batch.lotsCount) || 1;
+    const lotWeight = (batch.totalWeightKg / lCountVal).toFixed(2);
+    if (detailLotsInfo) detailLotsInfo.textContent = `${lCountVal.toFixed(2)} لوت (${lotWeight} كغ/لوت)`;
 
     if (detailPriorBatchInfo) detailPriorBatchInfo.textContent = batch.priorBatchNo ? `#${batch.priorBatchNo} (${batch.carryOverKg} كغ)` : 'لا يوجد (باتش حديث)';
 
@@ -864,7 +867,7 @@
     const totalMath = PharmaMath.kgToBlistersAndLots(batch.totalWeightKg, batch.isCoated, batch.preCoatingMg, batch.postCoatingMg, batch.unitsPerBlister, batch.totalWeightKg, batch.lotsCount);
 
     if (logStageTotalKg) logStageTotalKg.textContent = `${batch.totalWeightKg} كغ`;
-    if (logStageTotalBlisters) logStageTotalBlisters.textContent = `(${totalMath.equivalentLots} لوت | ${PharmaMath.formatNumber(totalMath.totalBlisters)} ظرف)`;
+    if (logStageTotalBlisters) logStageTotalBlisters.textContent = `(${totalMath.equivalentLots.toFixed(2)} لوت | ${PharmaMath.formatNumber(totalMath.totalBlisters)} ظرف)`;
 
     if (logStageAcceptedKg) logStageAcceptedKg.textContent = `${stageAccKg} كغ`;
     if (logStageAcceptedBlisters) logStageAcceptedBlisters.textContent = `(${PharmaMath.formatNumber(accMath.totalBlisters)} ظرف مقبول)`;
@@ -883,7 +886,7 @@
     const isBlisterStage = stage.id === 'blistering';
 
     if (isEditCorrectionMode) {
-      // CORRECTION & EDIT MODE: Replaces total accepted and rejected values directly
+      // CORRECTION & EDIT MODE
       let newAccKg = 0;
       let newRejKg = 0;
       let newAccBlisters = 0;
