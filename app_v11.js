@@ -243,6 +243,7 @@
         const importedData = JSON.parse(evt.target.result);
         if (Array.isArray(importedData)) {
           importedData.forEach(b => {
+            b.version = (b.version || 0) + 1;
             b.updatedAt = Date.now();
             b.deleted = false;
           });
@@ -281,27 +282,38 @@
       if (lb && lb.id) {
         if (lb.updatedAt === undefined) lb.updatedAt = 0;
         if (lb.deleted === undefined) lb.deleted = false;
+        if (lb.version === undefined) lb.version = 0;
 
         const existing = mergedMap.get(String(lb.id));
         if (!existing) {
           mergedMap.set(String(lb.id), lb);
         } else {
-          // Compare timestamps
-          if ((lb.updatedAt || 0) > (existing.updatedAt || 0)) {
+          if (existing.version === undefined) existing.version = 0;
+
+          // Compare logical versions first to bypass client clock skews
+          const lbVer = lb.version || 0;
+          const exVer = existing.version || 0;
+
+          if (lbVer > exVer) {
             mergedMap.set(String(lb.id), lb);
-          } else if ((lb.updatedAt || 0) === (existing.updatedAt || 0)) {
-            // Tie breaker
-            let localHasMoreProgress = false;
-            if (Array.isArray(lb.stages) && Array.isArray(existing.stages)) {
-              lb.stages.forEach((lst, idx) => {
-                const est = existing.stages[idx];
-                if (est && (lst.doneKg || 0) > (est.doneKg || 0)) {
-                  localHasMoreProgress = true;
-                }
-              });
-            }
-            if (localHasMoreProgress) {
+          } else if (lbVer === exVer) {
+            // Fallback to updatedAt as a tie breaker
+            if ((lb.updatedAt || 0) > (existing.updatedAt || 0)) {
               mergedMap.set(String(lb.id), lb);
+            } else if ((lb.updatedAt || 0) === (existing.updatedAt || 0)) {
+              // Tie breaker based on production progress
+              let localHasMoreProgress = false;
+              if (Array.isArray(lb.stages) && Array.isArray(existing.stages)) {
+                lb.stages.forEach((lst, idx) => {
+                  const est = existing.stages[idx];
+                  if (est && (lst.doneKg || 0) > (est.doneKg || 0)) {
+                    localHasMoreProgress = true;
+                  }
+                });
+              }
+              if (localHasMoreProgress) {
+                mergedMap.set(String(lb.id), lb);
+              }
             }
           }
         }
@@ -948,6 +960,7 @@
       stages: initialStages,
       currentStageIndex: 0,
       updatedAt: Date.now(),
+      version: 1,
       deleted: false,
       logs: [
         {
@@ -1023,6 +1036,7 @@
     if (confirm(`هل أنت متأكد من إلغاء وحذف تشغيلة المنتج [${batchName}] نهائياً من خط الإنتاج والحجر؟`)) {
       if (batch) {
         batch.deleted = true;
+        batch.version = (batch.version || 0) + 1;
         batch.updatedAt = Date.now();
       }
       saveBatches(true);
@@ -1177,6 +1191,7 @@
       });
 
       isEditCorrectionMode = false;
+      batch.version = (batch.version || 0) + 1;
       batch.updatedAt = Date.now();
       saveBatches(true);
       renderWorkflowTimeline(batch);
@@ -1243,6 +1258,7 @@
         `تسجيل إنجاز بمرحلة [${stage.name}]: (${addAcceptedKg} كغ مقبول = ${PharmaMath.formatNumber(addAcceptedBlisters)} ظرف) و (${addRejectedKg} كغ مرفوض = ${PharmaMath.formatNumber(addRejectedBlisters)} ظرف).`
     });
 
+    batch.version = (batch.version || 0) + 1;
     batch.updatedAt = Date.now();
     saveBatches(true);
     renderWorkflowTimeline(batch);
