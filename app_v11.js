@@ -326,7 +326,12 @@
       if (response.ok) {
         isCloudReadable = true;
         const cloudData = await response.json();
-        if (Array.isArray(cloudData)) {
+        if (cloudData === null) {
+          if (syncText) {
+            syncText.textContent = 'متصل بالسحابة 🟢 (قاعدة البيانات فارغة أو رابط السيرفر غير دقيق)';
+            syncText.style.color = '#f59e0b';
+          }
+        } else if (Array.isArray(cloudData)) {
           const mergedList = mergeBatches(batches, cloudData);
           const currentLocalHash = JSON.stringify(batches);
           const currentCloudHash = JSON.stringify(cloudData);
