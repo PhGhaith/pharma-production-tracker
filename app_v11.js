@@ -1,11 +1,31 @@
 /**
  * Main Application Logic for Pharma Production Tracker & Quarantine Inventory
- * Version 11 - Equipped with Throttled Conflict-Free Sync Engine to Prevent Rate Limits (Flicker-Free)
+ * Version 11 - Equipped with Throttled Conflict-Free Sync Engine & API Cache-Busting
  */
 
 (function () {
   const MASTER_STORAGE_KEY = 'pharma_production_batches_master_v2';
-  const CLOUD_API_ENDPOINT = 'https://jsonblob.com/api/jsonBlob/019fc699-099e-70ee-9ccd-d6048b84646a';
+  
+  // Previous keys for automatic user data recovery
+  const PREVIOUS_STORAGE_KEYS = [
+    'pharma_production_batches_master_v1',
+    'pharma_production_batches_cloud_v8',
+    'pharma_production_batches_cloud_v7',
+    'pharma_production_batches_cloud_v6',
+    'pharma_production_batches_cloud_v5',
+    'pharma_production_batches_cloud_v4',
+    'pharma_production_batches_cloud_v3',
+    'pharma_production_batches_cloud_v2',
+    'pharma_production_batches_cloud_v1',
+    'pharma_production_batches_v1'
+  ];
+
+  const CLOUD_API_BASE = 'https://jsonblob.com/api/jsonBlob/019fc699-099e-70ee-9ccd-d6048b84646a';
+
+  // Helper to generate cache-busting cloud URL
+  function getCloudUrl() {
+    return `${CLOUD_API_BASE}?cb=${Date.now()}`;
+  }
 
   // Application State
   let batches = [];
@@ -140,6 +160,7 @@
   }
 
   function loadBatchesLocal() {
+    // 1. Try master key
     const masterSaved = localStorage.getItem(MASTER_STORAGE_KEY);
     if (masterSaved) {
       try {
@@ -150,18 +171,33 @@
         }
       } catch (e) {}
     }
-    // Migrate from master_v1
-    const v1Saved = localStorage.getItem('pharma_production_batches_master_v1');
-    if (v1Saved) {
-      try {
-        const parsed = JSON.parse(v1Saved);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          batches = parsed;
-          localStorage.setItem(MASTER_STORAGE_KEY, JSON.stringify(batches));
-          return;
-        }
-      } catch (e) {}
+
+    // 2. Scan and aggregate all previous version keys to prevent data loss
+    const recoveredMap = new Map();
+    PREVIOUS_STORAGE_KEYS.forEach(key => {
+      const prevData = localStorage.getItem(key);
+      if (prevData) {
+        try {
+          const parsedArr = JSON.parse(prevData);
+          if (Array.isArray(parsedArr)) {
+            parsedArr.forEach(b => {
+              if (b && b.id) {
+                if (!recoveredMap.has(String(b.id))) {
+                  recoveredMap.set(String(b.id), b);
+                }
+              }
+            });
+          }
+        } catch (e) {}
+      }
+    });
+
+    if (recoveredMap.size > 0) {
+      batches = Array.from(recoveredMap.values());
+      localStorage.setItem(MASTER_STORAGE_KEY, JSON.stringify(batches));
+      return;
     }
+
     batches = [...window.DEFAULT_BATCHES];
   }
 
@@ -263,13 +299,13 @@
   }
 
   /**
-   * Realtime Synchronization Engine with Rate-Limit Cooldown
+   * Realtime Synchronization Engine with API Cache-Busting
    */
   async function syncFromCloud() {
     if (isSavingToCloud) return;
 
     try {
-      const response = await fetch(CLOUD_API_ENDPOINT, {
+      const response = await fetch(getCloudUrl(), {
         method: 'GET',
         headers: { 'Accept': 'application/json' }
       });
@@ -300,7 +336,7 @@
             }
           }
 
-          // Throttled Auto-Push: Only push merged data if cooldown allows to prevent 429 errors
+          // Throttled Auto-Push
           if (currentCloudHash !== mergedHash) {
             const now = Date.now();
             if (now - lastAutoPushTime > AUTO_PUSH_COOLDOWN) {
@@ -313,7 +349,6 @@
           updateSyncStatusLabel(true);
         }
       } else if (response.status === 429) {
-        // Rate limited but readable (active locally)
         updateSyncStatusLabel(true);
       } else {
         isCloudReadable = false;
@@ -328,7 +363,6 @@
   async function pushToCloud(force = false) {
     if (isSavingToCloud) return;
     
-    // Check cooldown for non-forced background pushes
     if (!force) {
       const now = Date.now();
       if (now - lastAutoPushTime < AUTO_PUSH_COOLDOWN) return;
@@ -340,7 +374,7 @@
     if (syncText) syncText.textContent = 'جاري مزامنة وتكامل البيانات سحابياً...';
 
     try {
-      const response = await fetch(CLOUD_API_ENDPOINT, {
+      const response = await fetch(CLOUD_API_BASE, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -352,14 +386,12 @@
       if (response.ok) {
         updateSyncStatusLabel(true);
       } else {
-        // Silent fail, preserve local storage, don't flicker status label
         if (response.status === 429) {
-          // Keep active status label green since GET still works
           updateSyncStatusLabel(true);
         }
       }
     } catch (e) {
-      // ignore network errors, fallback to local storage
+      // ignore network errors
     } finally {
       isSavingToCloud = false;
     }
@@ -372,7 +404,7 @@
       syncText.style.color = '';
     } else {
       syncText.textContent = 'محفوظ محلياً 🔴 (سيتم المزامنة عند الجاهزية)';
-      syncText.style.color = '#f59e0b'; // stable amber warning
+      syncText.style.color = '#f59e0b';
     }
   }
 
