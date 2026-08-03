@@ -14,7 +14,7 @@
   <script src="https://unpkg.com/lucide@latest"></script>
 
   <!-- Custom Styles with cache-busting -->
-  <link rel="stylesheet" href="styles.css?v=14.0">
+  <link rel="stylesheet" href="styles.css?v=15.0">
 </head>
 <body>
   <div id="app" class="app-container">
@@ -32,10 +32,16 @@
       </div>
       
       <div class="navbar-actions">
-        <div class="cloud-sync-status" id="cloud-sync-indicator" title="حالة المزامنة السحابية المباشرة بين الأجهزة">
+        <div class="cloud-sync-status" id="cloud-sync-indicator" title="حالة المزامنة السحابية المباشرة بين الأجهزة" style="cursor: pointer;">
           <span class="sync-dot active"></span>
-          <span id="sync-text">مزامنة سحابية لحظية 🟢</span>
+          <span id="sync-text">مزامنة سحابية لحظية 🟢 (اضغط للمزامنة اليدوية)</span>
         </div>
+
+        <!-- Server Settings Button -->
+        <button id="btn-server-settings" class="btn btn-secondary" style="border-color: var(--cyan); color: var(--cyan);" title="ضبط رابط سيرفر قاعدة البيانات السحابية">
+          <i data-lucide="settings"></i>
+          <span>إعدادات السيرفر</span>
+        </button>
 
         <!-- Reset Memory & Reconnect Button -->
         <button id="btn-reset-cache" class="btn btn-secondary" style="border-color: var(--rose); color: var(--rose);" title="تفريغ الذاكرة المحلية بالكامل وإعادة المزامنة النظيفة من السحابية">
@@ -424,12 +430,46 @@
       </div>
     </div>
 
+    <!-- Modal: Server Settings -->
+    <div id="modal-server-settings" class="modal-overlay hidden">
+      <div class="modal-card">
+        <div class="modal-header">
+          <div class="modal-title">
+            <i data-lucide="settings"></i>
+            <div>
+              <h3>إعدادات السيرفر وقاعدة البيانات</h3>
+              <p>ربط التطبيق بسيرفر مخصص لمنع حظر المزامنة</p>
+            </div>
+          </div>
+          <button class="btn-close-modal" id="close-server-settings-modal">&times;</button>
+        </div>
+        
+        <div class="modal-body">
+          <div class="form-group" style="margin-bottom: 1.5rem;">
+            <label for="input-server-url">رابط السيرفر السحابي (Firebase RTDB URL / JSONBlob) *</label>
+            <input type="url" id="input-server-url" style="direction: ltr; text-align: left;" placeholder="https://your-app-default-rtdb.firebaseio.com/batches.json" required>
+            <small class="help-text" style="margin-top: 0.5rem; display: block; color: var(--text-muted);">
+              للحصول على مزامنة مستقرة 100% وسرعة فائقة بدون حظر، نوصي بإنشاء قاعدة بيانات Firebase مجانية مجاناً للأبد ولصق الرابط الخاص بها هنا.
+            </small>
+          </div>
+          
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" id="cancel-server-settings-modal">إلغاء</button>
+            <button type="button" class="btn btn-primary" id="btn-save-server-url">
+              <i data-lucide="save"></i>
+              <span>حفظ وتطبيق الاتصال بالسيرفر</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
   </div>
 
   <!-- Scripts with cache-busting timestamp -->
-  <script src="pharmaMath.js?v=14.0"></script>
-  <script src="mockData.js?v=14.0"></script>
-  <script src="app_v11.js?v=1.2"></script>
+  <script src="pharmaMath.js?v=15.0"></script>
+  <script src="mockData.js?v=15.0"></script>
+  <script src="app_v11.js?v=1.3"></script>
   <script>
     lucide.createIcons();
   </script>

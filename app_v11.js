@@ -20,11 +20,14 @@
     'pharma_production_batches_v1'
   ];
 
-  const CLOUD_API_BASE = 'https://jsonblob.com/api/jsonBlob/019fc699-099e-70ee-9ccd-d6048b84646a';
+  const DEFAULT_CLOUD_API = 'https://jsonblob.com/api/jsonBlob/019fc699-099e-70ee-9ccd-d6048b84646a';
+  let CLOUD_API_BASE = localStorage.getItem('pharma_production_server_url') || DEFAULT_CLOUD_API;
 
   // Helper to generate cache-busting cloud URL
   function getCloudUrl() {
-    return `${CLOUD_API_BASE}?cb=${Date.now()}`;
+    // If it's a Firebase URL, we append ?cb=Date.now(), else we check if it already has search params
+    const separator = CLOUD_API_BASE.includes('?') ? '&' : '?';
+    return `${CLOUD_API_BASE}${separator}cb=${Date.now()}`;
   }
 
   // Application State
@@ -54,6 +57,15 @@
   const btnImportBackup = document.getElementById('btn-import-backup');
   const inputBackupFile = document.getElementById('input-backup-file');
   const btnResetCache = document.getElementById('btn-reset-cache');
+
+  // Server Settings Elements
+  const btnServerSettings = document.getElementById('btn-server-settings');
+  const modalServerSettings = document.getElementById('modal-server-settings');
+  const closeServerSettingsModal = document.getElementById('close-server-settings-modal');
+  const cancelServerSettingsModal = document.getElementById('cancel-server-settings-modal');
+  const inputServerUrl = document.getElementById('input-server-url');
+  const btnSaveServerUrl = document.getElementById('btn-save-server-url');
+  const cloudSyncIndicator = document.getElementById('cloud-sync-indicator');
 
   // Navigation Tabs
   const viewTabProduction = document.getElementById('view-tab-production');
@@ -337,14 +349,8 @@
             }
           }
 
-          // Throttled Auto-Push
-          if (currentCloudHash !== mergedHash) {
-            const now = Date.now();
-            if (now - lastAutoPushTime > AUTO_PUSH_COOLDOWN) {
-              lastAutoPushTime = now;
-              pushToCloud(false);
-            }
-          }
+          // No auto-push on background sync to prevent HTTP 429 Rate Limits.
+          // Pushes only happen when the user performs a local action (add, edit, delete, restore).
 
           lastSyncHash = mergedHash;
           updateSyncStatusLabel(true);
@@ -751,6 +757,48 @@
     }
     if (btnResetCache) {
       btnResetCache.addEventListener('click', handleResetCache);
+    }
+
+    // Server Settings Event Listeners
+    if (btnServerSettings) {
+      btnServerSettings.addEventListener('click', () => {
+        if (inputServerUrl) inputServerUrl.value = CLOUD_API_BASE;
+        if (modalServerSettings) modalServerSettings.classList.remove('hidden');
+      });
+    }
+
+    if (closeServerSettingsModal) {
+      closeServerSettingsModal.addEventListener('click', () => {
+        if (modalServerSettings) modalServerSettings.classList.add('hidden');
+      });
+    }
+
+    if (cancelServerSettingsModal) {
+      cancelServerSettingsModal.addEventListener('click', () => {
+        if (modalServerSettings) modalServerSettings.classList.add('hidden');
+      });
+    }
+
+    if (btnSaveServerUrl) {
+      btnSaveServerUrl.addEventListener('click', () => {
+        const val = inputServerUrl.value.trim();
+        if (!val) {
+          alert('يرجى إدخال رابط سيرفر صحيح.');
+          return;
+        }
+        localStorage.setItem('pharma_production_server_url', val);
+        alert('تم حفظ رابط السيرفر الجديد بنجاح! سيتم إعادة تحميل التطبيق لتطبيق الاتصال.');
+        window.location.reload();
+      });
+    }
+
+    if (cloudSyncIndicator) {
+      cloudSyncIndicator.addEventListener('click', () => {
+        if (syncText) syncText.textContent = 'جاري المزامنة اليدوية الآن... 🔄';
+        syncFromCloud().then(() => {
+          pushToCloud(true);
+        });
+      });
     }
   }
 
