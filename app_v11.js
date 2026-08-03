@@ -372,11 +372,12 @@
 
     isSavingToCloud = true;
     lastSyncHash = JSON.stringify(batches);
-    if (syncText) syncText.textContent = 'جاري مزامنة وتكامل البيانات سحابياً...';
+    if (syncText) syncText.textContent = 'جاري رفع وتكامل البيانات سحابياً... 🔄';
 
     try {
       const response = await fetch(CLOUD_API_BASE, {
         method: 'PUT',
+        mode: 'cors',
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json'
@@ -387,12 +388,16 @@
       if (response.ok) {
         updateSyncStatusLabel(true);
       } else {
-        if (response.status === 429) {
-          updateSyncStatusLabel(true);
+        if (syncText) {
+          syncText.textContent = `خطأ سحابي: ${response.status} ${response.statusText} 🔴`;
+          syncText.style.color = '#ef4444';
         }
       }
     } catch (e) {
-      // ignore network errors
+      if (syncText) {
+        syncText.textContent = `خطأ اتصال: ${e.message || e} 🔴`;
+        syncText.style.color = '#ef4444';
+      }
     } finally {
       isSavingToCloud = false;
     }
