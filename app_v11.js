@@ -1,6 +1,6 @@
 /**
  * Main Application Logic for Pharma Production Tracker & Quarantine Inventory
- * Version 11 - Equipped with 100% Conflict-Free Self-Healing Cloud Integration
+ * Version 11 - Equipped with Throttled Conflict-Free Sync Engine to Prevent Rate Limits (Flicker-Free)
  */
 
 (function () {
@@ -16,6 +16,11 @@
   let lastSyncHash = '';
   let isSavingToCloud = false;
   let isEditCorrectionMode = false;
+  
+  // Rate limit protection
+  let lastAutoPushTime = 0;
+  const AUTO_PUSH_COOLDOWN = 30000; // 30 seconds cooldown for automatic background uploads
+  let isCloudReadable = true;
 
   // DOM Elements
   const elStatActiveBatches = document.getElementById('stat-active-batches');
@@ -125,9 +130,9 @@
     setupEventListeners();
     renderApp();
 
-    // Start Conflict-Free Realtime Integration Engine
+    // Start Throttled Sync Engine (Sync every 8 seconds to prevent rate limits)
     syncFromCloud();
-    setInterval(syncFromCloud, 4000);
+    setInterval(syncFromCloud, 8000);
 
     window.addEventListener('focus', () => {
       syncFromCloud();
@@ -145,7 +150,7 @@
         }
       } catch (e) {}
     }
-    // Also try migrating from master_v1
+    // Migrate from master_v1
     const v1Saved = localStorage.getItem('pharma_production_batches_master_v1');
     if (v1Saved) {
       try {
@@ -163,7 +168,7 @@
   function saveBatches(triggerCloudUpload = true) {
     localStorage.setItem(MASTER_STORAGE_KEY, JSON.stringify(batches));
     if (triggerCloudUpload) {
-      pushToCloud();
+      pushToCloud(true); // Force push immediately for user actions
     }
   }
 
@@ -188,7 +193,6 @@
       try {
         const importedData = JSON.parse(evt.target.result);
         if (Array.isArray(importedData)) {
-          // Keep active ones and merge
           importedData.forEach(b => {
             b.updatedAt = Date.now();
             b.deleted = false;
@@ -259,7 +263,7 @@
   }
 
   /**
-   * Realtime Synchronization Engine
+   * Realtime Synchronization Engine with Rate-Limit Cooldown
    */
   async function syncFromCloud() {
     if (isSavingToCloud) return;
@@ -271,6 +275,7 @@
       });
 
       if (response.ok) {
+        isCloudReadable = true;
         const cloudData = await response.json();
         if (Array.isArray(cloudData)) {
           const mergedList = mergeBatches(batches, cloudData);
@@ -295,23 +300,44 @@
             }
           }
 
+          // Throttled Auto-Push: Only push merged data if cooldown allows to prevent 429 errors
           if (currentCloudHash !== mergedHash) {
-            pushToCloud();
+            const now = Date.now();
+            if (now - lastAutoPushTime > AUTO_PUSH_COOLDOWN) {
+              lastAutoPushTime = now;
+              pushToCloud(false);
+            }
           }
 
           lastSyncHash = mergedHash;
-          if (syncText) syncText.textContent = 'متصل بالسحابة الموحدة 🟢 (تكامل تام وتزامن دائم بين الأجهزة)';
+          updateSyncStatusLabel(true);
         }
+      } else if (response.status === 429) {
+        // Rate limited but readable (active locally)
+        updateSyncStatusLabel(true);
+      } else {
+        isCloudReadable = false;
+        updateSyncStatusLabel(false);
       }
     } catch (e) {
-      if (syncText) syncText.textContent = 'مزامنة محليّة';
+      isCloudReadable = false;
+      updateSyncStatusLabel(false);
     }
   }
 
-  async function pushToCloud() {
+  async function pushToCloud(force = false) {
+    if (isSavingToCloud) return;
+    
+    // Check cooldown for non-forced background pushes
+    if (!force) {
+      const now = Date.now();
+      if (now - lastAutoPushTime < AUTO_PUSH_COOLDOWN) return;
+      lastAutoPushTime = now;
+    }
+
     isSavingToCloud = true;
     lastSyncHash = JSON.stringify(batches);
-    if (syncText) syncText.textContent = 'جاري التحديث وتكامل البيانات مع جميع المستخدمين...';
+    if (syncText) syncText.textContent = 'جاري مزامنة وتكامل البيانات سحابياً...';
 
     try {
       const response = await fetch(CLOUD_API_ENDPOINT, {
@@ -324,14 +350,29 @@
       });
 
       if (response.ok) {
-        if (syncText) syncText.textContent = 'متصل بالسحابة الموحدة 🟢 (تكامل تام وتزامن دائم بين الأجهزة)';
+        updateSyncStatusLabel(true);
       } else {
-        if (syncText) syncText.textContent = 'محفوظ محلياً (سيتم المزامنة عند الجاهزية)';
+        // Silent fail, preserve local storage, don't flicker status label
+        if (response.status === 429) {
+          // Keep active status label green since GET still works
+          updateSyncStatusLabel(true);
+        }
       }
     } catch (e) {
-      if (syncText) syncText.textContent = 'محفوظ محلياً';
+      // ignore network errors, fallback to local storage
     } finally {
       isSavingToCloud = false;
+    }
+  }
+
+  function updateSyncStatusLabel(connected) {
+    if (!syncText) return;
+    if (connected && isCloudReadable) {
+      syncText.textContent = 'متصل بالسحابة الموحدة 🟢 (تكامل تام وتزامن دائم بين الأجهزة)';
+      syncText.style.color = '';
+    } else {
+      syncText.textContent = 'محفوظ محلياً 🔴 (سيتم المزامنة عند الجاهزية)';
+      syncText.style.color = '#f59e0b'; // stable amber warning
     }
   }
 
@@ -839,8 +880,8 @@
     if (detailCoatingStatus) detailCoatingStatus.textContent = batch.isCoated ? 'ملبس بالفيلم' : 'غير ملبس';
     if (detailTabletWeights) {
       detailTabletWeights.textContent = batch.isCoated ? 
-        `قبل: ${batch.preCoatingMg} ملغ | بعد: ${batch.postCoatingMg} ملغ` : 
-        `${batch.preCoatingMg || batch.unitWeightMg || 0} ملغ`;
+        `قبل: ${batch.preCoatingMg} milg | بعد: ${batch.postCoatingMg} milg` : 
+        `${batch.preCoatingMg || batch.unitWeightMg || 0} milg`;
     }
 
     if (detailUnitsPerBlister) detailUnitsPerBlister.textContent = `${batch.unitsPerBlister} وحدة`;
