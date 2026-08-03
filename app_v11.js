@@ -53,6 +53,7 @@
   const btnExportBackup = document.getElementById('btn-export-backup');
   const btnImportBackup = document.getElementById('btn-import-backup');
   const inputBackupFile = document.getElementById('input-backup-file');
+  const btnResetCache = document.getElementById('btn-reset-cache');
 
   // Navigation Tabs
   const viewTabProduction = document.getElementById('view-tab-production');
@@ -742,6 +743,20 @@
         const batch = batches.find(b => b && String(b.id) === String(activeBatchId));
         if (batch) renderStageLogger(batch);
       });
+    }
+    if (btnResetCache) {
+      btnResetCache.addEventListener('click', handleResetCache);
+    }
+  }
+
+  function handleResetCache() {
+    if (confirm('هل أنت متأكد من مسح الذاكرة المحلية المؤقتة بالكامل وإعادة تحميل كل البيانات من السحابة؟\n(هذا الإجراء سيقوم بحذف أي تغييرات غير متزامنة ويقوم بتحميل بيانات السحابة الموحدة فوراً)')) {
+      localStorage.removeItem(MASTER_STORAGE_KEY);
+      PREVIOUS_STORAGE_KEYS.forEach(key => localStorage.removeItem(key));
+      batches = [];
+      syncFromCloud();
+      renderApp();
+      alert('تم تفريغ الذاكرة المحلية بنجاح وجاري المزامنة مع السحابة الموحدة الآن...');
     }
   }
 
