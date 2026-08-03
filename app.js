@@ -1,11 +1,11 @@
 /**
  * Main Application Logic for Pharma Production Tracker & Quarantine Inventory
- * Pure Single Source of Truth Cloud Engine (100% Real-Time Data Integration Across All Users)
+ * Equipped with 100% Conflict-Free Self-Healing Cloud Integration & Unlimited Capacity
  */
 
 (function () {
-  const MASTER_STORAGE_KEY = 'pharma_production_batches_master_v1';
-  const CLOUD_API_ENDPOINT = 'https://jsonblob.com/api/jsonBlob/019fbd4f-e4fb-7718-89a0-2dbca17ce9d3';
+  const MASTER_STORAGE_KEY = 'pharma_production_batches_master_v2';
+  const CLOUD_API_ENDPOINT = 'https://jsonblob.com/api/jsonBlob/019fc699-099e-70ee-9ccd-d6048b84646a';
 
   // Application State
   let batches = [];
@@ -125,7 +125,7 @@
     setupEventListeners();
     renderApp();
 
-    // Start Pure Cloud Integration Engine (Sync every 4 seconds)
+    // Start Conflict-Free Realtime Integration Engine
     syncFromCloud();
     setInterval(syncFromCloud, 4000);
 
@@ -145,6 +145,18 @@
         }
       } catch (e) {}
     }
+    // Also try migrating from master_v1
+    const v1Saved = localStorage.getItem('pharma_production_batches_master_v1');
+    if (v1Saved) {
+      try {
+        const parsed = JSON.parse(v1Saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          batches = parsed;
+          localStorage.setItem(MASTER_STORAGE_KEY, JSON.stringify(batches));
+          return;
+        }
+      } catch (e) {}
+    }
     batches = [...window.DEFAULT_BATCHES];
   }
 
@@ -156,7 +168,8 @@
   }
 
   function exportBackupData() {
-    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(batches, null, 2));
+    const activeList = batches.filter(b => b && b.deleted !== true);
+    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(activeList, null, 2));
     const downloadAnchor = document.createElement('a');
     downloadAnchor.setAttribute("href", dataStr);
     const dateStamp = new Date().toISOString().split('T')[0];
@@ -175,10 +188,15 @@
       try {
         const importedData = JSON.parse(evt.target.result);
         if (Array.isArray(importedData)) {
-          batches = importedData;
+          // Keep active ones and merge
+          importedData.forEach(b => {
+            b.updatedAt = Date.now();
+            b.deleted = false;
+          });
+          batches = mergeBatches(batches, importedData);
           saveBatches(true);
           renderApp();
-          alert(`تم استرجاع النسخة الاحتياطية بنجاح! تم تحميل (${batches.length}) تشغيلة صيدلانية وتحديث كافة أجهزة الأفراد فوراً.`);
+          alert(`تم استرجاع النسخة الاحتياطية بنجاح! تم تحميل وتكامل (${importedData.length}) تشغيلة صيدلانية وتحديث كافة أجهزة الأفراد فوراً.`);
         } else {
           alert('تنسيق ملف النسخة الاحتياطية غير صحيح.');
         }
@@ -191,8 +209,59 @@
   }
 
   /**
-   * Pure Single Source of Truth Cloud Engine
-   * Ensures 100% identical data integration across ALL users & devices
+   * Conflict-Free Union Merge Engine
+   * Ensures no batch is ever lost, and soft deletes sync correctly.
+   */
+  function mergeBatches(localList, cloudList) {
+    const mergedMap = new Map();
+
+    // 1. Load cloud list
+    cloudList.forEach(cb => {
+      if (cb && cb.id) {
+        if (cb.updatedAt === undefined) cb.updatedAt = 0;
+        if (cb.deleted === undefined) cb.deleted = false;
+        mergedMap.set(String(cb.id), cb);
+      }
+    });
+
+    // 2. Load local list with conflict resolution
+    localList.forEach(lb => {
+      if (lb && lb.id) {
+        if (lb.updatedAt === undefined) lb.updatedAt = 0;
+        if (lb.deleted === undefined) lb.deleted = false;
+
+        const existing = mergedMap.get(String(lb.id));
+        if (!existing) {
+          // Exists locally only: it's a new batch to sync to the cloud
+          mergedMap.set(String(lb.id), lb);
+        } else {
+          // Exists in both: higher updatedAt wins
+          if ((lb.updatedAt || 0) > (existing.updatedAt || 0)) {
+            mergedMap.set(String(lb.id), lb);
+          } else if ((lb.updatedAt || 0) === (existing.updatedAt || 0)) {
+            // Tie breaker: check if local has more progress recorded
+            let localHasMoreProgress = false;
+            if (Array.isArray(lb.stages) && Array.isArray(existing.stages)) {
+              lb.stages.forEach((lst, idx) => {
+                const est = existing.stages[idx];
+                if (est && (lst.doneKg || 0) > (est.doneKg || 0)) {
+                  localHasMoreProgress = true;
+                }
+              });
+            }
+            if (localHasMoreProgress) {
+              mergedMap.set(String(lb.id), lb);
+            }
+          }
+        }
+      }
+    });
+
+    return Array.from(mergedMap.values());
+  }
+
+  /**
+   * Realtime Synchronization Engine
    */
   async function syncFromCloud() {
     if (isSavingToCloud) return;
@@ -206,11 +275,13 @@
       if (response.ok) {
         const cloudData = await response.json();
         if (Array.isArray(cloudData)) {
-          const currentHash = JSON.stringify(cloudData);
+          const mergedList = mergeBatches(batches, cloudData);
+          const currentLocalHash = JSON.stringify(batches);
+          const currentCloudHash = JSON.stringify(cloudData);
+          const mergedHash = JSON.stringify(mergedList);
 
-          if (currentHash !== lastSyncHash) {
-            lastSyncHash = currentHash;
-            batches = cloudData;
+          if (currentLocalHash !== mergedHash) {
+            batches = mergedList;
             localStorage.setItem(MASTER_STORAGE_KEY, JSON.stringify(batches));
             renderApp();
 
@@ -225,7 +296,14 @@
               }
             }
           }
-          if (syncText) syncText.textContent = 'متصل بالسحابة الموحدة 🟢 (تكامل تام بين جميع الأشخاص)';
+
+          // If the cloud state was outdated, push the fully merged state to synchronize everyone
+          if (currentCloudHash !== mergedHash) {
+            pushToCloud();
+          }
+
+          lastSyncHash = mergedHash;
+          if (syncText) syncText.textContent = 'متصل بالسحابة الموحدة 🟢 (تكامل تام وتزامن دائم بين الأجهزة)';
         }
       }
     } catch (e) {
@@ -249,7 +327,7 @@
       });
 
       if (response.ok) {
-        if (syncText) syncText.textContent = 'متصل بالسحابة الموحدة 🟢 (تكامل تام بين جميع الأشخاص)';
+        if (syncText) syncText.textContent = 'متصل بالسحابة الموحدة 🟢 (تكامل تام وتزامن دائم بين الأجهزة)';
       } else {
         if (syncText) syncText.textContent = 'محفوظ محلياً (سيتم المزامنة عند الجاهزية)';
       }
@@ -268,12 +346,13 @@
   }
 
   function renderStats() {
-    let totalBatches = batches.length;
+    const activeList = batches.filter(b => b && b.deleted !== true);
+    let totalBatches = activeList.length;
     let quarantineWeight = 0;
     let totalPassBlisters = 0;
     let totalReworkBlisters = 0;
 
-    batches.forEach(b => {
+    activeList.forEach(b => {
       if (!b || !Array.isArray(b.stages) || b.stages.length === 0) return;
       
       const stIndex = (b.currentStageIndex !== undefined && b.currentStageIndex >= 0 && b.currentStageIndex < b.stages.length) ? b.currentStageIndex : 0;
@@ -303,7 +382,8 @@
   }
 
   function renderBatchesGrid() {
-    let filtered = batches.filter(b => {
+    const activeList = batches.filter(b => b && b.deleted !== true);
+    let filtered = activeList.filter(b => {
       if (!b) return false;
       const matchForm = currentFormFilter === 'all' || b.pharmaForm === currentFormFilter;
       const matchSearch = (b.productName || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -415,7 +495,8 @@
     if (!elQuarantineGrid) return;
     elQuarantineGrid.innerHTML = '';
 
-    if (batches.length === 0) {
+    const activeList = batches.filter(b => b && b.deleted !== true);
+    if (activeList.length === 0) {
       elQuarantineGrid.innerHTML = `
         <div style="grid-column: 1/-1; text-align: center; padding: 3rem; color: var(--text-muted); background: var(--bg-card); border-radius: var(--radius-lg); border: 1px dashed var(--border-color);">
           <p style="font-size: 1.1rem; margin-bottom: 0.5rem;">لا توجد أصناف بالحجر حالياً.</p>
@@ -424,7 +505,7 @@
       return;
     }
 
-    batches.forEach(batch => {
+    activeList.forEach(batch => {
       if (!batch || !Array.isArray(batch.stages) || batch.stages.length === 0) return;
       const stIndex = (batch.currentStageIndex !== undefined && batch.currentStageIndex >= 0 && batch.currentStageIndex < batch.stages.length) ? batch.currentStageIndex : 0;
       const currentStage = batch.stages[stIndex];
@@ -723,6 +804,8 @@
       expDate: inputExpDate.value,
       stages: initialStages,
       currentStageIndex: 0,
+      updatedAt: Date.now(),
+      deleted: false,
       logs: [
         {
           time: new Date().toLocaleString('ar-EG'),
@@ -794,8 +877,11 @@
     const batch = batches.find(b => b && String(b.id) === String(batchId));
     const batchName = batch ? batch.productName : '';
     
-    if (confirm(`هل أنت تأكد من إلغاء وحذف تشغيلة المنتج [${batchName}] نهائياً من خط الإنتاج والحجر؟`)) {
-      batches = batches.filter(b => b && String(b.id) !== String(batchId));
+    if (confirm(`هل أنت متأكد من إلغاء وحذف تشغيلة المنتج [${batchName}] نهائياً من خط الإنتاج والحجر؟`)) {
+      if (batch) {
+        batch.deleted = true;
+        batch.updatedAt = Date.now();
+      }
       saveBatches(true);
       if (String(activeBatchId) === String(batchId)) {
         closeBatchDetailModal();
@@ -948,6 +1034,7 @@
       });
 
       isEditCorrectionMode = false;
+      batch.updatedAt = Date.now();
       saveBatches(true);
       renderWorkflowTimeline(batch);
       renderStageLogger(batch);
@@ -1013,6 +1100,7 @@
         `تسجيل إنجاز بمرحلة [${stage.name}]: (${addAcceptedKg} كغ مقبول = ${PharmaMath.formatNumber(addAcceptedBlisters)} ظرف) و (${addRejectedKg} كغ مرفوض = ${PharmaMath.formatNumber(addRejectedBlisters)} ظرف).`
     });
 
+    batch.updatedAt = Date.now();
     saveBatches(true);
     renderWorkflowTimeline(batch);
     renderStageLogger(batch);
