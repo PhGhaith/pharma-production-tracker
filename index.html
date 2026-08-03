@@ -17,6 +17,36 @@
   <link rel="stylesheet" href="styles.css?v=15.0">
 </head>
 <body>
+  <!-- Fullscreen Login Lock Screen -->
+  <div id="login-lock-screen" class="modal-overlay" style="z-index: 9999; background: radial-gradient(circle, var(--bg-card) 60%, #0b0f19 100%);">
+    <div class="modal-card" style="max-width: 400px; text-align: center; border: 1px solid var(--border-color); box-shadow: 0 20px 50px rgba(0,0,0,0.6);">
+      <div style="margin-bottom: 2rem;">
+        <div style="width: 70px; height: 70px; border-radius: 50%; background: var(--emerald-glow); border: 1px solid rgba(16, 185, 129, 0.4); display: flex; align-items: center; justify-content: center; margin: 0 auto 1.25rem auto;">
+          <i data-lucide="shield-check" style="width: 36px; height: 36px; color: var(--emerald);"></i>
+        </div>
+        <h2 style="font-weight: 800; font-size: 1.4rem; color: #fff; margin-bottom: 0.5rem;">بوابة الدخول الآمن</h2>
+        <p style="font-size: 0.85rem; color: var(--text-muted);">نظام تتبع الإنتاج والحجر - IDM Pharma</p>
+      </div>
+
+      <form id="form-login-auth" style="margin-bottom: 1.5rem;">
+        <div class="form-group" style="margin-bottom: 1.25rem;">
+          <label for="input-login-passcode" style="text-align: right; display: block; margin-bottom: 0.5rem;">رمز المرور الخاص بالشركة *</label>
+          <input type="password" id="input-login-passcode" style="direction: ltr; text-align: center; font-size: 1.2rem; letter-spacing: 0.15em;" placeholder="••••••••" required>
+          <small id="login-error-msg" class="help-text" style="color: var(--rose); display: block; margin-top: 0.5rem; display: none;">رمز المرور غير صحيح، يرجى المحاولة مجدداً.</small>
+        </div>
+        <button type="submit" class="btn btn-primary" style="width: 100%; justify-content: center; height: 46px; font-size: 1rem;">
+          <i data-lucide="log-in"></i>
+          <span>تسجيل الدخول للنظام</span>
+        </button>
+      </form>
+
+      <div style="border-top: 1px solid var(--border-color); padding-top: 1rem; font-size: 0.75rem; color: var(--text-dim);">
+        <i data-lucide="lock" style="width: 12px; height: 12px; vertical-align: middle; margin-left: 2px;"></i>
+        <span>مؤمن وحصري لشركة IDM Pharma © 2026</span>
+      </div>
+    </div>
+  </div>
+
   <div id="app" class="app-container">
     
     <!-- Top Header -->
@@ -41,6 +71,12 @@
         <button id="btn-server-settings" class="btn btn-secondary" style="border-color: var(--cyan); color: var(--cyan);" title="ضبط رابط سيرفر قاعدة البيانات السحابية">
           <i data-lucide="settings"></i>
           <span>إعدادات السيرفر</span>
+        </button>
+
+        <!-- Logout Button -->
+        <button id="btn-logout" class="btn btn-secondary" style="border-color: var(--rose); color: var(--rose);" title="تسجيل الخروج وقفل الشاشة">
+          <i data-lucide="log-out"></i>
+          <span>خروج</span>
         </button>
 
         <!-- Reset Memory & Reconnect Button -->
@@ -469,7 +505,7 @@
   <!-- Scripts with cache-busting timestamp -->
   <script src="pharmaMath.js?v=15.0"></script>
   <script src="mockData.js?v=15.0"></script>
-  <script src="app_v11.js?v=1.5"></script>
+  <script src="app_v11.js?v=1.6"></script>
   <script>
     lucide.createIcons();
   </script>

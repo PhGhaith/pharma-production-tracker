@@ -67,6 +67,13 @@
   const btnSaveServerUrl = document.getElementById('btn-save-server-url');
   const cloudSyncIndicator = document.getElementById('cloud-sync-indicator');
 
+  // Auth Screen Elements
+  const loginLockScreen = document.getElementById('login-lock-screen');
+  const formLoginAuth = document.getElementById('form-login-auth');
+  const inputLoginPasscode = document.getElementById('input-login-passcode');
+  const loginErrorMsg = document.getElementById('login-error-msg');
+  const btnLogout = document.getElementById('btn-logout');
+
   // Navigation Tabs
   const viewTabProduction = document.getElementById('view-tab-production');
   const viewTabQuarantine = document.getElementById('view-tab-quarantine');
@@ -158,7 +165,34 @@
     cream: 'كريمات ومراهم'
   };
 
-  function init() {
+  let correctPasscode = 'IDM@2026';
+
+  async function checkAuthentication() {
+    if (CLOUD_API_BASE.includes('.firebaseio.com')) {
+      try {
+        const configUrl = CLOUD_API_BASE.split('/').slice(0, 3).join('/') + '/app_config.json';
+        const res = await fetch(configUrl);
+        if (res.ok) {
+          const configData = await res.json();
+          if (configData && configData.passcode) {
+            correctPasscode = configData.passcode;
+          }
+        }
+      } catch (e) {
+        // fallback
+      }
+    }
+
+    const entered = localStorage.getItem('pharma_production_entered_passcode');
+    if (entered === correctPasscode) {
+      if (loginLockScreen) loginLockScreen.classList.add('hidden');
+    } else {
+      if (loginLockScreen) loginLockScreen.classList.remove('hidden');
+    }
+  }
+
+  async function init() {
+    await checkAuthentication();
     loadBatchesLocal();
     setupEventListeners();
     renderApp();
@@ -815,6 +849,35 @@
         syncFromCloud().then(() => {
           pushToCloud(true);
         });
+      });
+    }
+
+    // Auth Event Listeners
+    if (formLoginAuth) {
+      formLoginAuth.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const val = inputLoginPasscode.value.trim();
+        if (val === correctPasscode) {
+          localStorage.setItem('pharma_production_entered_passcode', val);
+          if (loginLockScreen) loginLockScreen.classList.add('hidden');
+          if (loginErrorMsg) loginErrorMsg.style.display = 'none';
+          syncFromCloud();
+        } else {
+          if (loginErrorMsg) loginErrorMsg.style.display = 'block';
+          if (inputLoginPasscode) {
+            inputLoginPasscode.value = '';
+            inputLoginPasscode.focus();
+          }
+        }
+      });
+    }
+
+    if (btnLogout) {
+      btnLogout.addEventListener('click', () => {
+        if (confirm('هل تريد تسجيل الخروج وقفل الشاشة؟')) {
+          localStorage.removeItem('pharma_production_entered_passcode');
+          window.location.reload();
+        }
       });
     }
   }
