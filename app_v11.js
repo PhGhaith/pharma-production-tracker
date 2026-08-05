@@ -1014,7 +1014,7 @@
   function openNewBatchModal() {
     if (elFormNewBatch) elFormNewBatch.reset();
     if (inputIsCoated) inputIsCoated.value = 'false';
-    if (inputLotsCount) inputLotsCount.value = '1';
+    if (inputLotsCount) inputLotsCount.value = '';
     toggleCoatingFields();
 
     const today = new Date().toISOString().split('T')[0];
