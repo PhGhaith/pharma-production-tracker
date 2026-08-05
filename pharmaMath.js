@@ -79,7 +79,7 @@ const PharmaMath = {
    */
   formatNumber: function (num) {
     if (isNaN(num)) return '0';
-    return num.toLocaleString('ar-EG');
+    return num.toLocaleString('en-US');
   }
 };
 

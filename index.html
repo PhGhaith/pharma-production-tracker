@@ -121,28 +121,6 @@
         </div>
 
         <div class="stat-card">
-          <div class="stat-icon icon-amber">
-            <i data-lucide="warehouse"></i>
-          </div>
-          <div class="stat-info">
-            <span class="stat-label">ما يحتويه الحجر (وزن)</span>
-            <h2><span id="stat-quarantine-weight">0</span> <small>كغ</small></h2>
-            <span class="stat-desc">محتوى المستودع من كافة الأصناف</span>
-          </div>
-        </div>
-
-        <div class="stat-card">
-          <div class="stat-icon icon-cyan">
-            <i data-lucide="check-circle-2"></i>
-          </div>
-          <div class="stat-info">
-            <span class="stat-label">ظروف مطابقة (PASS)</span>
-            <h2><span id="stat-pass-blisters">0</span> <small>ظرف</small></h2>
-            <span class="stat-desc">كمية الظروف المقرة والمطابقة</span>
-          </div>
-        </div>
-
-        <div class="stat-card">
           <div class="stat-icon icon-rose">
             <i data-lucide="alert-triangle"></i>
           </div>
@@ -153,18 +131,6 @@
           </div>
         </div>
       </section>
-
-      <!-- View Navigation Tabs (خطوط الإنتاج vs شاشة الحجر والمستودع) -->
-      <div class="view-nav-bar">
-        <button id="view-tab-production" class="view-tab active">
-          <i data-lucide="layout-grid"></i>
-          <span>خطوط الإنتاج والتشغيلات</span>
-        </button>
-        <button id="view-tab-quarantine" class="view-tab">
-          <i data-lucide="warehouse"></i>
-          <span>محتويات وشاشة الحجر (المستودع)</span>
-        </button>
-      </div>
 
       <!-- VIEW 1: Production Batches Grid View -->
       <div id="view-production-container">
@@ -192,24 +158,6 @@
           </div>
           <div id="batches-grid" class="batches-grid">
             <!-- Batches cards injected dynamically -->
-          </div>
-        </section>
-      </div>
-
-      <!-- VIEW 2: Quarantine Inventory Dedicated View -->
-      <div id="view-quarantine-container" class="hidden">
-        <section class="quarantine-section">
-          <div class="section-header">
-            <div>
-              <h3><i data-lucide="warehouse" style="color: var(--amber);"></i> شاشة محتويات الحجر والمستودع</h3>
-              <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 0.2rem;">
-                عرض شامل لجميع الأصناف والمواد الموجودة داخل الحجر وحالتها الفيزيائية وجودتها (PASS / REJECTED بالظروف).
-              </p>
-            </div>
-          </div>
-
-          <div class="quarantine-grid" id="quarantine-grid">
-            <!-- Quarantine items injected dynamically -->
           </div>
         </section>
       </div>
@@ -253,15 +201,15 @@
             </div>
 
             <div class="form-group">
-              <label for="input-is-coated">حالة التلبيس بالفيلم *</label>
+              <label for="input-is-coated">حالة التلبيس *</label>
               <select id="input-is-coated" required>
-                <option value="true">ملبس بالفيلم (Film Coated)</option>
-                <option value="false" selected>غير ملبس بالفيلم (Uncoated)</option>
+                <option value="true">ملبس (Coated)</option>
+                <option value="false" selected>غير ملبس (Uncoated)</option>
               </select>
             </div>
 
             <div class="form-group">
-              <label for="input-batch-weight">الوزن الكلي للباتش (كغ) *</label>
+              <label for="input-batch-weight">الوزن الكلي للباتش (kg) *</label>
               <input type="number" step="0.01" id="input-batch-weight" placeholder="مثال: 100" required>
             </div>
 
@@ -277,8 +225,8 @@
             </div>
 
             <div class="form-group">
-              <label for="input-carry-over-kg">الكمية المنقولة من الباتش السابق (كغ)</label>
-              <input type="number" step="0.1" id="input-carry-over-kg" placeholder="مثال: 4.5 كغ">
+              <label for="input-carry-over-kg">الكمية المنقولة من الباتش السابق (kg)</label>
+              <input type="number" step="0.1" id="input-carry-over-kg" placeholder="مثال: 4.5 kg">
             </div>
 
             <div class="form-group" id="group-pre-coating-weight">
@@ -292,7 +240,7 @@
             </div>
 
             <div class="form-group">
-              <label for="input-units-per-blister">عدد المضغوطات بالظرف (البليستر) *</label>
+              <label for="input-units-per-blister" id="label-units-per-blister">عدد الوحدات بالظرف (البليستر) *</label>
               <input type="number" id="input-units-per-blister" placeholder="مثال: 10" required>
             </div>
 
@@ -316,14 +264,14 @@
             <div class="math-preview-results">
               <div class="math-item">
                 <span>وزن اللوت الواحد (Single Lot):</span>
-                <strong id="preview-lot-weight">0 كغ/لوت</strong>
+                <strong id="preview-lot-weight">0 kg/Lot</strong>
               </div>
               <div class="math-item">
-                <span>عدد المضغوطات الكلي:</span>
-                <strong id="preview-total-tablets">0 مضغوطة</strong>
+                <span id="label-preview-total-units">إجمالي عدد الوحدات الكلي:</span>
+                <strong id="preview-total-tablets">0</strong>
               </div>
               <div class="math-item highlight">
-                <span>إجمالي البليسترات/الظروف المتوقعة:</span>
+                <span id="label-preview-total-packs">إجمالي البليسترات/الظروف المتوقعة:</span>
                 <strong id="preview-total-blisters">0 ظرف/بليستر</strong>
               </div>
             </div>
@@ -359,11 +307,11 @@
           <div class="detail-meta-grid">
             <div class="meta-card">
               <span class="meta-label">الوزن الإجمالي</span>
-              <strong id="detail-total-weight">0 كغ</strong>
+              <strong id="detail-total-weight">0 kg</strong>
             </div>
             <div class="meta-card highlight">
               <span class="meta-label">تقسيم اللوتات</span>
-              <strong id="detail-lots-info">0 لوت</strong>
+              <strong id="detail-lots-info">0 Lot</strong>
             </div>
             <div class="meta-card">
               <span class="meta-label">الباتش السابق المنقول منه</span>
@@ -374,8 +322,8 @@
               <strong id="detail-coating-status">-</strong>
             </div>
             <div class="meta-card">
-              <span class="meta-label">وزن المضغوطة</span>
-              <strong id="detail-tablet-weights">0 ملغ</strong>
+              <span class="meta-label" id="label-detail-tablet-weights">وزن الوحدة</span>
+              <strong id="detail-tablet-weights">0 mg</strong>
             </div>
             <div class="meta-card highlight">
               <span class="meta-label">إجمالي البليسترات الكلية</span>
@@ -406,20 +354,20 @@
 
             <div class="logger-grid">
               <div class="logger-info-card">
-                <span>الكيلوغرامات الإجمالية للمرحلة:</span>
-                <strong id="log-stage-total-kg">0 كغ</strong>
-                <small id="log-stage-total-blisters">(0 لوت / 0 ظرف)</small>
+                <span>الكمية الإجمالية للمرحلة:</span>
+                <strong id="log-stage-total-kg">0 kg</strong>
+                <small id="log-stage-total-blisters">(0 Lot / 0 ظرف)</small>
               </div>
 
               <div class="logger-info-card success">
-                <span>الكميات والظروف المقبولة (PASS):</span>
-                <strong id="log-stage-accepted-kg" style="color: var(--emerald);">0 كغ</strong>
+                <span>الكميات المقبولة (PASS):</span>
+                <strong id="log-stage-accepted-kg" style="color: var(--emerald);">0 kg</strong>
                 <small id="log-stage-accepted-blisters" style="color: var(--emerald);">(0 ظرف مقبول)</small>
               </div>
 
               <div class="logger-info-card warning">
-                <span>الكميات والظروف المرفوضة/إعادة تشغيل:</span>
-                <strong id="log-stage-rejected-kg" style="color: var(--rose);">0 كغ</strong>
+                <span>الكميات المرفوضة/إعادة تشغيل:</span>
+                <strong id="log-stage-rejected-kg" style="color: var(--rose);">0 kg</strong>
                 <small id="log-stage-rejected-blisters" style="color: var(--rose);">(0 ظرف مرفوض)</small>
               </div>
             </div>
@@ -503,9 +451,9 @@
   </div>
 
   <!-- Scripts with cache-busting timestamp -->
-  <script src="pharmaMath.js?v=15.0"></script>
+  <script src="pharmaMath.js?v=15.1"></script>
   <script src="mockData.js?v=15.0"></script>
-  <script src="app_v11.js?v=1.6"></script>
+  <script src="app_v11.js?v=1.8"></script>
   <script>
     lucide.createIcons();
   </script>

@@ -165,6 +165,61 @@
     cream: 'كريمات ومراهم'
   };
 
+  const FORMS_TERMINOLOGY = {
+    solid: {
+      unitName: 'مضغوطة',
+      unitPlural: 'مضغوطات',
+      packName: 'ظرف',
+      packPlural: 'بليسترات',
+      packLabel: 'إجمالي البليسترات الكلية',
+      packLabelShort: 'إجمالي البليسترات',
+      weightLabel: 'وزن المضغوطة',
+      weightLabelPre: 'وزن المضغوطة قبل التلبيس',
+      unitsPerPackLabel: 'عدد المضغوطات بالظرف (البليستر) *'
+    },
+    capsule: {
+      unitName: 'كبسولة',
+      unitPlural: 'كبسولات',
+      packName: 'ظرف',
+      packPlural: 'بليسترات',
+      packLabel: 'إجمالي البليسترات الكلية',
+      packLabelShort: 'إجمالي البليسترات',
+      weightLabel: 'وزن التعبئة للكبسولة الواحدة',
+      weightLabelPre: 'وزن التعبئة للكبسولة الواحدة',
+      unitsPerPackLabel: 'عدد الكبسولات بالظرف (البليستر) *'
+    },
+    suppository: {
+      unitName: 'تحميلة',
+      unitPlural: 'تحاميل',
+      packName: 'ظرف',
+      packPlural: 'بليسترات',
+      packLabel: 'إجمالي البليسترات الكلية',
+      packLabelShort: 'إجمالي البليسترات',
+      weightLabel: 'وزن التحميلة',
+      weightLabelPre: 'وزن التحميلة',
+      unitsPerPackLabel: 'عدد التحاميل بالظرف (البليستر) *'
+    },
+    cream: {
+      unitName: 'تيوب',
+      unitPlural: 'تيوبات',
+      packName: 'تيوب',
+      packPlural: 'تيوبات',
+      packLabel: 'إجمالي التيوبات الكلية',
+      packLabelShort: 'إجمالي التيوبات',
+      weightLabel: 'وزن التيوب',
+      weightLabelPre: 'وزن التيوب',
+      unitsPerPackLabel: 'عدد الوحدات بالتيوب *'
+    }
+  };
+
+  function getTerminology(form) {
+    return FORMS_TERMINOLOGY[form] || FORMS_TERMINOLOGY.solid;
+  }
+
+  function getUnitLabel(form) {
+    return getTerminology(form).packName;
+  }
+
   let correctPasscode = 'IDM@2026';
 
   async function checkAuthentication() {
@@ -577,7 +632,7 @@
         <div class="batch-card-header">
           <div class="batch-title">
             <h4>${batch.productName}</h4>
-            <span class="batch-code"># ${batch.batchNo} (${lCountVal.toFixed(2)} لوت / ${lotWeightKg} كغ للوت)</span>
+            <span class="batch-code"># ${batch.batchNo} (${lCountVal.toFixed(2)} Lot / ${lotWeightKg} kg/Lot)</span>
           </div>
           <div class="header-right-actions">
             <span class="pharma-badge ${batch.pharmaForm}">${batch.pharmaFormLabel || FORM_LABELS_MAP[batch.pharmaForm] || '-'}</span>
@@ -589,13 +644,13 @@
 
         ${batch.priorBatchNo ? `
           <div class="batch-card-weights-pill" style="background: rgba(245, 158, 11, 0.1); border: 1px dashed rgba(245, 158, 11, 0.3); color: var(--amber);">
-            <span>منقول من باتش سابق: <strong>#${batch.priorBatchNo} (${batch.carryOverKg} كغ)</strong></span>
+            <span>منقول من باتش سابق: <strong>#${batch.priorBatchNo} (${batch.carryOverKg} kg)</strong></span>
           </div>
         ` : ''}
 
         <div class="batch-card-weights-pill">
-          <span>التلبيس: <strong>${batch.isCoated ? 'ملبس بالفيلم' : 'غير ملبس'}</strong></span>
-          <span>وزن الوحدة: <strong>${batch.isCoated ? batch.postCoatingMg + ' ملغ' : batch.preCoatingMg + ' ملغ'}</strong></span>
+          <span>التلبيس: <strong>${batch.isCoated ? 'ملبس' : 'غير ملبس'}</strong></span>
+          <span>وزن الوحدة: <strong>${batch.isCoated ? batch.postCoatingMg + ' mg' : batch.preCoatingMg + ' mg'}</strong></span>
         </div>
 
         <div class="stage-indicator-box">
@@ -609,13 +664,13 @@
           </div>
 
           <div class="stage-weight-details">
-            <span>المنجز: ${doneKg} كغ (${mathDone.equivalentLots.toFixed(2)} لوت | ${PharmaMath.formatNumber(mathDone.totalBlisters)} ظرف)</span>
-            <span>إجمالي الباتش: ${batch.totalWeightKg} كغ</span>
+            <span>المنجز: ${doneKg} kg (${mathDone.equivalentLots.toFixed(2)} Lot | ${PharmaMath.formatNumber(mathDone.totalBlisters)} ${getUnitLabel(batch.pharmaForm)})</span>
+            <span>إجمالي الباتش: ${batch.totalWeightKg} kg</span>
           </div>
         </div>
 
         <div class="batch-footer-meta">
-          <div>إجمالي البليسترات: <strong>${PharmaMath.formatNumber(mathTotal.totalBlisters)} ظرف</strong></div>
+          <div>${batch.pharmaForm === 'cream' ? 'إجمالي التيوبات' : 'إجمالي البليسترات'}: <strong>${PharmaMath.formatNumber(mathTotal.totalBlisters)} ${getUnitLabel(batch.pharmaForm)}</strong></div>
           <div>الانتهاء: <strong>${batch.expDate}</strong></div>
         </div>
       `;
@@ -702,7 +757,7 @@
         <div class="q-item-body">
           <div class="q-info-field">
             <span>الوزن المتبقي بالحجر:</span>
-            <strong>${remKgInQuarantine} كغ (${qMathRem.equivalentLots.toFixed(2)} لوت)</strong>
+            <strong>${remKgInQuarantine} kg (${qMathRem.equivalentLots.toFixed(2)} Lot)</strong>
           </div>
 
           <div class="q-info-field">
@@ -712,12 +767,12 @@
 
           <div class="q-info-field" style="border-right: 3px solid var(--emerald); padding-right: 0.5rem;">
             <span style="color: var(--emerald);">الكمية المقبولة المطابقة:</span>
-            <strong style="color: var(--emerald);">${accKgTotal} كغ (${PharmaMath.formatNumber(qMathAcc.totalBlisters)} ظرف)</strong>
+            <strong style="color: var(--emerald);">${accKgTotal} kg (${PharmaMath.formatNumber(qMathAcc.totalBlisters)} ${getUnitLabel(batch.pharmaForm)})</strong>
           </div>
 
           <div class="q-info-field" style="border-right: 3px solid var(--rose); padding-right: 0.5rem;">
             <span style="color: var(--rose);">الكمية المرفوضة/إعادة تشغيل:</span>
-            <strong style="color: var(--rose);">${rejKgTotal} كغ (${PharmaMath.formatNumber(qMathRej.totalBlisters)} ظرف)</strong>
+            <strong style="color: var(--rose);">${rejKgTotal} kg (${PharmaMath.formatNumber(qMathRej.totalBlisters)} ${getUnitLabel(batch.pharmaForm)})</strong>
           </div>
         </div>
 
@@ -903,16 +958,28 @@
 
   function toggleCoatingFields() {
     const isCoated = inputIsCoated.value === 'true';
-    const isSolid = inputPharmaForm.value === 'solid';
+    const form = inputPharmaForm.value || 'solid';
+    const term = getTerminology(form);
 
-    if (isSolid && isCoated) {
+    if (labelPreCoatingWeight) {
+      if (form === 'solid' && isCoated) {
+        labelPreCoatingWeight.textContent = `${term.weightLabelPre} (mg) *`;
+      } else {
+        labelPreCoatingWeight.textContent = `${term.weightLabel} (mg) *`;
+      }
+    }
+
+    const labelUnitsPerBlister = document.getElementById('label-units-per-blister');
+    if (labelUnitsPerBlister) {
+      labelUnitsPerBlister.textContent = term.unitsPerPackLabel;
+    }
+
+    if (form === 'solid' && isCoated) {
       if (groupPostCoatingWeight) groupPostCoatingWeight.classList.remove('hidden');
       if (inputPostCoatingWeight) inputPostCoatingWeight.required = true;
-      if (labelPreCoatingWeight) labelPreCoatingWeight.textContent = 'وزن المضغوطة قبل التلبيس (ملغ mg) *';
     } else {
       if (groupPostCoatingWeight) groupPostCoatingWeight.classList.add('hidden');
       if (inputPostCoatingWeight) inputPostCoatingWeight.required = false;
-      if (labelPreCoatingWeight) labelPreCoatingWeight.textContent = 'وزن المضغوطة/الوحدة (ملغ mg) *';
     }
 
     updateNewBatchMathPreview();
@@ -925,11 +992,23 @@
     const preMg = parseFloat(inputPreCoatingWeight.value) || 0;
     const postMg = parseFloat(inputPostCoatingWeight.value) || 0;
     const uPerB = parseInt(inputUnitsPerBlister.value, 10) || 1;
+    const form = inputPharmaForm.value || 'solid';
 
     const res = PharmaMath.calculateTotals(wKg, isCoated, preMg, postMg, uPerB, lCount);
-    if (previewLotWeight) previewLotWeight.textContent = `${res.lotWeightKg.toFixed(2)} كغ/لوت`;
-    if (previewTotalTablets) previewTotalTablets.textContent = `${PharmaMath.formatNumber(res.totalTablets)} مضغوطة`;
-    if (previewTotalBlisters) previewTotalBlisters.textContent = `${PharmaMath.formatNumber(res.totalBlisters)} ظرف/بليستر`;
+    if (previewLotWeight) previewLotWeight.textContent = `${res.lotWeightKg.toFixed(2)} kg/Lot`;
+    
+    const term = getTerminology(form);
+    if (previewTotalTablets) previewTotalTablets.textContent = `${PharmaMath.formatNumber(res.totalTablets)} ${term.unitName}`;
+    if (previewTotalBlisters) previewTotalBlisters.textContent = `${PharmaMath.formatNumber(res.totalBlisters)} ${term.packName}`;
+
+    const labelPreviewTotalUnits = document.getElementById('label-preview-total-units');
+    if (labelPreviewTotalUnits) {
+      labelPreviewTotalUnits.textContent = `إجمالي عدد الـ ${term.unitPlural} الكلي:`;
+    }
+    const labelPreviewTotalPacks = document.getElementById('label-preview-total-packs');
+    if (labelPreviewTotalPacks) {
+      labelPreviewTotalPacks.textContent = form === 'cream' ? 'إجمالي التيوبات المتوقعة:' : 'إجمالي البليسترات/الظروف المتوقعة:';
+    }
   }
 
   function openNewBatchModal() {
@@ -1027,8 +1106,8 @@
       deleted: false,
       logs: [
         {
-          time: new Date().toLocaleString('ar-EG'),
-          text: `إنشاء الباتش (${inputBatchWeight.value} كغ / ${lCount.toFixed(2)} لوتات، ${isCoated ? 'ملبس بالفيلم' : 'غير ملبس'})${priorBatch ? ` - منقول من باتش سابق #${priorBatch} (${carryKg} كغ).` : '.'}`
+          time: new Date().toLocaleString('en-US'),
+          text: `إنشاء الباتش (${inputBatchWeight.value} kg / ${lCount.toFixed(2)} Lot، ${isCoated ? 'ملبس' : 'غير ملبس'})${priorBatch ? ` - منقول من باتش سابق #${priorBatch} (${carryKg} kg).` : '.'}`
         }
       ]
     };
@@ -1049,23 +1128,31 @@
 
     if (detailProductName) detailProductName.textContent = batch.productName;
     if (detailBatchNo) detailBatchNo.textContent = batch.batchNo;
+    const term = getTerminology(batch.pharmaForm);
+
     if (detailFormName) detailFormName.textContent = batch.pharmaFormLabel || FORM_LABELS_MAP[batch.pharmaForm] || '-';
-    if (detailTotalWeight) detailTotalWeight.textContent = `${batch.totalWeightKg} كغ`;
+    if (detailTotalWeight) detailTotalWeight.textContent = `${batch.totalWeightKg} kg`;
 
     const lCountVal = parseFloat(batch.lotsCount) || 1;
     const lotWeight = (batch.totalWeightKg / lCountVal).toFixed(2);
-    if (detailLotsInfo) detailLotsInfo.textContent = `${lCountVal.toFixed(2)} لوت (${lotWeight} كغ/لوت)`;
+    if (detailLotsInfo) detailLotsInfo.textContent = `${lCountVal.toFixed(2)} Lot (${lotWeight} kg/Lot)`;
 
-    if (detailPriorBatchInfo) detailPriorBatchInfo.textContent = batch.priorBatchNo ? `#${batch.priorBatchNo} (${batch.carryOverKg} كغ)` : 'لا يوجد (باتش حديث)';
+    if (detailPriorBatchInfo) detailPriorBatchInfo.textContent = batch.priorBatchNo ? `#${batch.priorBatchNo} (${batch.carryOverKg} kg)` : 'لا يوجد (باتش حديث)';
 
-    if (detailCoatingStatus) detailCoatingStatus.textContent = batch.isCoated ? 'ملبس بالفيلم' : 'غير ملبس';
-    if (detailTabletWeights) {
-      detailTabletWeights.textContent = batch.isCoated ? 
-        `قبل: ${batch.preCoatingMg} milg | بعد: ${batch.postCoatingMg} milg` : 
-        `${batch.preCoatingMg || batch.unitWeightMg || 0} milg`;
+    if (detailCoatingStatus) detailCoatingStatus.textContent = batch.isCoated ? 'ملبس' : 'غير ملبس';
+
+    const labelDetailTabletWeights = document.getElementById('label-detail-tablet-weights');
+    if (labelDetailTabletWeights) {
+      labelDetailTabletWeights.textContent = term.weightLabel;
     }
 
-    if (detailUnitsPerBlister) detailUnitsPerBlister.textContent = `${batch.unitsPerBlister} وحدة`;
+    if (detailTabletWeights) {
+      detailTabletWeights.textContent = batch.isCoated ? 
+        `قبل: ${batch.preCoatingMg} mg | بعد: ${batch.postCoatingMg} mg` : 
+        `${batch.preCoatingMg || batch.unitWeightMg || 0} mg`;
+    }
+
+    if (detailUnitsPerBlister) detailUnitsPerBlister.textContent = `${batch.unitsPerBlister} ${term.unitName}`;
 
     const mathTotal = PharmaMath.calculateTotals(
       batch.totalWeightKg,
@@ -1076,7 +1163,13 @@
       batch.lotsCount
     );
 
-    if (detailTotalBlisters) detailTotalBlisters.textContent = `${PharmaMath.formatNumber(mathTotal.totalBlisters)} ظرف`;
+    const detailTotalBlistersLabel = document.querySelector('#detail-total-blisters') ? document.querySelector('#detail-total-blisters').previousElementSibling : null;
+    if (detailTotalBlistersLabel) {
+      detailTotalBlistersLabel.textContent = term.packLabel;
+    }
+    if (detailTotalBlisters) {
+      detailTotalBlisters.textContent = `${PharmaMath.formatNumber(mathTotal.totalBlisters)} ${term.packName}`;
+    }
 
     renderWorkflowTimeline(batch);
     renderStageLogger(batch);
@@ -1116,7 +1209,13 @@
 
     batch.stages.forEach((stage, idx) => {
       const isSelected = idx === activeStageIndex;
-      const isCompleted = stage.doneKg >= batch.totalWeightKg;
+      
+      let maxAllowedTotal = batch.totalWeightKg;
+      if (idx > 0) {
+        const prevStage = batch.stages[idx - 1];
+        maxAllowedTotal = prevStage ? (prevStage.acceptedKg || 0) : 0;
+      }
+      const isCompleted = stage.doneKg >= (maxAllowedTotal - 0.05) && maxAllowedTotal > 0;
 
       const card = document.createElement('div');
       card.className = `stage-step-card ${isSelected ? 'active' : ''} ${isCompleted ? 'completed' : ''}`;
@@ -1125,7 +1224,7 @@
       card.innerHTML = `
         <div class="step-number">${idx + 1}</div>
         <span class="step-name">${stage.name}</span>
-        <span class="step-status">${stage.doneKg} / ${batch.totalWeightKg} كغ</span>
+        <span class="step-status">${stage.doneKg} / ${maxAllowedTotal} kg</span>
       `;
 
       stagesTimeline.appendChild(card);
@@ -1150,7 +1249,8 @@
     if (!stage) return;
 
     if (logStageName) logStageName.textContent = stage.name;
-    const isBlisterStage = stage.id === 'blistering';
+    const isBlisterStage = activeStageIndex === batch.stages.length - 1;
+    const unitLabel = getUnitLabel(batch.pharmaForm);
 
     if (editModeBtnText) editModeBtnText.textContent = isEditCorrectionMode ? 'إلغاء وضع التصحيح' : 'تعديل وتصحيح الإنجاز المسجل';
     if (btnCancelEditMode) btnCancelEditMode.classList.toggle('hidden', !isEditCorrectionMode);
@@ -1164,8 +1264,10 @@
 
     if (isEditCorrectionMode) {
       if (isBlisterStage) {
-        if (labelLogAccepted) labelLogAccepted.textContent = 'تعديل وتصحيح الكلي المقبول (عدد الظروف PASS) *';
-        if (labelLogRejected) labelLogRejected.textContent = 'تعديل وتصحيح الكلي المرفوض (عدد الظروف REJECTED) *';
+        const acceptLabel = batch.pharmaForm === 'cream' ? 'تعديل وتصحيح الكلي المقبول (عدد التيوبات PASS) *' : 'تعديل وتصحيح الكلي المقبول (عدد الظروف PASS) *';
+        const rejectLabel = batch.pharmaForm === 'cream' ? 'تعديل وتصحيح الكلي المرفوض (عدد التيوبات REJECTED) *' : 'تعديل وتصحيح الكلي المرفوض (عدد الظروف REJECTED) *';
+        if (labelLogAccepted) labelLogAccepted.textContent = acceptLabel;
+        if (labelLogRejected) labelLogRejected.textContent = rejectLabel;
         if (inputLogAcceptedKg) inputLogAcceptedKg.value = accMath.totalBlisters;
         if (inputLogRejectedKg) inputLogRejectedKg.value = rejMath.totalBlisters;
       } else {
@@ -1177,30 +1279,40 @@
       if (logConversionHint) logConversionHint.textContent = 'وضع التصحيح نشط: قم بتغيير القيم وتأكيد التعديل لتحديث الحجر والمراحل مباشرة.';
     } else {
       if (isBlisterStage) {
-        if (labelLogAccepted) labelLogAccepted.textContent = 'عدد الظروف/البليسترات المقبولة المضافة (ظرف PASS) *';
-        if (labelLogRejected) labelLogRejected.textContent = 'عدد الظروف المرفوضة/إعادة تشغيل (ظرف REJECTED) *';
-        if (inputLogAcceptedKg) { inputLogAcceptedKg.value = ''; inputLogAcceptedKg.placeholder = 'مثال: 500 ظرف مقبول'; }
-        if (inputLogRejectedKg) { inputLogRejectedKg.value = '0'; inputLogRejectedKg.placeholder = 'مثال: 10 ظروف مرفوضة'; }
-        if (logConversionHint) logConversionHint.textContent = 'مرحلة البليستر: يتم إدخال عدد الظروف مباشرة وتقوم المنظومة بتحويلها تلقائياً إلى الوزن المقابل بالكيلوغرام وتحديث أجهزة المعمل.';
+        const acceptLabel = batch.pharmaForm === 'cream' ? 'عدد التيوبات المقبولة المضافة (تيوب PASS) *' : 'عدد الظروف/البليسترات المقبولة المضافة (ظرف PASS) *';
+        const rejectLabel = batch.pharmaForm === 'cream' ? 'عدد التيوبات المرفوضة/إعادة تشغيل (تيوب REJECTED) *' : 'عدد الظروف المرفوضة/إعادة تشغيل (ظرف REJECTED) *';
+        if (labelLogAccepted) labelLogAccepted.textContent = acceptLabel;
+        if (labelLogRejected) labelLogRejected.textContent = rejectLabel;
+        if (inputLogAcceptedKg) { inputLogAcceptedKg.value = ''; inputLogAcceptedKg.placeholder = batch.pharmaForm === 'cream' ? 'مثال: 500 تيوب مقبول' : `مثال: 500 ${unitLabel} مقبول`; }
+        if (inputLogRejectedKg) { inputLogRejectedKg.value = '0'; inputLogRejectedKg.placeholder = batch.pharmaForm === 'cream' ? 'مثال: 10 تيوبات مرفوضة' : `مثال: 10 ${unitLabel} مرفوضة`; }
+        if (logConversionHint) logConversionHint.textContent = batch.pharmaForm === 'cream' ? 
+          'مرحلة التعبئة النهائية: يتم إدخال عدد الأنابيب/التيوبات مباشرة وتقوم المنظومة بتحويلها تلقائياً إلى الوزن المقابل بالكيلوغرام وتحديث أجهزة المعمل.' : 
+          `مرحلة التعبئة النهائية: يتم إدخال عدد الـ ${unitLabel} مباشرة وتقوم المنظومة بتحويلها تلقائياً إلى الوزن المقابل بالكيلوغرام وتحديث أجهزة المعمل.`;
       } else {
-        if (labelLogAccepted) labelLogAccepted.textContent = 'الكمية المقبولة/المطابقة المضافة (كغ) *';
-        if (labelLogRejected) labelLogRejected.textContent = 'الكمية المرفوضة/إعادة تشغيل (كغ) *';
-        if (inputLogAcceptedKg) { inputLogAcceptedKg.value = ''; inputLogAcceptedKg.placeholder = 'مثال: 18 كغ مقبول'; }
-        if (inputLogRejectedKg) { inputLogRejectedKg.value = '0'; inputLogRejectedKg.placeholder = 'مثال: 2 كغ مرفوض'; }
-        if (logConversionHint) logConversionHint.textContent = 'يتم إدخال الوزن بالكيلوغرام وتقوم المنظومة بتحويلها تلقائياً إلى أعداد ظروف ولوتات وتحديث كافة أجهزة المعمل.';
+        if (labelLogAccepted) labelLogAccepted.textContent = 'الكمية المقبولة/المطابقة المضافة (kg) *';
+        if (labelLogRejected) labelLogRejected.textContent = 'الكمية المرفوضة/إعادة تشغيل (kg) *';
+        if (inputLogAcceptedKg) { inputLogAcceptedKg.value = ''; inputLogAcceptedKg.placeholder = 'مثال: 18 kg مقبول'; }
+        if (inputLogRejectedKg) { inputLogRejectedKg.value = '0'; inputLogRejectedKg.placeholder = 'مثال: 2 kg مرفوض'; }
+        if (logConversionHint) logConversionHint.textContent = 'يتم إدخال الوزن بالكيلوغرام وتقوم المنظومة بتحويلها تلقائياً إلى أعداد ظروف/تيوبات ولوتات وتحديث كافة أجهزة المعمل.';
       }
     }
 
-    const totalMath = PharmaMath.kgToBlistersAndLots(batch.totalWeightKg, batch.isCoated, batch.preCoatingMg, batch.postCoatingMg, batch.unitsPerBlister, batch.totalWeightKg, batch.lotsCount);
+    let maxAllowedTotal = batch.totalWeightKg;
+    if (activeStageIndex > 0) {
+      const prevStage = batch.stages[activeStageIndex - 1];
+      maxAllowedTotal = prevStage ? (prevStage.acceptedKg || 0) : 0;
+    }
 
-    if (logStageTotalKg) logStageTotalKg.textContent = `${batch.totalWeightKg} كغ`;
-    if (logStageTotalBlisters) logStageTotalBlisters.textContent = `(${totalMath.equivalentLots.toFixed(2)} لوت | ${PharmaMath.formatNumber(totalMath.totalBlisters)} ظرف)`;
+    const totalMath = PharmaMath.kgToBlistersAndLots(maxAllowedTotal, batch.isCoated, batch.preCoatingMg, batch.postCoatingMg, batch.unitsPerBlister, batch.totalWeightKg, batch.lotsCount);
 
-    if (logStageAcceptedKg) logStageAcceptedKg.textContent = `${stageAccKg} كغ`;
-    if (logStageAcceptedBlisters) logStageAcceptedBlisters.textContent = `(${PharmaMath.formatNumber(accMath.totalBlisters)} ظرف مقبول)`;
+    if (logStageTotalKg) logStageTotalKg.textContent = `${maxAllowedTotal} kg`;
+    if (logStageTotalBlisters) logStageTotalBlisters.textContent = `(${totalMath.equivalentLots.toFixed(2)} Lot | ${PharmaMath.formatNumber(totalMath.totalBlisters)} ${unitLabel})`;
 
-    if (logStageRejectedKg) logStageRejectedKg.textContent = `${stageRejKg} كغ`;
-    if (logStageRejectedBlisters) logStageRejectedBlisters.textContent = `(${PharmaMath.formatNumber(rejMath.totalBlisters)} ظرف مرفوض/إعادة تشغيل)`;
+    if (logStageAcceptedKg) logStageAcceptedKg.textContent = `${stageAccKg} kg`;
+    if (logStageAcceptedBlisters) logStageAcceptedBlisters.textContent = `(${PharmaMath.formatNumber(accMath.totalBlisters)} ${unitLabel} مقبول)`;
+
+    if (logStageRejectedKg) logStageRejectedKg.textContent = `${stageRejKg} kg`;
+    if (logStageRejectedBlisters) logStageRejectedBlisters.textContent = `(${PharmaMath.formatNumber(rejMath.totalBlisters)} ${unitLabel} مرفوض/إعادة تشغيل)`;
   }
 
   function handleUpdateStageSubmit(e) {
@@ -1210,7 +1322,8 @@
 
     const stage = batch.stages[activeStageIndex];
     if (!stage) return;
-    const isBlisterStage = stage.id === 'blistering';
+    const isBlisterStage = activeStageIndex === batch.stages.length - 1;
+    const term = getTerminology(batch.pharmaForm);
 
     if (isEditCorrectionMode) {
       let newAccKg = 0;
@@ -1235,11 +1348,26 @@
         newRejBlisters = rejMath.totalBlisters;
       }
 
+      let maxAllowedTotal = batch.totalWeightKg;
+      if (activeStageIndex > 0) {
+        const prevStage = batch.stages[activeStageIndex - 1];
+        maxAllowedTotal = prevStage ? (prevStage.acceptedKg || 0) : 0;
+      }
+
+      if ((newAccKg + newRejKg) > (maxAllowedTotal + 0.05)) {
+        if (activeStageIndex > 0) {
+          alert(`الكمية الإجمالية المصححة لا يمكن أن تتجاوز ${maxAllowedTotal.toFixed(2)} kg (المحدودة بالكمية المقبولة في المرحلة السابقة: ${maxAllowedTotal.toFixed(2)} kg).`);
+        } else {
+          alert(`الكمية الإجمالية المصححة لا يمكن أن تتجاوز وزن الباتش الكلي ${maxAllowedTotal.toFixed(2)} kg.`);
+        }
+        return;
+      }
+
       stage.acceptedKg = newAccKg;
       stage.rejectedKg = newRejKg;
       stage.doneKg = newAccKg + newRejKg;
 
-      if (stage.doneKg >= batch.totalWeightKg) {
+      if (stage.doneKg >= (maxAllowedTotal - 0.05)) {
         stage.status = 'completed';
       } else if (stage.doneKg > 0) {
         stage.status = 'in_progress';
@@ -1248,9 +1376,10 @@
       }
 
       if (!Array.isArray(batch.logs)) batch.logs = [];
+      const uLabel = getUnitLabel(batch.pharmaForm);
       batch.logs.unshift({
-        time: new Date().toLocaleString('ar-EG'),
-        text: `تعديل وتصحيح إنجاز مرحلة [${stage.name}]: (الكلي المقبول: ${newAccKg} كغ = ${PharmaMath.formatNumber(newAccBlisters)} ظرف) و (الكلي المرفوض: ${newRejKg} كغ = ${PharmaMath.formatNumber(newRejBlisters)} ظرف).`
+        time: new Date().toLocaleString('en-US'),
+        text: `تعديل وتصحيح إنجاز مرحلة [${stage.name}]: (الكلي المقبول: ${newAccKg} kg = ${PharmaMath.formatNumber(newAccBlisters)} ${uLabel}) و (الكلي المرفوض: ${newRejKg} kg = ${PharmaMath.formatNumber(newRejBlisters)} ${uLabel}).`
       });
 
       isEditCorrectionMode = false;
@@ -1294,10 +1423,19 @@
       return;
     }
 
-    const maxAddableKg = Math.max(0, batch.totalWeightKg - stage.doneKg);
+    let maxAllowedTotal = batch.totalWeightKg;
+    if (activeStageIndex > 0) {
+      const prevStage = batch.stages[activeStageIndex - 1];
+      maxAllowedTotal = prevStage ? (prevStage.acceptedKg || 0) : 0;
+    }
+    const maxAddableKg = Math.max(0, maxAllowedTotal - stage.doneKg);
 
     if (addTotalKg > (maxAddableKg + 0.05)) {
-      alert(`الكمية المتاحة كحد أقصى لهذه المرحلة هي ${maxAddableKg.toFixed(2)} كغ.`);
+      if (activeStageIndex > 0) {
+        alert(`الكمية المتاحة كحد أقصى لهذه المرحلة هي ${maxAddableKg.toFixed(2)} kg (محدودة بالكمية المقبولة في المرحلة السابقة: ${maxAllowedTotal.toFixed(2)} kg).`);
+      } else {
+        alert(`الكمية المتاحة كحد أقصى لهذه المرحلة هي ${maxAddableKg.toFixed(2)} kg.`);
+      }
       return;
     }
 
@@ -1305,7 +1443,7 @@
     stage.acceptedKg = (stage.acceptedKg || 0) + addAcceptedKg;
     stage.rejectedKg = (stage.rejectedKg || 0) + addRejectedKg;
 
-    if (stage.doneKg >= batch.totalWeightKg) {
+    if (stage.doneKg >= (maxAllowedTotal - 0.05)) {
       stage.status = 'completed';
     } else {
       stage.status = 'in_progress';
@@ -1314,11 +1452,14 @@
     batch.currentStageIndex = activeStageIndex;
 
     if (!Array.isArray(batch.logs)) batch.logs = [];
+    const uLabel = getUnitLabel(batch.pharmaForm);
     batch.logs.unshift({
-      time: new Date().toLocaleString('ar-EG'),
+      time: new Date().toLocaleString('en-US'),
       text: isBlisterStage ?
-        `تسجيل إنجاز بالبليستر: (${addAcceptedBlisters} ظرف مقبول = ${addAcceptedKg} كغ) و (${addRejectedBlisters} ظرف مرفوض = ${addRejectedKg} كغ).` :
-        `تسجيل إنجاز بمرحلة [${stage.name}]: (${addAcceptedKg} كغ مقبول = ${PharmaMath.formatNumber(addAcceptedBlisters)} ظرف) و (${addRejectedKg} كغ مرفوض = ${PharmaMath.formatNumber(addRejectedBlisters)} ظرف).`
+        (batch.pharmaForm === 'cream' ?
+          `تسجيل إنجاز بالتعبئة والتعبئة النهائية: (${addAcceptedBlisters} تيوب مقبول = ${addAcceptedKg} kg) و (${addRejectedBlisters} تيوب مرفوض = ${addRejectedKg} kg).` :
+          `تسجيل إنجاز بالبليستر والتغليف: (${addAcceptedBlisters} ${term.packName} مقبول = ${addAcceptedKg} kg) و (${addRejectedBlisters} ${term.packName} مرفوض = ${addRejectedKg} kg).`) :
+        `تسجيل إنجاز بمرحلة [${stage.name}]: (${addAcceptedKg} kg مقبول = ${PharmaMath.formatNumber(addAcceptedBlisters)} ${uLabel}) و (${addRejectedKg} kg مرفوض = ${PharmaMath.formatNumber(addRejectedBlisters)} ${uLabel}).`
     });
 
     batch.version = (batch.version || 0) + 1;
