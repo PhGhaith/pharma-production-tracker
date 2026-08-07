@@ -168,6 +168,7 @@
   const elInputQCAssayVal = document.getElementById('input-qc-assay-val');
   const elQCLotsClearanceTableContainer = document.getElementById('qc-lots-clearance-table-container');
   const elQCBatchStatusBadge = document.getElementById('qc-batch-status-badge');
+  const elQCRunsLoggedList = document.getElementById('qc-runs-logged-list');
 
   const FORM_LABELS_MAP = {
     solid: 'أقراص صلبة',
@@ -1659,6 +1660,9 @@
         elQCBatchStatusBadge.style.color = 'var(--amber)';
       }
     }
+
+    // Update logged runs list
+    renderQCRunsHistory(batch);
   }
 
   function renderQCForm(batch) {
@@ -1705,6 +1709,18 @@
       // Populate checkboxes for Lots
       if (elQCLotsCheckboxesContainer) {
         elQCLotsCheckboxesContainer.innerHTML = '';
+        
+        // Add "Select All" checkbox
+        const selectAllLabel = document.createElement('label');
+        selectAllLabel.className = 'qc-lots-checkbox-label';
+        selectAllLabel.style.background = 'rgba(59, 130, 246, 0.12)';
+        selectAllLabel.style.borderColor = 'rgba(59, 130, 246, 0.4)';
+        selectAllLabel.innerHTML = `
+          <input type="checkbox" id="qc-select-all-lots" checked onchange="toggleSelectAllQCLots(this)">
+          <span style="font-weight: bold; color: #60a5fa;">تحديد الكل (Select All)</span>
+        `;
+        elQCLotsCheckboxesContainer.appendChild(selectAllLabel);
+
         const lCountVal = Math.ceil(parseFloat(batch.lotsCount) || 1);
         for (let i = 1; i <= lCountVal; i++) {
           const lotName = `Lot ${i}`;
@@ -1797,6 +1813,102 @@
       alert('تم حفظ نتيجة الفحص المخبري بنجاح 🟢');
     }
   }
+
+  window.toggleSelectAllQCLots = function(source) {
+    const checkboxes = document.querySelectorAll('input[name="qc-target-lot"]');
+    checkboxes.forEach(cb => {
+      cb.checked = source.checked;
+    });
+  };
+
+  function renderQCRunsHistory(batch) {
+    if (!elQCRunsLoggedList) return;
+    elQCRunsLoggedList.innerHTML = '';
+    
+    if (!Array.isArray(batch.qc_runs) || batch.qc_runs.length === 0) {
+      elQCRunsLoggedList.innerHTML = '<p class="text-dim" style="font-size: 0.8rem; margin: 0; padding: 5px;">لا توجد تحاليل مسجلة حالياً.</p>';
+      return;
+    }
+
+    const testLabels = {
+      assay: 'المعايرة (Assay)',
+      dissolution: 'الانحلالية (Dissolution)',
+      uniformity: 'تجانس المحتوى (Uniformity)',
+      microbiology: 'الزرع الجرثومي (Microbiology)'
+    };
+
+    batch.qc_runs.forEach(run => {
+      const item = document.createElement('div');
+      item.className = 'history-item';
+      item.style.borderRightColor = run.status === 'passed' ? 'var(--emerald)' : 'var(--rose)';
+      item.style.padding = '0.5rem 0.8rem';
+      item.style.marginBottom = '0.25rem';
+      item.style.fontSize = '0.78rem';
+      
+      const testName = testLabels[run.test_type] || run.test_type;
+      const detailText = (run.test_type === 'assay' && run.assay_val) ? ` (${run.assay_val}%)` : '';
+      
+      item.innerHTML = `
+        <div style="display: flex; flex-direction: column; gap: 2px;">
+          <strong>${testName}${detailText} - ${run.phase || ''}</strong>
+          <span style="color: var(--text-dim); font-size: 0.72rem;">اللوتات: [${(run.target_lots || []).join(', ')}] | النتيجة: [${run.status === 'passed' ? 'مطابق 🟢' : 'غير مطابق 🔴'}]</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <span style="color: var(--text-dim); font-size: 0.72rem;">${run.timestamp || ''}</span>
+          <button type="button" class="btn btn-secondary btn-sm" onclick="deleteQCRun('${run.run_id}')" style="color: var(--rose); border-color: rgba(244, 63, 94, 0.3); padding: 2px 6px; font-size: 0.7rem; display: flex; align-items: center; gap: 3px;">
+            <i data-lucide="trash-2" style="width: 11px; height: 11px;"></i>
+            <span>حذف</span>
+          </button>
+        </div>
+      `;
+      elQCRunsLoggedList.appendChild(item);
+    });
+
+    if (window.lucide) window.lucide.createIcons();
+  }
+
+  window.deleteQCRun = function(runId) {
+    const batch = batches.find(b => b && String(b.id) === String(activeBatchId));
+    if (!batch || !Array.isArray(batch.qc_runs)) return;
+
+    const runIndex = batch.qc_runs.findIndex(r => r.run_id === runId);
+    if (runIndex === -1) return;
+
+    const run = batch.qc_runs[runIndex];
+    const testLabels = {
+      assay: 'المعايرة (Assay)',
+      dissolution: 'الانحلالية (Dissolution)',
+      uniformity: 'تجانس المحتوى (Uniformity)',
+      microbiology: 'الزرع الجرثومي (Microbiology)'
+    };
+    const testLabel = testLabels[run.test_type] || run.test_type;
+
+    if (confirm(`هل أنت متأكد من حذف وتصحيح فحص [${testLabel}] للوتات (${run.target_lots.join(', ')})؟`)) {
+      // Remove from array
+      batch.qc_runs.splice(runIndex, 1);
+
+      // Log this deletion
+      if (!Array.isArray(batch.logs)) batch.logs = [];
+      batch.logs.unshift({
+        time: new Date().toLocaleString('en-US'),
+        text: `تنبيه جودة (QC): قام المختبر بحذف وتصحيح فحص [${testLabel}] للوتات (${run.target_lots.join(', ')}).`
+      });
+
+      batch.version = (batch.version || 0) + 1;
+      batch.updatedAt = Date.now();
+      saveBatches(true);
+
+      // Refresh views
+      renderQCLotsClearanceTable(batch);
+      renderQCForm(batch);
+      renderHistoryList(batch);
+      renderApp();
+
+      if (window.showToast) {
+        window.showToast('تم حذف وتصحيح فحص المختبر بنجاح 🟢', 'success');
+      }
+    }
+  };
 
   document.addEventListener('DOMContentLoaded', init);
 })();

@@ -470,6 +470,14 @@
                 </button>
               </div>
             </form>
+
+            <!-- Logged QC Runs List (for deletion/correction) -->
+            <div id="qc-runs-logged-section" style="margin-top: 1.5rem; border-top: 1px dashed rgba(255,255,255,0.1); padding-top: 1rem;">
+              <h5 style="font-size: 0.9rem; margin-bottom: 0.5rem; font-weight: bold; color: var(--text-dim);">التحاليل المخبرية المسجلة بالباتش (إمكانية الحذف والتصحيح):</h5>
+              <div id="qc-runs-logged-list" style="display: flex; flex-direction: column; gap: 0.5rem; max-height: 150px; overflow-y: auto; padding: 5px;">
+                <!-- Runs loaded dynamically -->
+              </div>
+            </div>
           </div>
 
           <!-- History Section -->
@@ -530,7 +538,7 @@
   <!-- Scripts with cache-busting timestamp -->
   <script src="pharmaMath.js?v=15.1"></script>
   <script src="mockData.js?v=15.0"></script>
-  <script src="app_v11.js?v=2.1"></script>
+  <script src="app_v11.js?v=2.2"></script>
   <script>
     lucide.createIcons();
   </script>
