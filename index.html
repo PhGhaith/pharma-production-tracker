@@ -395,6 +395,83 @@
             </form>
           </div>
 
+          <!-- QC Laboratory Control Box -->
+          <div class="stage-logger-box qc-logger-box" style="border-color: var(--primary); background: rgba(59, 130, 246, 0.03); margin-top: 1.5rem;">
+            <div class="logger-header" style="justify-content: space-between; border-bottom: 1px solid rgba(59, 130, 246, 0.2); padding-bottom: 0.5rem; margin-bottom: 1rem;">
+              <div style="display: flex; align-items: center; gap: 0.5rem;">
+                <i data-lucide="beaker" style="color: var(--primary);"></i>
+                <h4 style="color: var(--primary);">الرقابة المخبرية وضمان الجودة (QC Control)</h4>
+              </div>
+              <span class="badge" id="qc-batch-status-badge" style="background: var(--amber); color: #000; font-size: 0.8rem; padding: 4px 8px; border-radius: 4px; font-weight: bold;">معلق في المختبر</span>
+            </div>
+
+            <!-- QC Lots Status Grid -->
+            <div class="qc-lots-grid-wrapper" style="margin-bottom: 1rem;">
+              <h5 style="font-size: 0.95rem; margin-bottom: 0.5rem; font-weight: bold;">مصفوفة مطابقة اللوتات الفرعية (Lot Clearance Matrix):</h5>
+              <div id="qc-lots-clearance-table-container" style="overflow-x: auto;">
+                <!-- Tables rendered dynamically -->
+              </div>
+            </div>
+
+            <!-- QC Run Input Form -->
+            <form id="form-add-qc-run" class="logger-form" style="border: 1px dashed rgba(59, 130, 246, 0.3); padding: 12px; border-radius: 6px; background: rgba(255,255,255,0.01);">
+              <h5 style="font-size: 0.9rem; margin-bottom: 0.5rem; font-weight: bold; color: var(--primary);">+ تسجيل عينة فحص مخبري جديدة (New QC Test Run):</h5>
+              
+              <div class="form-grid" style="grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1rem;">
+                <!-- Test Type Dropdown -->
+                <div class="form-group">
+                  <label for="input-qc-test-type">نوع الفحص المطلوب *</label>
+                  <select id="input-qc-test-type" required>
+                    <!-- Options populated dynamically -->
+                  </select>
+                </div>
+                
+                <!-- Incubation/Sampling Phase -->
+                <div class="form-group">
+                  <label for="input-qc-phase">الطور / مرحلة السحب *</label>
+                  <select id="input-qc-phase" required>
+                    <option value="بداية الكبس/الإنتاج (Start)">بداية المرحلة (Start)</option>
+                    <option value="وسط الكبس/الإنتاج (Middle)">وسط المرحلة (Middle)</option>
+                    <option value="نهاية الكبس/الإنتاج (End)">نهاية المرحلة (End)</option>
+                    <option value="أثناء المزج والتحضير (Mixing)">أثناء المزج والتحضير (Mixing)</option>
+                  </select>
+                </div>
+
+                <!-- Result Status -->
+                <div class="form-group">
+                  <label for="input-qc-status">نتيجة الفحص المخبري *</label>
+                  <select id="input-qc-status" required>
+                    <option value="passed">مطابق ومقبول (Passed) 🟢</option>
+                    <option value="failed">غير مطابق / مرفوض (Failed) 🔴</option>
+                  </select>
+                </div>
+              </div>
+
+              <!-- Lots selection Checkboxes -->
+              <div class="form-group" style="margin-top: 1rem;">
+                <label style="font-weight: bold; margin-bottom: 0.25rem;">اللوتات الفرعية المشمولة بالتحليل *:</label>
+                <div id="qc-lots-checkboxes-container" style="display: flex; flex-wrap: wrap; gap: 10px; background: rgba(0,0,0,0.15); padding: 10px; border-radius: 4px;">
+                  <!-- Checkboxes generated dynamically -->
+                </div>
+              </div>
+
+              <!-- Assay input value -->
+              <div class="form-row" id="qc-assay-value-group" style="display: none; margin-top: 1rem;">
+                <div class="form-group">
+                  <label for="input-qc-assay-val">تركيز المادة الفعالة المكتشفة (Assay Potency %) *</label>
+                  <input type="number" step="0.01" id="input-qc-assay-val" placeholder="مثال: 99.5">
+                </div>
+              </div>
+
+              <div style="margin-top: 1rem; display: flex; gap: 1rem; align-items: center;">
+                <button type="submit" class="btn btn-primary" id="btn-submit-qc-run" style="background: var(--primary); border-color: var(--primary);">
+                  <i data-lucide="check-square"></i>
+                  <span>حفظ نتائج الفحص المخبري</span>
+                </button>
+              </div>
+            </form>
+          </div>
+
           <!-- History Section -->
           <div class="history-section">
             <h4><i data-lucide="history"></i> سجل العمليات والملاحظات الميدانية</h4>

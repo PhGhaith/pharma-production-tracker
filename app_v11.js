@@ -158,6 +158,17 @@
   const submitStageBtnText = document.getElementById('submit-stage-btn-text');
   const btnCancelEditMode = document.getElementById('btn-cancel-edit-mode');
 
+  // QC DOM references
+  const elFormAddQCRun = document.getElementById('form-add-qc-run');
+  const elInputQCTestType = document.getElementById('input-qc-test-type');
+  const elInputQCPhase = document.getElementById('input-qc-phase');
+  const elInputQCStatus = document.getElementById('input-qc-status');
+  const elQCLotsCheckboxesContainer = document.getElementById('qc-lots-checkboxes-container');
+  const elQCAssayValueGroup = document.getElementById('qc-assay-value-group');
+  const elInputQCAssayVal = document.getElementById('input-qc-assay-val');
+  const elQCLotsClearanceTableContainer = document.getElementById('qc-lots-clearance-table-container');
+  const elQCBatchStatusBadge = document.getElementById('qc-batch-status-badge');
+
   const FORM_LABELS_MAP = {
     solid: 'أقراص صلبة',
     capsule: 'كبسول',
@@ -861,6 +872,12 @@
         if (batch) renderStageLogger(batch);
       });
     }
+    if (elFormAddQCRun) {
+      elFormAddQCRun.addEventListener('submit', handleQCSubmit);
+    }
+    if (elInputQCTestType) {
+      elInputQCTestType.addEventListener('change', handleQCTestTypeChange);
+    }
     if (btnResetCache) {
       btnResetCache.addEventListener('click', handleResetCache);
     }
@@ -1101,6 +1118,7 @@
       expDate: inputExpDate.value,
       stages: initialStages,
       currentStageIndex: 0,
+      qc_runs: [],
       updatedAt: Date.now(),
       version: 1,
       deleted: false,
@@ -1171,8 +1189,11 @@
       detailTotalBlisters.textContent = `${PharmaMath.formatNumber(mathTotal.totalBlisters)} ${term.packName}`;
     }
 
+    if (!Array.isArray(batch.qc_runs)) batch.qc_runs = [];
     renderWorkflowTimeline(batch);
     renderStageLogger(batch);
+    renderQCLotsClearanceTable(batch);
+    renderQCForm(batch);
     renderHistoryList(batch);
 
     if (elModalBatchDetail) elModalBatchDetail.classList.remove('hidden');
@@ -1240,6 +1261,8 @@
       saveBatches(true);
       renderWorkflowTimeline(batch);
       renderStageLogger(batch);
+      renderQCLotsClearanceTable(batch);
+      renderQCForm(batch);
     }
   }
 
@@ -1324,6 +1347,66 @@
     if (!stage) return;
     const isBlisterStage = activeStageIndex === batch.stages.length - 1;
     const term = getTerminology(batch.pharmaForm);
+
+    // QC Gate Validation Checks
+    if (!Array.isArray(batch.qc_runs)) batch.qc_runs = [];
+    
+    let maxAllowedTotal = batch.totalWeightKg;
+    if (activeStageIndex > 0) {
+      const prevStage = batch.stages[activeStageIndex - 1];
+      maxAllowedTotal = prevStage ? (prevStage.acceptedKg || 0) : 0;
+    }
+    
+    // Check 1: Compression/Filling stage needs passed Assay in Preparation
+    if (stage.id === 'compression' || stage.id === 'filling') {
+      const hasPassedAssay = batch.qc_runs.some(r => r.test_type === 'assay' && r.status === 'passed');
+      if (!hasPassedAssay) {
+        alert('يجب تسجيل فحص المعايرة الكيميائية (Assay) ومطابقته بنجاح 🟢 في مرحلة التحضير أولاً قبل إدخال إنجاز هذه المرحلة.');
+        return;
+      }
+    }
+    
+    // Check 2: Blistering/Packaging stage needs passed Dissolution & Uniformity (for Tablets/Capsules)
+    if (stage.id === 'blistering' || stage.id === 'packaging') {
+      if (batch.pharmaForm === 'solid' || batch.pharmaForm === 'capsule') {
+        const hasPassedDiss = batch.qc_runs.some(r => r.test_type === 'dissolution' && r.status === 'passed');
+        const hasPassedUnif = batch.qc_runs.some(r => r.test_type === 'uniformity' && r.status === 'passed');
+        if (!hasPassedDiss || !hasPassedUnif) {
+          alert('يجب تسجيل فحوصات الانحلالية (Dissolution) وتجانس المحتوى (Content Uniformity) ومطابقتها بنجاح 🟢 في مرحلة الضغط/التعبئة أولاً قبل إدخال إنجاز هذه المرحلة.');
+          return;
+        }
+      }
+    }
+
+    // Check 3: Final stage completion needs passed Microbiology
+    if (isBlisterStage) {
+      let willBeDone = 0;
+      if (isEditCorrectionMode) {
+        let newAcc = 0;
+        let newRej = 0;
+        const newAccBlisters = parseFloat(inputLogAcceptedKg.value) || 0;
+        const newRejBlisters = parseFloat(inputLogRejectedKg.value) || 0;
+        newAcc = PharmaMath.blistersToKg(newAccBlisters, batch.isCoated, batch.preCoatingMg, batch.postCoatingMg, batch.unitsPerBlister);
+        newRej = PharmaMath.blistersToKg(newRejBlisters, batch.isCoated, batch.preCoatingMg, batch.postCoatingMg, batch.unitsPerBlister);
+        willBeDone = newAcc + newRej;
+      } else {
+        let addAcc = 0;
+        let addRej = 0;
+        const addAccBlisters = parseFloat(inputLogAcceptedKg.value) || 0;
+        const addRejBlisters = parseFloat(inputLogRejectedKg.value) || 0;
+        addAcc = PharmaMath.blistersToKg(addAccBlisters, batch.isCoated, batch.preCoatingMg, batch.postCoatingMg, batch.unitsPerBlister);
+        addRej = PharmaMath.blistersToKg(addRejBlisters, batch.isCoated, batch.preCoatingMg, batch.postCoatingMg, batch.unitsPerBlister);
+        willBeDone = stage.doneKg + addAcc + addRej;
+      }
+      
+      if (willBeDone >= (maxAllowedTotal - 0.05)) {
+        const hasPassedMicro = batch.qc_runs.some(r => r.test_type === 'microbiology' && r.status === 'passed');
+        if (!hasPassedMicro) {
+          alert('لا يمكن إغلاق مرحلة التغليف والتعبئة النهائية وإفراج الباتش إلا بعد تسجيل فحص الزرع الجرثومي (Microbiology) ومطابقته بنجاح 🟢.');
+          return;
+        }
+      }
+    }
 
     if (isEditCorrectionMode) {
       let newAccKg = 0;
@@ -1488,6 +1571,259 @@
       `;
       stageHistoryList.appendChild(item);
     });
+  }
+
+  function renderQCLotsClearanceTable(batch) {
+    if (!elQCLotsClearanceTableContainer || !batch) return;
+
+    const form = batch.pharmaForm || 'solid';
+    const lCountVal = Math.ceil(parseFloat(batch.lotsCount) || 1);
+    
+    // Determine required tests
+    const isTabletOrCapsule = (form === 'solid' || form === 'capsule');
+    const requiredTests = isTabletOrCapsule 
+      ? ['assay', 'dissolution', 'uniformity', 'microbiology'] 
+      : ['assay', 'microbiology'];
+
+    const testLabels = {
+      assay: 'المعايرة (Assay)',
+      dissolution: 'الانحلالية (Dissolution)',
+      uniformity: 'تجانس المحتوى (Uniformity)',
+      microbiology: 'الزرع الجرثومي (Microbiology)'
+    };
+
+    let tableHtml = `
+      <table class="qc-table">
+        <thead>
+          <tr>
+            <th>اللوت الفرعي</th>
+    `;
+    
+    requiredTests.forEach(test => {
+      tableHtml += `<th>${testLabels[test]}</th>`;
+    });
+    
+    tableHtml += `
+            <th>حالة الإفراج النهائي</th>
+          </tr>
+        </thead>
+        <tbody>
+    `;
+
+    let allLotsReleased = true;
+    let anyLotFailed = false;
+
+    for (let i = 1; i <= lCountVal; i++) {
+      const lotName = `Lot ${i}`;
+      tableHtml += `<tr><td style="font-weight: bold; color: var(--cyan);">${lotName}</td>`;
+      
+      let lotPassedAll = true;
+      let lotFailedAny = false;
+
+      requiredTests.forEach(testType => {
+        // Find latest status of this test for this lot
+        const runsForLot = (batch.qc_runs || []).filter(r => r.test_type === testType && Array.isArray(r.target_lots) && r.target_lots.includes(lotName));
+        
+        let status = 'pending';
+        let detailText = '';
+        
+        if (runsForLot.length > 0) {
+          const hasPassed = runsForLot.some(r => r.status === 'passed');
+          const hasFailed = runsForLot.some(r => r.status === 'failed');
+          
+          if (hasPassed) {
+            status = 'passed';
+            const passedRun = runsForLot.find(r => r.status === 'passed');
+            if (testType === 'assay' && passedRun.assay_val !== undefined && passedRun.assay_val !== null) {
+              detailText = ` (${passedRun.assay_val}%)`;
+            }
+          } else if (hasFailed) {
+            status = 'failed';
+          }
+        }
+
+        if (status === 'passed') {
+          tableHtml += `<td><span class="qc-badge-status passed">مطابق 🟢${detailText}</span></td>`;
+        } else if (status === 'failed') {
+          tableHtml += `<td><span class="qc-badge-status failed">غير مطابق 🔴</span></td>`;
+          lotFailedAny = true;
+        } else {
+          tableHtml += `<td><span class="qc-badge-status pending">قيد الانتظار 🟡</span></td>`;
+          lotPassedAll = false;
+        }
+      });
+
+      let releaseStatusHtml = '';
+      if (lotFailedAny) {
+        releaseStatusHtml = `<span class="qc-badge-status failed" style="width: 100%;">محتجز/مرفوض 🔴</span>`;
+        anyLotFailed = true;
+        allLotsReleased = false;
+      } else if (lotPassedAll) {
+        releaseStatusHtml = `<span class="qc-badge-status passed" style="width: 100%;">مفرج عنه 🟢</span>`;
+      } else {
+        releaseStatusHtml = `<span class="qc-badge-status pending" style="width: 100%;">معلق ⏳</span>`;
+        allLotsReleased = false;
+      }
+
+      tableHtml += `<td>${releaseStatusHtml}</td></tr>`;
+    }
+
+    tableHtml += `</tbody></table>`;
+    elQCLotsClearanceTableContainer.innerHTML = tableHtml;
+
+    // Update batch status badge
+    if (elQCBatchStatusBadge) {
+      if (anyLotFailed) {
+        elQCBatchStatusBadge.textContent = 'مرفوض / محتجز بالكامل 🔴';
+        elQCBatchStatusBadge.style.background = 'rgba(244, 63, 94, 0.2)';
+        elQCBatchStatusBadge.style.color = 'var(--rose)';
+      } else if (allLotsReleased) {
+        elQCBatchStatusBadge.textContent = 'مفرج عنه بالكامل (Released) 🟢';
+        elQCBatchStatusBadge.style.background = 'rgba(16, 185, 129, 0.2)';
+        elQCBatchStatusBadge.style.color = 'var(--emerald)';
+      } else {
+        elQCBatchStatusBadge.textContent = 'معلق في المختبر ⏳';
+        elQCBatchStatusBadge.style.background = 'rgba(245, 158, 11, 0.2)';
+        elQCBatchStatusBadge.style.color = 'var(--amber)';
+      }
+    }
+  }
+
+  function renderQCForm(batch) {
+    if (!elFormAddQCRun || !batch || !Array.isArray(batch.stages)) return;
+    
+    const stage = batch.stages[activeStageIndex];
+    if (!stage) return;
+    
+    const stageId = stage.id;
+    const form = batch.pharmaForm || 'solid';
+    
+    let optionsHtml = '';
+    if (stageId === 'preparation') {
+      optionsHtml = `<option value="assay">المعايرة الكيميائية (Assay)</option>`;
+    } else if (stageId === 'compression' || stageId === 'filling') {
+      if (form === 'solid' || form === 'capsule') {
+        optionsHtml = `
+          <option value="dissolution">الانحلالية (Dissolution)</option>
+          <option value="uniformity">تجانس المحتوى (Content Uniformity)</option>
+        `;
+      }
+    } else if (stageId === 'blistering' || stageId === 'packaging') {
+      optionsHtml = `<option value="microbiology">الزرع الجرثومي (Microbiology)</option>`;
+    }
+    
+    if (optionsHtml === '') {
+      elFormAddQCRun.style.display = 'none';
+      
+      // Add a small notice inside container that this stage requires no QC
+      if (elQCLotsCheckboxesContainer) {
+        elQCLotsCheckboxesContainer.parentElement.style.display = 'none';
+      }
+    } else {
+      elFormAddQCRun.style.display = 'block';
+      if (elQCLotsCheckboxesContainer) {
+        elQCLotsCheckboxesContainer.parentElement.style.display = 'block';
+      }
+      
+      if (elInputQCTestType) {
+        elInputQCTestType.innerHTML = optionsHtml;
+        handleQCTestTypeChange();
+      }
+      
+      // Populate checkboxes for Lots
+      if (elQCLotsCheckboxesContainer) {
+        elQCLotsCheckboxesContainer.innerHTML = '';
+        const lCountVal = Math.ceil(parseFloat(batch.lotsCount) || 1);
+        for (let i = 1; i <= lCountVal; i++) {
+          const lotName = `Lot ${i}`;
+          const label = document.createElement('label');
+          label.className = 'qc-lots-checkbox-label';
+          label.innerHTML = `
+            <input type="checkbox" name="qc-target-lot" value="${lotName}" checked>
+            <span>${lotName}</span>
+          `;
+          elQCLotsCheckboxesContainer.appendChild(label);
+        }
+      }
+    }
+  }
+
+  function handleQCTestTypeChange() {
+    if (!elInputQCTestType || !elQCAssayValueGroup || !elInputQCAssayVal) return;
+    if (elInputQCTestType.value === 'assay') {
+      elQCAssayValueGroup.style.display = 'block';
+      elInputQCAssayVal.required = true;
+    } else {
+      elQCAssayValueGroup.style.display = 'none';
+      elInputQCAssayVal.required = false;
+      elInputQCAssayVal.value = '';
+    }
+  }
+
+  async function handleQCSubmit(e) {
+    e.preventDefault();
+    const batch = batches.find(b => b && String(b.id) === String(activeBatchId));
+    if (!batch) return;
+
+    const checkedBoxes = document.querySelectorAll('input[name="qc-target-lot"]:checked');
+    const targetLots = Array.from(checkedBoxes).map(cb => cb.value);
+    
+    if (targetLots.length === 0) {
+      alert('يرجى اختيار لوت واحد على الأقل لربطه بالفحص المخبري.');
+      return;
+    }
+
+    const test_type = elInputQCTestType.value;
+    const phase = elInputQCPhase.value;
+    const status = elInputQCStatus.value;
+    const assay_val = test_type === 'assay' ? (parseFloat(elInputQCAssayVal.value) || 0) : null;
+
+    const newRun = {
+      run_id: 'qc-run-' + Date.now(),
+      stage_id: batch.stages[activeStageIndex].id,
+      test_type,
+      phase,
+      status,
+      target_lots: targetLots,
+      assay_val,
+      timestamp: new Date().toLocaleString('en-US')
+    };
+
+    if (!Array.isArray(batch.qc_runs)) batch.qc_runs = [];
+    batch.qc_runs.push(newRun);
+
+    // Logging this action
+    if (!Array.isArray(batch.logs)) batch.logs = [];
+    const testLabels = {
+      assay: 'المعايرة (Assay)',
+      dissolution: 'الانحلالية (Dissolution)',
+      uniformity: 'تجانس المحتوى (Uniformity)',
+      microbiology: 'الزرع الجرثومي (Microbiology)'
+    };
+    const testLabel = testLabels[test_type] || test_type;
+    
+    batch.logs.unshift({
+      time: new Date().toLocaleString('en-US'),
+      text: `مراقبة الجودة (QC): تسجيل فحص [${testLabel}] للوتات (${targetLots.join(', ')}) بوضع: [${status === 'passed' ? 'مطابق 🟢' : 'غير مطابق 🔴'}].`
+    });
+
+    batch.version = (batch.version || 0) + 1;
+    batch.updatedAt = Date.now();
+    saveBatches(true);
+
+    if (elInputQCAssayVal) elInputQCAssayVal.value = '';
+
+    // Refresh views
+    renderQCLotsClearanceTable(batch);
+    renderQCForm(batch);
+    renderHistoryList(batch);
+    renderApp();
+
+    if (window.showToast) {
+      window.showToast('تم حفظ نتيجة الفحص المخبري والمزامنة السحابية بنجاح 🟢', 'success');
+    } else {
+      alert('تم حفظ نتيجة الفحص المخبري بنجاح 🟢');
+    }
   }
 
   document.addEventListener('DOMContentLoaded', init);

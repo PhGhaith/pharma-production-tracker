@@ -1079,3 +1079,76 @@ body {
 .hidden {
   display: none !important;
 }
+
+/* QC Control Styles */
+.qc-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 0.5rem;
+  font-size: 0.85rem;
+}
+
+.qc-table th, .qc-table td {
+  padding: 0.6rem;
+  text-align: center;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.qc-table th {
+  background: rgba(59, 130, 246, 0.12);
+  color: #60a5fa;
+  font-weight: bold;
+}
+
+.qc-table tr:nth-child(even) {
+  background: rgba(255, 255, 255, 0.01);
+}
+
+.qc-badge-status {
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: bold;
+  display: inline-block;
+}
+
+.qc-badge-status.passed {
+  background: rgba(16, 185, 129, 0.15);
+  color: var(--emerald);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.qc-badge-status.failed {
+  background: rgba(244, 63, 94, 0.15);
+  color: var(--rose);
+  border: 1px solid rgba(244, 63, 94, 0.3);
+}
+
+.qc-badge-status.pending {
+  background: rgba(245, 158, 11, 0.15);
+  color: var(--amber);
+  border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+.qc-lots-checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255, 255, 255, 0.04);
+  padding: 6px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  transition: background 0.2s;
+  border: 1px solid rgba(255,255,255,0.05);
+}
+
+.qc-lots-checkbox-label:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.qc-lots-checkbox-label input {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+}
