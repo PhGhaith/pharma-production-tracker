@@ -161,7 +161,6 @@
   // QC DOM references
   const elFormAddQCRun = document.getElementById('form-add-qc-run');
   const elInputQCTestType = document.getElementById('input-qc-test-type');
-  const elInputQCPhase = document.getElementById('input-qc-phase');
   const elInputQCStatus = document.getElementById('input-qc-status');
   const elQCLotsCheckboxesContainer = document.getElementById('qc-lots-checkboxes-container');
   const elQCAssayValueGroup = document.getElementById('qc-assay-value-group');
@@ -1762,7 +1761,6 @@
     }
 
     const test_type = elInputQCTestType.value;
-    const phase = elInputQCPhase.value;
     const status = elInputQCStatus.value;
     const assay_val = test_type === 'assay' ? (parseFloat(elInputQCAssayVal.value) || 0) : null;
 
@@ -1770,7 +1768,6 @@
       run_id: 'qc-run-' + Date.now(),
       stage_id: batch.stages[activeStageIndex].id,
       test_type,
-      phase,
       status,
       target_lots: targetLots,
       assay_val,
@@ -1850,7 +1847,7 @@
       
       item.innerHTML = `
         <div style="display: flex; flex-direction: column; gap: 2px;">
-          <strong>${testName}${detailText} - ${run.phase || ''}</strong>
+          <strong>${testName}${detailText}</strong>
           <span style="color: var(--text-dim); font-size: 0.72rem;">اللوتات: [${(run.target_lots || []).join(', ')}] | النتيجة: [${run.status === 'passed' ? 'مطابق 🟢' : 'غير مطابق 🔴'}]</span>
         </div>
         <div style="display: flex; align-items: center; gap: 10px;">

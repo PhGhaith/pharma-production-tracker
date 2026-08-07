@@ -1152,3 +1152,38 @@ body {
   height: 16px;
   cursor: pointer;
 }
+
+/* QC Form Styling Fixes */
+.qc-logger-box select, .qc-logger-box input[type="number"] {
+  background: rgba(0, 0, 0, 0.45) !important;
+  color: #ffffff !important;
+  border: 1px solid rgba(255, 255, 255, 0.2) !important;
+  padding: 0.6rem !important;
+  border-radius: var(--radius-sm) !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+}
+
+.qc-logger-box select option {
+  background: #0f172a !important;
+  color: #ffffff !important;
+}
+
+#btn-submit-qc-run {
+  color: #ffffff !important;
+  font-weight: 700 !important;
+  background: #2563eb !important;
+  border: 1px solid #2563eb !important;
+  padding: 0.65rem 1.25rem !important;
+  border-radius: var(--radius-sm) !important;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  transition: background 0.2s, border-color 0.2s;
+}
+
+#btn-submit-qc-run:hover {
+  background: #1d4ed8 !important;
+  border-color: #1d4ed8 !important;
+}
