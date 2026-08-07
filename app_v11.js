@@ -234,27 +234,7 @@
   let correctPasscode = 'IDM@2026';
 
   async function checkAuthentication() {
-    if (CLOUD_API_BASE.includes('.firebaseio.com')) {
-      try {
-        const configUrl = CLOUD_API_BASE.split('/').slice(0, 3).join('/') + '/app_config.json';
-        const res = await fetch(configUrl);
-        if (res.ok) {
-          const configData = await res.json();
-          if (configData && configData.passcode) {
-            correctPasscode = configData.passcode;
-          }
-        }
-      } catch (e) {
-        // fallback
-      }
-    }
-
-    const entered = localStorage.getItem('pharma_production_entered_passcode');
-    if (entered === correctPasscode) {
-      if (loginLockScreen) loginLockScreen.classList.add('hidden');
-    } else {
-      if (loginLockScreen) loginLockScreen.classList.remove('hidden');
-    }
+    if (loginLockScreen) loginLockScreen.classList.add('hidden');
   }
 
   async function init() {
