@@ -1411,11 +1411,7 @@
         newRejBlisters = rejMath.totalBlisters;
       }
 
-      let maxAllowedTotal = batch.totalWeightKg;
-      if (activeStageIndex > 0) {
-        const prevStage = batch.stages[activeStageIndex - 1];
-        maxAllowedTotal = prevStage ? (prevStage.acceptedKg || 0) : 0;
-      }
+
 
       if ((newAccKg + newRejKg) > (maxAllowedTotal + 0.05)) {
         if (activeStageIndex > 0) {
@@ -1486,11 +1482,7 @@
       return;
     }
 
-    let maxAllowedTotal = batch.totalWeightKg;
-    if (activeStageIndex > 0) {
-      const prevStage = batch.stages[activeStageIndex - 1];
-      maxAllowedTotal = prevStage ? (prevStage.acceptedKg || 0) : 0;
-    }
+
     const maxAddableKg = Math.max(0, maxAllowedTotal - stage.doneKg);
 
     if (addTotalKg > (maxAddableKg + 0.05)) {
