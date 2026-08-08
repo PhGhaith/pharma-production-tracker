@@ -168,6 +168,7 @@
   const elQCLotsClearanceTableContainer = document.getElementById('qc-lots-clearance-table-container');
   const elQCBatchStatusBadge = document.getElementById('qc-batch-status-badge');
   const elQCRunsLoggedList = document.getElementById('qc-runs-logged-list');
+  const elLabelQCValueInput = document.getElementById('label-qc-value-input');
 
   const FORM_LABELS_MAP = {
     solid: 'أقراص صلبة',
@@ -1606,7 +1607,7 @@
           if (hasPassed) {
             status = 'passed';
             const passedRun = runsForLot.find(r => r.status === 'passed');
-            if (testType === 'assay' && passedRun.assay_val !== undefined && passedRun.assay_val !== null) {
+            if ((testType === 'assay' || testType === 'dissolution' || testType === 'uniformity') && passedRun.assay_val !== undefined && passedRun.assay_val !== null) {
               detailText = ` (${passedRun.assay_val}%)`;
             }
           } else if (hasFailed) {
@@ -1737,9 +1738,24 @@
 
   function handleQCTestTypeChange() {
     if (!elInputQCTestType || !elQCAssayValueGroup || !elInputQCAssayVal) return;
-    if (elInputQCTestType.value === 'assay') {
+    const testVal = elInputQCTestType.value;
+    
+    if (testVal === 'assay' || testVal === 'dissolution' || testVal === 'uniformity') {
       elQCAssayValueGroup.style.display = 'block';
       elInputQCAssayVal.required = true;
+      
+      if (elLabelQCValueInput) {
+        if (testVal === 'assay') {
+          elLabelQCValueInput.textContent = 'تركيز المادة الفعالة المكتشفة (Assay Potency %) *';
+          elInputQCAssayVal.placeholder = 'مثال: 99.5';
+        } else if (testVal === 'dissolution') {
+          elLabelQCValueInput.textContent = 'نسبة الانحلالية المكتشفة (Dissolution %) *';
+          elInputQCAssayVal.placeholder = 'مثال: 85.0';
+        } else if (testVal === 'uniformity') {
+          elLabelQCValueInput.textContent = 'نسبة تجانس المحتوى المكتشفة (Content Uniformity %) *';
+          elInputQCAssayVal.placeholder = 'مثال: 100.2';
+        }
+      }
     } else {
       elQCAssayValueGroup.style.display = 'none';
       elInputQCAssayVal.required = false;
@@ -1762,7 +1778,7 @@
 
     const test_type = elInputQCTestType.value;
     const status = elInputQCStatus.value;
-    const assay_val = test_type === 'assay' ? (parseFloat(elInputQCAssayVal.value) || 0) : null;
+    const assay_val = (test_type === 'assay' || test_type === 'dissolution' || test_type === 'uniformity') ? (parseFloat(elInputQCAssayVal.value) || 0) : null;
 
     const newRun = {
       run_id: 'qc-run-' + Date.now(),
@@ -1843,7 +1859,7 @@
       item.style.fontSize = '0.78rem';
       
       const testName = testLabels[run.test_type] || run.test_type;
-      const detailText = (run.test_type === 'assay' && run.assay_val) ? ` (${run.assay_val}%)` : '';
+      const detailText = ((run.test_type === 'assay' || run.test_type === 'dissolution' || run.test_type === 'uniformity') && run.assay_val) ? ` (${run.assay_val}%)` : '';
       
       item.innerHTML = `
         <div style="display: flex; flex-direction: column; gap: 2px;">
