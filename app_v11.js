@@ -1927,12 +1927,12 @@
     
     // Clear or Populate Coating Config Box dynamically
     if (elCoatingConfigContainer) {
-      if (stageId === 'coating') {
+      if (batch.isCoated) {
         const hasDiss = Array.isArray(batch.active_optional_tests) && batch.active_optional_tests.includes('coating_dissolution');
         const hasUnif = Array.isArray(batch.active_optional_tests) && batch.active_optional_tests.includes('coating_uniformity');
         elCoatingConfigContainer.innerHTML = `
-          <div class="coating-config-box" style="margin-bottom: 1rem; padding: 10px; border: 1px dashed rgba(255,255,255,0.1); border-radius: 4px; background: rgba(255,255,255,0.02);">
-            <h6 style="font-weight: bold; margin-bottom: 0.5rem; color: var(--cyan); font-size: 0.85rem;">تفعيل الفحوصات لمرحلة التلبيس (اختياري):</h6>
+          <div class="coating-config-box" style="margin-bottom: 1.25rem; padding: 12px; border: 1px dashed rgba(59, 130, 246, 0.4); border-radius: 6px; background: rgba(59, 130, 246, 0.04);">
+            <h6 style="font-weight: bold; margin-bottom: 0.5rem; color: var(--cyan); font-size: 0.85rem;">تفعيل الفحوصات الاختيارية لمرحلة التلبيس (Coating Tests Checklist):</h6>
             <div style="display: flex; flex-direction: column; gap: 8px;">
               <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.82rem;">
                 <input type="checkbox" id="chk-opt-diss" ${hasDiss ? 'checked' : ''} onchange="toggleCoatingOptionalTest('coating_dissolution', this.checked)">
