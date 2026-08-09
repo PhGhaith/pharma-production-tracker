@@ -1766,8 +1766,8 @@
       assay: 'المعايرة (Assay)',
       dissolution: 'الانحلالية بالضغط',
       uniformity: 'تجانس المحتوى بالضغط',
-      coating_dissolution: 'انحلالية التلبيس (اختياري)',
-      coating_uniformity: 'تجانس التلبيس (اختياري)',
+      coating_dissolution: 'فحص الانحلالية بالتلبيس',
+      coating_uniformity: 'فحص تجانس المحتوى بالتلبيس',
       microbiology: 'الزرع الجرثومي (Microbiology)'
     };
 
@@ -1966,10 +1966,10 @@
       let tempOpts = '';
       if (Array.isArray(batch.active_optional_tests)) {
         if (batch.active_optional_tests.includes('coating_dissolution')) {
-          tempOpts += `<option value="coating_dissolution">الانحلالية بالتلبيس (Dissolution)</option>`;
+          tempOpts += `<option value="coating_dissolution">فحص الانحلالية بالتلبيس (Dissolution)</option>`;
         }
         if (batch.active_optional_tests.includes('coating_uniformity')) {
-          tempOpts += `<option value="coating_uniformity">تجانس التلبيس (Uniformity)</option>`;
+          tempOpts += `<option value="coating_uniformity">فحص تجانس المحتوى بالتلبيس (Content Uniformity)</option>`;
         }
       }
       optionsHtml = tempOpts;
@@ -2208,8 +2208,8 @@
         assay: 'المعايرة (Assay)',
         dissolution: 'الانحلالية بالضغط',
         uniformity: 'تجانس المحتوى بالضغط',
-        coating_dissolution: 'انحلالية التلبيس (اختياري)',
-        coating_uniformity: 'تجانس التلبيس (اختياري)',
+        coating_dissolution: 'فحص الانحلالية بالتلبيس',
+        coating_uniformity: 'فحص تجانس المحتوى بالتلبيس',
         microbiology: 'الزرع الجرثومي (Microbiology)'
       };
       const testName = testLabelsExt[run.test_type] || run.test_type;
