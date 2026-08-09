@@ -161,19 +161,12 @@
 
   // QC DOM references
   const elFormAddQCRun = document.getElementById('form-add-qc-run');
-  const elInputQCTestType = document.getElementById('input-qc-test-type');
-  const elInputQCMicroStatus = document.getElementById('input-qc-micro-status');
-  const elQCMicroStatusGroup = document.getElementById('qc-micro-status-group');
+  const elQCDynamicTestsContainer = document.getElementById('qc-dynamic-tests-container');
   const elInputQCSampleNo = document.getElementById('input-qc-sample-no');
   const elQCLotsCheckboxesContainer = document.getElementById('qc-lots-checkboxes-container');
-  const elQCAssayValueGroup = document.getElementById('qc-assay-value-group');
-  const elInputQCRange = document.getElementById('input-qc-range');
-  const elInputQCResult = document.getElementById('input-qc-result');
   const elQCLotsClearanceTableContainer = document.getElementById('qc-lots-clearance-table-container');
   const elQCBatchStatusBadge = document.getElementById('qc-batch-status-badge');
   const elQCRunsLoggedList = document.getElementById('qc-runs-logged-list');
-  const elLabelQCRangeInput = document.getElementById('label-qc-range-input');
-  const elLabelQCResultInput = document.getElementById('label-qc-result-input');
   const elCoatingConfigContainer = document.getElementById('coating-config-container');
 
   const FORM_LABELS_MAP = {
@@ -1766,8 +1759,8 @@
       assay: 'المعايرة (Assay)',
       dissolution: 'الانحلالية بالضغط',
       uniformity: 'تجانس المحتوى بالضغط',
-      coating_dissolution: 'فحص الانحلالية بالتلبيس',
-      coating_uniformity: 'فحص تجانس المحتوى بالتلبيس',
+      coating_dissolution: 'فحص الانحلالية',
+      coating_uniformity: 'فحص تجانس المحتوى',
       microbiology: 'الزرع الجرثومي (Microbiology)'
     };
 
@@ -1950,37 +1943,30 @@
       }
     }
 
-    let optionsHtml = '';
+    let activeTests = [];
     if (stageId === 'preparation') {
-      optionsHtml = `<option value="assay">المعايرة الكيميائية (Assay)</option>`;
+      activeTests = ['assay'];
     } else if (stageId === 'compression' || stageId === 'filling') {
       if (form === 'solid' || form === 'capsule') {
-        optionsHtml = `
-          <option value="dissolution">الانحلالية (Dissolution)</option>
-          <option value="uniformity">تجانس المحتوى (Content Uniformity)</option>
-        `;
+        activeTests = ['dissolution', 'uniformity'];
       } else if (form === 'suppository' || form === 'cream') {
-        optionsHtml = `<option value="microbiology">الزرع الجرثومي (Microbiology)</option>`;
+        activeTests = ['microbiology'];
       }
     } else if (stageId === 'coating') {
-      let tempOpts = '';
       if (Array.isArray(batch.active_optional_tests)) {
         if (batch.active_optional_tests.includes('coating_dissolution')) {
-          tempOpts += `<option value="coating_dissolution">فحص الانحلالية بالتلبيس (Dissolution)</option>`;
+          activeTests.push('coating_dissolution');
         }
         if (batch.active_optional_tests.includes('coating_uniformity')) {
-          tempOpts += `<option value="coating_uniformity">فحص تجانس المحتوى بالتلبيس (Content Uniformity)</option>`;
+          activeTests.push('coating_uniformity');
         }
       }
-      optionsHtml = tempOpts;
     } else if (stageId === 'blistering' || stageId === 'packaging') {
-      optionsHtml = `<option value="microbiology">الزرع الجرثومي (Microbiology)</option>`;
+      activeTests = ['microbiology'];
     }
-    
-    if (optionsHtml === '') {
+
+    if (activeTests.length === 0) {
       elFormAddQCRun.style.display = 'none';
-      
-      // Add a small notice inside container that this stage requires no QC
       if (elQCLotsCheckboxesContainer) {
         elQCLotsCheckboxesContainer.parentElement.style.display = 'none';
       }
@@ -1989,10 +1975,54 @@
       if (elQCLotsCheckboxesContainer) {
         elQCLotsCheckboxesContainer.parentElement.style.display = 'block';
       }
-      
-      if (elInputQCTestType) {
-        elInputQCTestType.innerHTML = optionsHtml;
-        handleQCTestTypeChange();
+
+      const testNamesMap = {
+        assay: { title: 'فحص المعايرة الكيميائية (Assay)', rangePlaceholder: 'مثال: 95.0% - 105.0%', resultPlaceholder: 'مثال: 99.4%', rangeLabel: 'المجال المقبول للمعايرة (Assay Range)' },
+        dissolution: { title: 'فحص الانحلالية (Dissolution)', rangePlaceholder: 'مثال: ≥ 75%', resultPlaceholder: 'مثال: 82.5%', rangeLabel: 'المجال المقبول للانحلالية (Dissolution Range)' },
+        uniformity: { title: 'فحص تجانس المحتوى (Content Uniformity)', rangePlaceholder: 'مثال: 85.0% - 115.0%', resultPlaceholder: 'مثال: 101.2%', rangeLabel: 'المجال المقبول لتجانس المحتوى' },
+        coating_dissolution: { title: 'فحص الانحلالية (Dissolution)', rangePlaceholder: 'مثال: ≥ 75%', resultPlaceholder: 'مثال: 82.5%', rangeLabel: 'المجال المقبول للانحلالية (Dissolution Range)' },
+        coating_uniformity: { title: 'فحص تجانس المحتوى (Content Uniformity)', rangePlaceholder: 'مثال: 85.0% - 115.0%', resultPlaceholder: 'مثال: 101.2%', rangeLabel: 'المجال المقبول لتجانس المحتوى' },
+        microbiology: { title: 'الزرع الجرثومي (Microbiology)' }
+      };
+
+      let containerHtml = '';
+      activeTests.forEach(testType => {
+        const metadata = testNamesMap[testType] || { title: testType };
+        
+        if (testType === 'microbiology') {
+          containerHtml += `
+            <div class="qc-test-row-container" style="margin-top: 1.25rem; border-top: 1px dashed rgba(255,255,255,0.08); padding-top: 1rem;">
+              <h6 style="font-weight: bold; color: var(--cyan); margin-bottom: 0.5rem; font-size: 0.85rem;">${metadata.title}:</h6>
+              <div class="form-group">
+                <label for="input-qc-micro-status-${testType}">نتيجة فحص الزرع الجرثومي (Microbiology) *</label>
+                <select id="input-qc-micro-status-${testType}" data-test-type="${testType}" class="qc-dynamic-micro-status" style="width: 100%; box-sizing: border-box;">
+                  <option value="passed" selected>مطابق ومقبول (Passed) 🟢</option>
+                  <option value="failed">غير مطابق / مرفوض (Failed) 🔴</option>
+                </select>
+              </div>
+            </div>
+          `;
+        } else {
+          containerHtml += `
+            <div class="qc-test-row-container" style="margin-top: 1.25rem; border-top: 1px dashed rgba(255,255,255,0.08); padding-top: 1rem;">
+              <h6 style="font-weight: bold; color: var(--cyan); margin-bottom: 0.5rem; font-size: 0.85rem;">${metadata.title}:</h6>
+              <div class="form-grid" style="grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1rem; display: grid;">
+                <div class="form-group">
+                  <label for="input-qc-range-${testType}">${metadata.rangeLabel} *</label>
+                  <input type="text" id="input-qc-range-${testType}" data-test-type="${testType}" class="qc-dynamic-range" required placeholder="${metadata.rangePlaceholder}" style="width: 100%; box-sizing: border-box;">
+                </div>
+                <div class="form-group">
+                  <label for="input-qc-result-${testType}">النتيجة الفعلية المكتشفة *</label>
+                  <input type="text" id="input-qc-result-${testType}" data-test-type="${testType}" class="qc-dynamic-result" required placeholder="${metadata.resultPlaceholder}" style="width: 100%; box-sizing: border-box;">
+                </div>
+              </div>
+            </div>
+          `;
+        }
+      });
+
+      if (elQCDynamicTestsContainer) {
+        elQCDynamicTestsContainer.innerHTML = containerHtml;
       }
       
       // Populate checkboxes for Lots
@@ -2025,52 +2055,7 @@
     }
   }
 
-  function handleQCTestTypeChange() {
-    if (!elInputQCTestType || !elQCAssayValueGroup || !elInputQCRange || !elInputQCResult) return;
-    const testVal = elInputQCTestType.value;
-    
-    // Manage microbiology result selector visibility
-    if (elQCMicroStatusGroup) {
-      if (testVal === 'microbiology') {
-        elQCMicroStatusGroup.style.display = 'block';
-        if (elInputQCMicroStatus) elInputQCMicroStatus.required = true;
-      } else {
-        elQCMicroStatusGroup.style.display = 'none';
-        if (elInputQCMicroStatus) elInputQCMicroStatus.required = false;
-      }
-    }
 
-    if (testVal === 'assay' || testVal === 'dissolution' || testVal === 'uniformity' || testVal === 'coating_dissolution' || testVal === 'coating_uniformity') {
-      elQCAssayValueGroup.style.display = 'grid';
-      elInputQCRange.required = true;
-      elInputQCResult.required = true;
-      
-      if (elLabelQCRangeInput && elLabelQCResultInput) {
-        if (testVal === 'assay') {
-          elLabelQCRangeInput.textContent = 'المجال المقبول للمعايرة (Assay Range) *';
-          elInputQCRange.placeholder = 'مثال: 95.0% - 105.0%';
-          elLabelQCResultInput.textContent = 'النتيجة الفعلية المكتشفة *';
-          elInputQCResult.placeholder = 'مثال: 99.4%';
-        } else if (testVal === 'dissolution' || testVal === 'coating_dissolution') {
-          elLabelQCRangeInput.textContent = 'المجال المقبول للانحلالية (Dissolution Range) *';
-          elInputQCRange.placeholder = 'مثال: ≥ 75%';
-          elLabelQCResultInput.textContent = 'النتيجة الفعلية المكتشفة *';
-          elInputQCResult.placeholder = 'مثال: 82.5%';
-        } else if (testVal === 'uniformity' || testVal === 'coating_uniformity') {
-          elLabelQCRangeInput.textContent = 'المجال المقبول لتجانس المحتوى *';
-          elInputQCRange.placeholder = 'مثال: 85.0% - 115.0%';
-          elLabelQCResultInput.textContent = 'النتيجة الفعلية المكتشفة *';
-          elInputQCResult.placeholder = 'مثال: 101.2%';
-        }
-      }
-    } else {
-      elQCAssayValueGroup.style.display = 'none';
-      elInputQCRange.required = false;
-      elInputQCRange.value = '';
-      elInputQCResult.required = false;
-      elInputQCResult.value = '';
-    }
-  }
 
   async function handleQCSubmit(e) {
     e.preventDefault();
@@ -2085,73 +2070,117 @@
       return;
     }
 
-    const test_type = elInputQCTestType.value;
-    const assay_val = (test_type === 'assay' || test_type === 'dissolution' || test_type === 'uniformity' || test_type === 'coating_dissolution' || test_type === 'coating_uniformity') ? elInputQCResult.value.trim() : null;
-    const qc_range = (test_type === 'assay' || test_type === 'dissolution' || test_type === 'uniformity' || test_type === 'coating_dissolution' || test_type === 'coating_uniformity') ? elInputQCRange.value.trim() : null;
-    
-    let status = 'passed';
-    if (test_type === 'microbiology') {
-      status = elInputQCMicroStatus ? elInputQCMicroStatus.value : 'passed';
-    } else if (assay_val && qc_range) {
-      const isCompliant = evaluateQCCompliance(qc_range, assay_val);
-      status = isCompliant ? 'passed' : 'failed';
-    }
-
     const sample_no = elInputQCSampleNo ? elInputQCSampleNo.value.trim() : '';
-    
     if (!sample_no) {
       alert('يرجى إدخال رقم عينة المختبر قبل الحفظ.');
       return;
     }
 
-    const newRun = {
-      run_id: 'qc-run-' + Date.now(),
-      stage_id: batch.stages[activeStageIndex].id,
-      test_type,
-      status,
-      target_lots: targetLots,
-      assay_val,
-      qc_range,
-      sample_no,
-      timestamp: new Date().toLocaleString('en-US')
-    };
-
-    if (!Array.isArray(batch.qc_runs)) batch.qc_runs = [];
-    batch.qc_runs.push(newRun);
-
-    // Logging this action
-    if (!Array.isArray(batch.logs)) batch.logs = [];
-    const testLabels = {
-      assay: 'المعايرة (Assay)',
-      dissolution: 'الانحلالية (Dissolution)',
-      uniformity: 'تجانس المحتوى (Uniformity)',
-      microbiology: 'الزرع الجرثومي (Microbiology)'
-    };
-    const testLabel = testLabels[test_type] || test_type;
-    
-    batch.logs.unshift({
-      time: new Date().toLocaleString('en-US'),
-      text: `مراقبة الجودة (QC): تسجيل فحص [${testLabel}] للوتات (${targetLots.join(', ')}) بوضع: [${status === 'passed' ? 'مطابق 🟢' : 'غير مطابق 🔴'}].`
+    // Get all active test types rendered in the dynamic container
+    const activeTestTypes = new Set();
+    document.querySelectorAll('#qc-dynamic-tests-container [data-test-type]').forEach(el => {
+      activeTestTypes.add(el.getAttribute('data-test-type'));
     });
 
-    batch.version = (batch.version || 0) + 1;
-    batch.updatedAt = Date.now();
-    saveBatches(true);
+    if (activeTestTypes.size === 0) {
+      alert('لا توجد فحوصات نشطة لحفظها.');
+      return;
+    }
 
-    if (elInputQCRange) elInputQCRange.value = '';
-    if (elInputQCResult) elInputQCResult.value = '';
-    if (elInputQCSampleNo) elInputQCSampleNo.value = '';
+    if (!Array.isArray(batch.qc_runs)) batch.qc_runs = [];
+    if (!Array.isArray(batch.logs)) batch.logs = [];
 
-    // Refresh views
-    renderQCLotsClearanceTable(batch);
-    renderQCForm(batch);
-    renderHistoryList(batch);
-    renderApp();
+    const testLabels = {
+      assay: 'المعايرة (Assay)',
+      dissolution: 'الانحلالية',
+      uniformity: 'تجانس المحتوى',
+      coating_dissolution: 'فحص الانحلالية',
+      coating_uniformity: 'فحص تجانس المحتوى',
+      microbiology: 'الزرع الجرثومي (Microbiology)'
+    };
 
-    if (window.showToast) {
-      window.showToast('تم حفظ نتيجة الفحص المخبري والمزامنة السحابية بنجاح 🟢', 'success');
-    } else {
-      alert('تم حفظ نتيجة الفحص المخبري بنجاح 🟢');
+    let savedTestsCount = 0;
+    let logSummaryParts = [];
+
+    for (let test_type of activeTestTypes) {
+      if (test_type === 'microbiology') {
+        const microEl = document.getElementById(`input-qc-micro-status-${test_type}`);
+        if (microEl) {
+          const status = microEl.value;
+          const newRun = {
+            run_id: 'qc-run-' + Date.now() + '-' + Math.random().toString(36).substr(2, 5),
+            stage_id: batch.stages[activeStageIndex].id,
+            test_type,
+            status,
+            assay_val: null,
+            qc_range: null,
+            sample_no,
+            timestamp: new Date().toLocaleString('ar-EG')
+          };
+          newRun.target_lots = targetLots;
+          batch.qc_runs.push(newRun);
+          savedTestsCount++;
+          
+          const label = testLabels[test_type] || test_type;
+          logSummaryParts.push(`[${label}]: ${status === 'passed' ? 'مطابق 🟢' : 'غير مطابق 🔴'}`);
+        }
+      } else {
+        const rangeEl = document.getElementById(`input-qc-range-${test_type}`);
+        const resultEl = document.getElementById(`input-qc-result-${test_type}`);
+        if (rangeEl && resultEl) {
+          const qc_range = rangeEl.value.trim();
+          const assay_val = resultEl.value.trim();
+          if (!qc_range || !assay_val) {
+            alert(`يرجى تعبئة حقل المجال والنتيجة لفحص ${testLabels[test_type] || test_type}`);
+            return;
+          }
+          const isCompliant = evaluateQCCompliance(qc_range, assay_val);
+          const status = isCompliant ? 'passed' : 'failed';
+          const newRun = {
+            run_id: 'qc-run-' + Date.now() + '-' + Math.random().toString(36).substr(2, 5),
+            stage_id: batch.stages[activeStageIndex].id,
+            test_type,
+            status,
+            assay_val,
+            qc_range,
+            sample_no,
+            timestamp: new Date().toLocaleString('ar-EG')
+          };
+          newRun.target_lots = targetLots;
+          batch.qc_runs.push(newRun);
+          savedTestsCount++;
+
+          const label = testLabels[test_type] || test_type;
+          logSummaryParts.push(`[${label}]: نتيجة ${assay_val} (${status === 'passed' ? 'مطابق 🟢' : 'غير مطابق 🔴'})`);
+        }
+      }
+    }
+
+    if (savedTestsCount > 0) {
+      batch.logs.unshift({
+        time: new Date().toLocaleString('ar-EG'),
+        text: `مراقبة الجودة (QC): تسجيل عينات (${sample_no}) للوتات (${targetLots.join(', ')}) بـ: ${logSummaryParts.join(' | ')}.`
+      });
+
+      batch.version = (batch.version || 0) + 1;
+      batch.updatedAt = Date.now();
+      saveBatches(true);
+
+      // Clear dynamic inputs
+      document.querySelectorAll('#qc-dynamic-tests-container input').forEach(inp => inp.value = '');
+      if (elInputQCSampleNo) elInputQCSampleNo.value = '';
+
+      // Refresh views
+      renderQCLotsClearanceTable(batch);
+      renderQCForm(batch);
+      renderHistoryList(batch);
+      renderApp();
+
+      if (window.showToast) {
+        window.showToast('تم حفظ نتائج الفحوصات المخبرية بنجاح 🟢', 'success');
+      } else {
+        alert('تم حفظ نتائج الفحوصات المخبرية بنجاح 🟢');
+      }
     }
   }
 
@@ -2208,8 +2237,8 @@
         assay: 'المعايرة (Assay)',
         dissolution: 'الانحلالية بالضغط',
         uniformity: 'تجانس المحتوى بالضغط',
-        coating_dissolution: 'فحص الانحلالية بالتلبيس',
-        coating_uniformity: 'فحص تجانس المحتوى بالتلبيس',
+        coating_dissolution: 'فحص الانحلالية',
+        coating_uniformity: 'فحص تجانس المحتوى',
         microbiology: 'الزرع الجرثومي (Microbiology)'
       };
       const testName = testLabelsExt[run.test_type] || run.test_type;

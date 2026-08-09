@@ -433,18 +433,10 @@
               <h5 style="font-size: 0.9rem; margin-bottom: 0.5rem; font-weight: bold; color: var(--primary);">+ تسجيل عينة فحص مخبري جديدة (New QC Test Run):</h5>
               
               <div class="form-grid" style="grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1rem;">
-                <!-- Test Type Dropdown -->
-                <div class="form-group">
-                  <label for="input-qc-test-type">نوع الفحص المطلوب *</label>
-                  <select id="input-qc-test-type" required>
-                    <!-- Options populated dynamically -->
-                  </select>
-                </div>
-                
                 <!-- Lab Sample Number -->
                 <div class="form-group">
                   <label for="input-qc-sample-no">رقم عينة المختبر (Sample No.) *</label>
-                  <input type="text" id="input-qc-sample-no" required placeholder="مثال: S-105">
+                  <input type="text" id="input-qc-sample-no" required placeholder="مثال: S-105" style="width: 100%; box-sizing: border-box;">
                 </div>
               </div>
 
@@ -456,26 +448,8 @@
                 </div>
               </div>
 
-              <!-- Assay/Dissolution/Uniformity input value & range -->
-              <div class="form-grid" id="qc-assay-value-group" style="display: none; margin-top: 1rem; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1rem;">
-                <div class="form-group">
-                  <label for="input-qc-range" id="label-qc-range-input">المجال المقبول المعتمد (Range) *</label>
-                  <input type="text" id="input-qc-range" placeholder="مثال: 95.0% - 105.0%">
-                </div>
-                <div class="form-group">
-                  <label for="input-qc-result" id="label-qc-result-input">النتيجة الفعلية المكتشفة (Result) *</label>
-                  <input type="text" id="input-qc-result" placeholder="مثال: 99.4%">
-                </div>
-              </div>
-
-              <!-- Microbiology result selection (shown only for micro) -->
-              <div class="form-group" id="qc-micro-status-group" style="display: none; margin-top: 1rem;">
-                <label for="input-qc-micro-status">نتيجة فحص الزرع الجرثومي (Microbiology) *</label>
-                <select id="input-qc-micro-status" style="width: 100%; box-sizing: border-box;">
-                  <option value="passed" selected>مطابق ومقبول (Passed) 🟢</option>
-                  <option value="failed">غير مطابق / مرفوض (Failed) 🔴</option>
-                </select>
-              </div>
+              <!-- Dynamic Test Input Sections Container -->
+              <div id="qc-dynamic-tests-container"></div>
 
               <div style="margin-top: 1rem; display: flex; gap: 1rem; align-items: center;">
                 <button type="submit" class="btn btn-primary" id="btn-submit-qc-run" style="background: var(--primary); border-color: var(--primary);">
@@ -552,7 +526,7 @@
   <!-- Scripts with cache-busting timestamp -->
   <script src="pharmaMath.js?v=15.1"></script>
   <script src="mockData.js?v=15.0"></script>
-  <script src="app_v11.js?v=3.1"></script>
+  <script src="app_v11.js?v=3.2"></script>
   <script>
     lucide.createIcons();
   </script>
