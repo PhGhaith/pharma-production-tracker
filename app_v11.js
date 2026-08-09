@@ -162,7 +162,8 @@
   // QC DOM references
   const elFormAddQCRun = document.getElementById('form-add-qc-run');
   const elInputQCTestType = document.getElementById('input-qc-test-type');
-  const elInputQCCompliant = document.getElementById('input-qc-compliant');
+  const elInputQCMicroStatus = document.getElementById('input-qc-micro-status');
+  const elQCMicroStatusGroup = document.getElementById('qc-micro-status-group');
   const elInputQCSampleNo = document.getElementById('input-qc-sample-no');
   const elQCLotsCheckboxesContainer = document.getElementById('qc-lots-checkboxes-container');
   const elQCAssayValueGroup = document.getElementById('qc-assay-value-group');
@@ -870,25 +871,8 @@
     });
   }
 
-  function autoCheckQCCompliance() {
-    if (!elInputQCRange || !elInputQCResult || !elInputQCCompliant) return;
-    const rangeVal = elInputQCRange.value.trim();
-    const resultVal = elInputQCResult.value.trim();
-    if (rangeVal && resultVal) {
-      const isCompliant = evaluateQCCompliance(rangeVal, resultVal);
-      elInputQCCompliant.checked = isCompliant;
-    }
-  }
-
   function setupEventListeners() {
     window.openBatchDetail = openBatchDetail;
-    
-    if (elInputQCRange) {
-      elInputQCRange.addEventListener('input', autoCheckQCCompliance);
-    }
-    if (elInputQCResult) {
-      elInputQCResult.addEventListener('input', autoCheckQCCompliance);
-    }
     if (btnExportBackup) btnExportBackup.addEventListener('click', exportBackupData);
     if (btnImportBackup) btnImportBackup.addEventListener('click', () => inputBackupFile.click());
     if (inputBackupFile) inputBackupFile.addEventListener('change', importBackupData);
@@ -2045,6 +2029,17 @@
     if (!elInputQCTestType || !elQCAssayValueGroup || !elInputQCRange || !elInputQCResult) return;
     const testVal = elInputQCTestType.value;
     
+    // Manage microbiology result selector visibility
+    if (elQCMicroStatusGroup) {
+      if (testVal === 'microbiology') {
+        elQCMicroStatusGroup.style.display = 'block';
+        if (elInputQCMicroStatus) elInputQCMicroStatus.required = true;
+      } else {
+        elQCMicroStatusGroup.style.display = 'none';
+        if (elInputQCMicroStatus) elInputQCMicroStatus.required = false;
+      }
+    }
+
     if (testVal === 'assay' || testVal === 'dissolution' || testVal === 'uniformity' || testVal === 'coating_dissolution' || testVal === 'coating_uniformity') {
       elQCAssayValueGroup.style.display = 'grid';
       elInputQCRange.required = true;
@@ -2094,8 +2089,10 @@
     const assay_val = (test_type === 'assay' || test_type === 'dissolution' || test_type === 'uniformity' || test_type === 'coating_dissolution' || test_type === 'coating_uniformity') ? elInputQCResult.value.trim() : null;
     const qc_range = (test_type === 'assay' || test_type === 'dissolution' || test_type === 'uniformity' || test_type === 'coating_dissolution' || test_type === 'coating_uniformity') ? elInputQCRange.value.trim() : null;
     
-    let status = elInputQCCompliant.checked ? 'passed' : 'failed';
-    if (assay_val && qc_range) {
+    let status = 'passed';
+    if (test_type === 'microbiology') {
+      status = elInputQCMicroStatus ? elInputQCMicroStatus.value : 'passed';
+    } else if (assay_val && qc_range) {
       const isCompliant = evaluateQCCompliance(qc_range, assay_val);
       status = isCompliant ? 'passed' : 'failed';
     }
