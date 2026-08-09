@@ -166,11 +166,13 @@
   const elInputQCSampleNo = document.getElementById('input-qc-sample-no');
   const elQCLotsCheckboxesContainer = document.getElementById('qc-lots-checkboxes-container');
   const elQCAssayValueGroup = document.getElementById('qc-assay-value-group');
-  const elInputQCAssayVal = document.getElementById('input-qc-assay-val');
+  const elInputQCRange = document.getElementById('input-qc-range');
+  const elInputQCResult = document.getElementById('input-qc-result');
   const elQCLotsClearanceTableContainer = document.getElementById('qc-lots-clearance-table-container');
   const elQCBatchStatusBadge = document.getElementById('qc-batch-status-badge');
   const elQCRunsLoggedList = document.getElementById('qc-runs-logged-list');
-  const elLabelQCValueInput = document.getElementById('label-qc-value-input');
+  const elLabelQCRangeInput = document.getElementById('label-qc-range-input');
+  const elLabelQCResultInput = document.getElementById('label-qc-result-input');
   const elCoatingConfigContainer = document.getElementById('coating-config-container');
 
   const FORM_LABELS_MAP = {
@@ -616,22 +618,19 @@
         const stIndex = (batch.currentStageIndex !== undefined && batch.currentStageIndex >= 0 && batch.currentStageIndex < batch.stages.length) ? batch.currentStageIndex : 0;
         const currentStage = batch.stages[stIndex] || batch.stages[0];
 
-        // Build a compact stage dot pipeline
-        let pipelineHtml = `<div class="row-timeline" style="display: flex; gap: 4px; align-items: center;">`;
-        batch.stages.forEach((stg, idx) => {
-          let dotColor = 'rgba(255,255,255,0.08)';
-          if (stg.status === 'completed') dotColor = 'var(--emerald)';
-          else if (stg.status === 'in_progress') dotColor = 'var(--amber)';
-          
-          const isCurrent = idx === stIndex;
-          const borderStyle = isCurrent ? 'border: 2px solid var(--cyan); box-shadow: 0 0 6px var(--cyan);' : '';
-          
-          pipelineHtml += `
-            <span class="timeline-dot-mini" style="width: 10px; height: 10px; border-radius: 50%; background: ${dotColor}; ${borderStyle} display: inline-block;" title="${stg.name} (${stg.status})"></span>
-          `;
-        });
-        const activeStageName = currentStage ? currentStage.name : 'مكتمل';
-        pipelineHtml += `<span style="font-size: 0.72rem; margin-right: 8px; color: var(--cyan); font-weight: bold;">${activeStageName}</span></div>`;
+        const doneKg = currentStage ? currentStage.doneKg : 0;
+        const progressPercent = Math.min(100, Math.round((doneKg / batch.totalWeightKg) * 100));
+        let pipelineHtml = `
+          <div style="min-width: 150px;">
+            <div style="display: flex; justify-content: space-between; font-size: 0.75rem; margin-bottom: 3px;">
+              <span style="color: var(--cyan); font-weight: bold;">${currentStage ? currentStage.name : '-'}</span>
+              <strong style="color: var(--text-muted);">${progressPercent}%</strong>
+            </div>
+            <div style="width: 100%; height: 6px; background: rgba(255,255,255,0.08); border-radius: 3px; overflow: hidden;">
+              <div style="width: ${progressPercent}%; height: 100%; background: var(--cyan); border-radius: 3px;"></div>
+            </div>
+          </div>
+        `;
 
         tableHtml += `
           <tr onclick="openBatchDetail('${batch.id}')">
@@ -871,7 +870,25 @@
     });
   }
 
+  function autoCheckQCCompliance() {
+    if (!elInputQCRange || !elInputQCResult || !elInputQCCompliant) return;
+    const rangeVal = elInputQCRange.value.trim();
+    const resultVal = elInputQCResult.value.trim();
+    if (rangeVal && resultVal) {
+      const isCompliant = evaluateQCCompliance(rangeVal, resultVal);
+      elInputQCCompliant.checked = isCompliant;
+    }
+  }
+
   function setupEventListeners() {
+    window.openBatchDetail = openBatchDetail;
+    
+    if (elInputQCRange) {
+      elInputQCRange.addEventListener('input', autoCheckQCCompliance);
+    }
+    if (elInputQCResult) {
+      elInputQCResult.addEventListener('input', autoCheckQCCompliance);
+    }
     if (btnExportBackup) btnExportBackup.addEventListener('click', exportBackupData);
     if (btnImportBackup) btnImportBackup.addEventListener('click', () => inputBackupFile.click());
     if (inputBackupFile) inputBackupFile.addEventListener('change', importBackupData);
@@ -1707,6 +1724,39 @@
     });
   }
 
+  function evaluateQCCompliance(rangeStr, resultStr) {
+    if (!rangeStr || !resultStr) return true;
+    
+    const rangeNums = rangeStr.match(/[-+]?[0-9]*\.?[0-9]+/g);
+    const resultNums = resultStr.match(/[-+]?[0-9]*\.?[0-9]+/g);
+    
+    if (!rangeNums || rangeNums.length === 0 || !resultNums || resultNums.length === 0) {
+      return true;
+    }
+    
+    const resVal = parseFloat(resultNums[0]);
+    
+    if (rangeNums.length >= 2) {
+      const val1 = parseFloat(rangeNums[0]);
+      const val2 = parseFloat(rangeNums[1]);
+      const min = Math.min(val1, val2);
+      const max = Math.max(val1, val2);
+      return (resVal >= min && resVal <= max);
+    }
+    
+    const limit = parseFloat(rangeNums[0]);
+    const textClean = rangeStr.replace(/\s+/g, '');
+    
+    if (textClean.includes('>') || textClean.includes('≥') || textClean.includes('atleast') || textClean.includes('أكبر')) {
+      return resVal >= limit;
+    }
+    if (textClean.includes('<') || textClean.includes('≤') || textClean.includes('أقل')) {
+      return resVal <= limit;
+    }
+    
+    return resVal >= limit;
+  }
+
   function renderQCLotsClearanceTable(batch) {
     if (!elQCLotsClearanceTableContainer || !batch) return;
 
@@ -1802,7 +1852,11 @@
           activeRun = runsForLot[runsForLot.length - 1]; // latest run
           status = activeRun.status;
           if (activeRun.assay_val !== undefined && activeRun.assay_val !== null && activeRun.assay_val !== '') {
-            detailText = ` (${activeRun.assay_val})`;
+            if (activeRun.qc_range) {
+              detailText = `<br><span style="font-size: 0.72rem; opacity: 0.85; display: inline-block; margin-top: 3px;">النتيجة: <strong>${activeRun.assay_val}</strong><br>المجال: <strong>${activeRun.qc_range}</strong></span>`;
+            } else {
+              detailText = ` (${activeRun.assay_val})`;
+            }
           }
           if (activeRun.sample_no) {
             sampleText = `<br><span style="font-size: 0.65rem; opacity: 0.75;">عينة: ${activeRun.sample_no}</span>`;
@@ -1988,29 +2042,38 @@
   }
 
   function handleQCTestTypeChange() {
-    if (!elInputQCTestType || !elQCAssayValueGroup || !elInputQCAssayVal) return;
+    if (!elInputQCTestType || !elQCAssayValueGroup || !elInputQCRange || !elInputQCResult) return;
     const testVal = elInputQCTestType.value;
     
     if (testVal === 'assay' || testVal === 'dissolution' || testVal === 'uniformity' || testVal === 'coating_dissolution' || testVal === 'coating_uniformity') {
-      elQCAssayValueGroup.style.display = 'block';
-      elInputQCAssayVal.required = true;
+      elQCAssayValueGroup.style.display = 'grid';
+      elInputQCRange.required = true;
+      elInputQCResult.required = true;
       
-      if (elLabelQCValueInput) {
+      if (elLabelQCRangeInput && elLabelQCResultInput) {
         if (testVal === 'assay') {
-          elLabelQCValueInput.textContent = 'تركيز المادة الفعالة المكتشفة (Assay Potency %) *';
-          elInputQCAssayVal.placeholder = 'مثال: 99.5';
+          elLabelQCRangeInput.textContent = 'المجال المقبول للمعايرة (Assay Range) *';
+          elInputQCRange.placeholder = 'مثال: 95.0% - 105.0%';
+          elLabelQCResultInput.textContent = 'النتيجة الفعلية المكتشفة *';
+          elInputQCResult.placeholder = 'مثال: 99.4%';
         } else if (testVal === 'dissolution' || testVal === 'coating_dissolution') {
-          elLabelQCValueInput.textContent = 'نسبة الانحلالية المكتشفة (Dissolution %) *';
-          elInputQCAssayVal.placeholder = 'مثال: 85.0% - 95.0%';
+          elLabelQCRangeInput.textContent = 'المجال المقبول للانحلالية (Dissolution Range) *';
+          elInputQCRange.placeholder = 'مثال: ≥ 75%';
+          elLabelQCResultInput.textContent = 'النتيجة الفعلية المكتشفة *';
+          elInputQCResult.placeholder = 'مثال: 82.5%';
         } else if (testVal === 'uniformity' || testVal === 'coating_uniformity') {
-          elLabelQCValueInput.textContent = 'نسبة تجانس المحتوى المكتشفة (Content Uniformity %) *';
-          elInputQCAssayVal.placeholder = 'مثال: 98.0% - 102.0%';
+          elLabelQCRangeInput.textContent = 'المجال المقبول لتجانس المحتوى *';
+          elInputQCRange.placeholder = 'مثال: 85.0% - 115.0%';
+          elLabelQCResultInput.textContent = 'النتيجة الفعلية المكتشفة *';
+          elInputQCResult.placeholder = 'مثال: 101.2%';
         }
       }
     } else {
       elQCAssayValueGroup.style.display = 'none';
-      elInputQCAssayVal.required = false;
-      elInputQCAssayVal.value = '';
+      elInputQCRange.required = false;
+      elInputQCRange.value = '';
+      elInputQCResult.required = false;
+      elInputQCResult.value = '';
     }
   }
 
@@ -2028,8 +2091,15 @@
     }
 
     const test_type = elInputQCTestType.value;
-    const status = elInputQCCompliant.checked ? 'passed' : 'failed';
-    const assay_val = (test_type === 'assay' || test_type === 'dissolution' || test_type === 'uniformity' || test_type === 'coating_dissolution' || test_type === 'coating_uniformity') ? elInputQCAssayVal.value.trim() : null;
+    const assay_val = (test_type === 'assay' || test_type === 'dissolution' || test_type === 'uniformity' || test_type === 'coating_dissolution' || test_type === 'coating_uniformity') ? elInputQCResult.value.trim() : null;
+    const qc_range = (test_type === 'assay' || test_type === 'dissolution' || test_type === 'uniformity' || test_type === 'coating_dissolution' || test_type === 'coating_uniformity') ? elInputQCRange.value.trim() : null;
+    
+    let status = elInputQCCompliant.checked ? 'passed' : 'failed';
+    if (assay_val && qc_range) {
+      const isCompliant = evaluateQCCompliance(qc_range, assay_val);
+      status = isCompliant ? 'passed' : 'failed';
+    }
+
     const sample_no = elInputQCSampleNo ? elInputQCSampleNo.value.trim() : '';
     
     if (!sample_no) {
@@ -2044,6 +2114,7 @@
       status,
       target_lots: targetLots,
       assay_val,
+      qc_range,
       sample_no,
       timestamp: new Date().toLocaleString('en-US')
     };
@@ -2070,7 +2141,8 @@
     batch.updatedAt = Date.now();
     saveBatches(true);
 
-    if (elInputQCAssayVal) elInputQCAssayVal.value = '';
+    if (elInputQCRange) elInputQCRange.value = '';
+    if (elInputQCResult) elInputQCResult.value = '';
     if (elInputQCSampleNo) elInputQCSampleNo.value = '';
 
     // Refresh views
