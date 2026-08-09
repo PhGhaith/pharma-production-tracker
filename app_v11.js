@@ -942,9 +942,7 @@
     if (elFormAddQCRun) {
       elFormAddQCRun.addEventListener('submit', handleQCSubmit);
     }
-    if (elInputQCTestType) {
-      elInputQCTestType.addEventListener('change', handleQCTestTypeChange);
-    }
+
     if (btnResetCache) {
       btnResetCache.addEventListener('click', handleResetCache);
     }
