@@ -1154,7 +1154,7 @@ body {
 }
 
 /* QC Form Styling Fixes */
-.qc-logger-box select, .qc-logger-box input[type="number"] {
+.qc-logger-box select, .qc-logger-box input[type="text"], .qc-logger-box input[type="number"] {
   background: rgba(0, 0, 0, 0.45) !important;
   color: #ffffff !important;
   border: 1px solid rgba(255, 255, 255, 0.2) !important;
@@ -1186,4 +1186,49 @@ body {
 #btn-submit-qc-run:hover {
   background: #1d4ed8 !important;
   border-color: #1d4ed8 !important;
+}
+
+/* Batches Dual View (Table Mode) styling */
+.table-responsive {
+  width: 100%;
+  overflow-x: auto;
+  border-radius: var(--radius-md);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  background: rgba(255, 255, 255, 0.01);
+  margin-top: 1rem;
+}
+
+.batches-list-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: right;
+  font-size: 0.9rem;
+  min-width: 800px;
+}
+
+.batches-list-table th, .batches-list-table td {
+  padding: 14px 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.batches-list-table th {
+  background: rgba(0, 0, 0, 0.4);
+  color: var(--text-dim);
+  font-weight: 600;
+  font-size: 0.8rem;
+  letter-spacing: 0.5px;
+}
+
+.batches-list-table tbody tr {
+  transition: background 0.2s;
+  cursor: pointer;
+}
+
+.batches-list-table tbody tr:hover {
+  background: rgba(59, 130, 246, 0.06);
+}
+
+.batches-list-table td {
+  vertical-align: middle;
+  color: var(--text-muted);
 }

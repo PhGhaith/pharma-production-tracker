@@ -39,6 +39,7 @@
   let lastSyncHash = '';
   let isSavingToCloud = false;
   let isEditCorrectionMode = false;
+  let currentViewMode = localStorage.getItem('pharma_view_mode') || 'grid';
   
   // Rate limit protection
   let lastAutoPushTime = 0;
@@ -161,7 +162,8 @@
   // QC DOM references
   const elFormAddQCRun = document.getElementById('form-add-qc-run');
   const elInputQCTestType = document.getElementById('input-qc-test-type');
-  const elInputQCStatus = document.getElementById('input-qc-status');
+  const elInputQCCompliant = document.getElementById('input-qc-compliant');
+  const elInputQCSampleNo = document.getElementById('input-qc-sample-no');
   const elQCLotsCheckboxesContainer = document.getElementById('qc-lots-checkboxes-container');
   const elQCAssayValueGroup = document.getElementById('qc-assay-value-group');
   const elInputQCAssayVal = document.getElementById('input-qc-assay-val');
@@ -169,6 +171,7 @@
   const elQCBatchStatusBadge = document.getElementById('qc-batch-status-badge');
   const elQCRunsLoggedList = document.getElementById('qc-runs-logged-list');
   const elLabelQCValueInput = document.getElementById('label-qc-value-input');
+  const elCoatingConfigContainer = document.getElementById('coating-config-container');
 
   const FORM_LABELS_MAP = {
     solid: 'أقراص صلبة',
@@ -585,90 +588,179 @@
       return;
     }
 
-    filtered.forEach(batch => {
-      const stIndex = (batch.currentStageIndex !== undefined && batch.currentStageIndex >= 0 && batch.currentStageIndex < batch.stages.length) ? batch.currentStageIndex : 0;
-      const currentStage = batch.stages[stIndex] || batch.stages[0];
-      const doneKg = currentStage ? currentStage.doneKg : 0;
-      const progressPercent = Math.min(100, Math.round((doneKg / batch.totalWeightKg) * 100));
+    if (currentViewMode === 'list') {
+      // Render Horizontal Row/Table View
+      let tableHtml = `
+        <div class="table-responsive">
+          <table class="batches-list-table">
+            <thead>
+              <tr>
+                <th>معلومات التشغيلة (Batch)</th>
+                <th>الشكل الصيدلاني</th>
+                <th>التلبيس</th>
+                <th>الوزن الكلي</th>
+                <th>اللوتات (Lots)</th>
+                <th>التواريخ</th>
+                <th>مخطط خط الإنتاج والمرحلة الحالية</th>
+                <th>الإجراءات</th>
+              </tr>
+            </thead>
+            <tbody>
+      `;
 
-      const mathTotal = PharmaMath.calculateTotals(
-        batch.totalWeightKg,
-        batch.isCoated,
-        batch.preCoatingMg,
-        batch.postCoatingMg,
-        batch.unitsPerBlister,
-        batch.lotsCount
-      );
+      filtered.forEach(batch => {
+        const formLabel = batch.pharmaFormLabel || FORM_LABELS_MAP[batch.pharmaForm] || batch.pharmaForm;
+        const lCountVal = parseFloat(batch.lotsCount) || 1;
+        const lotWeightKg = (batch.totalWeightKg / lCountVal).toFixed(2);
+        
+        const stIndex = (batch.currentStageIndex !== undefined && batch.currentStageIndex >= 0 && batch.currentStageIndex < batch.stages.length) ? batch.currentStageIndex : 0;
+        const currentStage = batch.stages[stIndex] || batch.stages[0];
 
-      const mathDone = PharmaMath.kgToBlistersAndLots(
-        doneKg,
-        batch.isCoated,
-        batch.preCoatingMg,
-        batch.postCoatingMg,
-        batch.unitsPerBlister,
-        batch.totalWeightKg,
-        batch.lotsCount
-      );
+        // Build a compact stage dot pipeline
+        let pipelineHtml = `<div class="row-timeline" style="display: flex; gap: 4px; align-items: center;">`;
+        batch.stages.forEach((stg, idx) => {
+          let dotColor = 'rgba(255,255,255,0.08)';
+          if (stg.status === 'completed') dotColor = 'var(--emerald)';
+          else if (stg.status === 'in_progress') dotColor = 'var(--amber)';
+          
+          const isCurrent = idx === stIndex;
+          const borderStyle = isCurrent ? 'border: 2px solid var(--cyan); box-shadow: 0 0 6px var(--cyan);' : '';
+          
+          pipelineHtml += `
+            <span class="timeline-dot-mini" style="width: 10px; height: 10px; border-radius: 50%; background: ${dotColor}; ${borderStyle} display: inline-block;" title="${stg.name} (${stg.status})"></span>
+          `;
+        });
+        const activeStageName = currentStage ? currentStage.name : 'مكتمل';
+        pipelineHtml += `<span style="font-size: 0.72rem; margin-right: 8px; color: var(--cyan); font-weight: bold;">${activeStageName}</span></div>`;
 
-      const lCountVal = parseFloat(batch.lotsCount) || 1;
-      const lotWeightKg = (batch.totalWeightKg / lCountVal).toFixed(2);
+        tableHtml += `
+          <tr onclick="openBatchDetail('${batch.id}')">
+            <td>
+              <div style="font-weight: bold; color: #ffffff; font-size: 0.95rem;">${batch.productName}</div>
+              <div style="font-size: 0.78rem; color: var(--text-dim); margin-top: 2px;">رقم التشغيلة: <strong style="color: var(--amber);">${batch.batchNo}</strong></div>
+            </td>
+            <td><span class="pharma-badge ${batch.pharmaForm}" style="font-size: 0.75rem; padding: 2px 6px;">${formLabel}</span></td>
+            <td><span style="font-size: 0.85rem; color: ${batch.isCoated ? 'var(--cyan)' : 'var(--text-dim)'};">${batch.isCoated ? 'ملبس' : 'غير ملبس'}</span></td>
+            <td><strong style="color: var(--emerald); font-size: 0.88rem;">${batch.totalWeightKg} kg</strong></td>
+            <td><strong style="color: var(--cyan); font-size: 0.88rem;">${lCountVal.toFixed(2)} Lots</strong><br><span style="font-size: 0.72rem; opacity: 0.7;">(${lotWeightKg} kg/Lot)</span></td>
+            <td>
+              <div style="font-size: 0.75rem; color: var(--text-dim);">بدء: ${batch.startDate}</div>
+              <div style="font-size: 0.75rem; color: var(--rose); margin-top: 2px;">انتهاء: ${batch.expDate}</div>
+            </td>
+            <td>${pipelineHtml}</td>
+            <td>
+              <div style="display: flex; gap: 6px; align-items: center;" onclick="event.stopPropagation();">
+                <button class="btn btn-secondary btn-sm" onclick="openBatchDetail('${batch.id}')" style="padding: 4px 8px; font-size: 0.75rem; border-color: var(--cyan); color: var(--cyan);">
+                  <i data-lucide="eye" style="width: 12px; height: 12px; display: inline-block; vertical-align: middle;"></i>
+                  <span style="vertical-align: middle;">تفاصيل</span>
+                </button>
+                <button class="btn btn-secondary btn-sm" onclick="deleteBatch('${batch.id}')" style="padding: 4px 8px; font-size: 0.75rem; border-color: var(--rose); color: var(--rose);">
+                  <i data-lucide="trash-2" style="width: 12px; height: 12px; display: inline-block; vertical-align: middle;"></i>
+                  <span style="vertical-align: middle;">حذف</span>
+                </button>
+              </div>
+            </td>
+          </tr>
+        `;
+      });
 
-      const card = document.createElement('div');
-      card.className = 'batch-card';
-      card.onclick = (e) => {
-        if (e.target.closest('.btn-icon-delete')) return;
-        openBatchDetail(batch.id);
-      };
-
-      card.innerHTML = `
-        <div class="batch-card-header">
-          <div class="batch-title">
-            <h4>${batch.productName}</h4>
-            <span class="batch-code"># ${batch.batchNo} (${lCountVal.toFixed(2)} Lot / ${lotWeightKg} kg/Lot)</span>
-          </div>
-          <div class="header-right-actions">
-            <span class="pharma-badge ${batch.pharmaForm}">${batch.pharmaFormLabel || FORM_LABELS_MAP[batch.pharmaForm] || '-'}</span>
-            <button class="btn-icon-delete" title="إلغاء وحذف الباتش" onclick="event.stopPropagation(); deleteBatch('${batch.id}');">
-              <i data-lucide="trash-2"></i>
-            </button>
-          </div>
-        </div>
-
-        ${batch.priorBatchNo ? `
-          <div class="batch-card-weights-pill" style="background: rgba(245, 158, 11, 0.1); border: 1px dashed rgba(245, 158, 11, 0.3); color: var(--amber);">
-            <span>منقول من باتش سابق: <strong>#${batch.priorBatchNo} (${batch.carryOverKg} kg)</strong></span>
-          </div>
-        ` : ''}
-
-        <div class="batch-card-weights-pill">
-          <span>التلبيس: <strong>${batch.isCoated ? 'ملبس' : 'غير ملبس'}</strong></span>
-          <span>وزن الوحدة: <strong>${batch.isCoated ? batch.postCoatingMg + ' mg' : batch.preCoatingMg + ' mg'}</strong></span>
-        </div>
-
-        <div class="stage-indicator-box">
-          <div class="stage-title-line">
-            <span>المرحلة الحالية: <span class="stage-name">${currentStage ? currentStage.name : '-'}</span></span>
-            <strong>${progressPercent}%</strong>
-          </div>
-
-          <div class="progress-bar-track">
-            <div class="progress-bar-fill" style="width: ${progressPercent}%;"></div>
-          </div>
-
-          <div class="stage-weight-details">
-            <span>المنجز: ${doneKg} kg (${mathDone.equivalentLots.toFixed(2)} Lot | ${PharmaMath.formatNumber(mathDone.totalBlisters)} ${getUnitLabel(batch.pharmaForm)})</span>
-            <span>إجمالي الباتش: ${batch.totalWeightKg} kg</span>
-          </div>
-        </div>
-
-        <div class="batch-footer-meta">
-          <div>${batch.pharmaForm === 'cream' ? 'إجمالي التيوبات' : 'إجمالي البليسترات'}: <strong>${PharmaMath.formatNumber(mathTotal.totalBlisters)} ${getUnitLabel(batch.pharmaForm)}</strong></div>
-          <div>الانتهاء: <strong>${batch.expDate}</strong></div>
+      tableHtml += `
+            </tbody>
+          </table>
         </div>
       `;
 
-      elBatchesGrid.appendChild(card);
-    });
+      elBatchesGrid.innerHTML = tableHtml;
+      elBatchesGrid.style.display = 'block'; // Make grid container block-level in list mode
+    } else {
+      // Render Card Grid View (Original Mode)
+      elBatchesGrid.style.display = 'grid'; // Reset to grid layout
+
+      filtered.forEach(batch => {
+        const stIndex = (batch.currentStageIndex !== undefined && batch.currentStageIndex >= 0 && batch.currentStageIndex < batch.stages.length) ? batch.currentStageIndex : 0;
+        const currentStage = batch.stages[stIndex] || batch.stages[0];
+        const doneKg = currentStage ? currentStage.doneKg : 0;
+        const progressPercent = Math.min(100, Math.round((doneKg / batch.totalWeightKg) * 100));
+
+        const mathTotal = PharmaMath.calculateTotals(
+          batch.totalWeightKg,
+          batch.isCoated,
+          batch.preCoatingMg,
+          batch.postCoatingMg,
+          batch.unitsPerBlister,
+          batch.lotsCount
+        );
+
+        const mathDone = PharmaMath.kgToBlistersAndLots(
+          doneKg,
+          batch.isCoated,
+          batch.preCoatingMg,
+          batch.postCoatingMg,
+          batch.unitsPerBlister,
+          batch.totalWeightKg,
+          batch.lotsCount
+        );
+
+        const lCountVal = parseFloat(batch.lotsCount) || 1;
+        const lotWeightKg = (batch.totalWeightKg / lCountVal).toFixed(2);
+
+        const card = document.createElement('div');
+        card.className = 'batch-card';
+        card.onclick = (e) => {
+          if (e.target.closest('.btn-icon-delete') || e.target.closest('.btn-icon-detail')) return;
+          openBatchDetail(batch.id);
+        };
+
+        card.innerHTML = `
+          <div class="batch-card-header">
+            <div class="batch-title">
+              <h4>${batch.productName}</h4>
+              <span class="batch-code"># ${batch.batchNo} (${lCountVal.toFixed(2)} Lot / ${lotWeightKg} kg/Lot)</span>
+            </div>
+            <div class="header-right-actions">
+              <span class="pharma-badge ${batch.pharmaForm}">${batch.pharmaFormLabel || FORM_LABELS_MAP[batch.pharmaForm] || '-'}</span>
+              <button class="btn-icon-delete" title="إلغاء وحذف الباتش" onclick="event.stopPropagation(); deleteBatch('${batch.id}');">
+                <i data-lucide="trash-2"></i>
+              </button>
+            </div>
+          </div>
+
+          ${batch.priorBatchNo ? `
+            <div class="batch-card-weights-pill" style="background: rgba(245, 158, 11, 0.1); border: 1px dashed rgba(245, 158, 11, 0.3); color: var(--amber);">
+              <span>منقول من باتش سابق: <strong>#${batch.priorBatchNo} (${batch.carryOverKg} kg)</strong></span>
+            </div>
+          ` : ''}
+
+          <div class="batch-card-weights-pill">
+            <span>التلبيس: <strong>${batch.isCoated ? 'ملبس' : 'غير ملبس'}</strong></span>
+            <span>وزن الوحدة: <strong>${batch.isCoated ? batch.postCoatingMg + ' mg' : batch.preCoatingMg + ' mg'}</strong></span>
+          </div>
+
+          <div class="stage-indicator-box">
+            <div class="stage-title-line">
+              <span>المرحلة الحالية: <span class="stage-name">${currentStage ? currentStage.name : '-'}</span></span>
+              <strong>${progressPercent}%</strong>
+            </div>
+
+            <div class="progress-bar-track">
+              <div class="progress-bar-fill" style="width: ${progressPercent}%;"></div>
+            </div>
+
+            <div class="stage-weight-details">
+              <span>المنجز: ${doneKg} kg (${mathDone.equivalentLots.toFixed(2)} Lot | ${PharmaMath.formatNumber(mathDone.totalBlisters)} ${getUnitLabel(batch.pharmaForm)})</span>
+              <span>إجمالي الباتش: ${batch.totalWeightKg} kg</span>
+            </div>
+          </div>
+
+          <div class="batch-footer-meta">
+            <div>${batch.pharmaForm === 'cream' ? 'إجمالي التيوبات' : 'إجمالي البليسترات'}: <strong>${PharmaMath.formatNumber(mathTotal.totalBlisters)} ${getUnitLabel(batch.pharmaForm)}</strong></div>
+            <div>الانتهاء: <strong>${batch.expDate}</strong></div>
+          </div>
+        `;
+
+        elBatchesGrid.appendChild(card);
+      });
+    }
   }
 
   function renderQuarantineView() {
@@ -861,6 +953,55 @@
     }
     if (btnResetCache) {
       btnResetCache.addEventListener('click', handleResetCache);
+    }
+
+    // View Mode Toggle Listeners
+    const btnViewGrid = document.getElementById('btn-view-grid');
+    const btnViewList = document.getElementById('btn-view-list');
+    
+    function updateToggleButtonsUI() {
+      if (!btnViewGrid || !btnViewList) return;
+      if (currentViewMode === 'grid') {
+        btnViewGrid.classList.remove('btn-secondary');
+        btnViewGrid.classList.add('btn-primary');
+        btnViewGrid.style.background = '';
+        btnViewGrid.style.color = '';
+        
+        btnViewList.classList.remove('btn-primary');
+        btnViewList.classList.add('btn-secondary');
+        btnViewList.style.background = 'transparent';
+        btnViewList.style.borderColor = 'transparent';
+        btnViewList.style.color = 'var(--text-dim)';
+      } else {
+        btnViewList.classList.remove('btn-secondary');
+        btnViewList.classList.add('btn-primary');
+        btnViewList.style.background = '';
+        btnViewList.style.color = '';
+        
+        btnViewGrid.classList.remove('btn-primary');
+        btnViewGrid.classList.add('btn-secondary');
+        btnViewGrid.style.background = 'transparent';
+        btnViewGrid.style.borderColor = 'transparent';
+        btnViewGrid.style.color = 'var(--text-dim)';
+      }
+    }
+    
+    if (btnViewGrid && btnViewList) {
+      updateToggleButtonsUI();
+      
+      btnViewGrid.addEventListener('click', () => {
+        currentViewMode = 'grid';
+        localStorage.setItem('pharma_view_mode', 'grid');
+        updateToggleButtonsUI();
+        renderBatchesGrid();
+      });
+      
+      btnViewList.addEventListener('click', () => {
+        currentViewMode = 'list';
+        localStorage.setItem('pharma_view_mode', 'list');
+        updateToggleButtonsUI();
+        renderBatchesGrid();
+      });
     }
 
     // Server Settings Event Listeners
@@ -1359,6 +1500,26 @@
       }
     }
 
+    // Check 2.5: Coating stage optional tests (if enabled, they must pass before completing coating stage)
+    if (stage.id === 'coating') {
+      if (Array.isArray(batch.active_optional_tests)) {
+        if (batch.active_optional_tests.includes('coating_dissolution')) {
+          const hasPassed = batch.qc_runs.some(r => r.test_type === 'coating_dissolution' && r.status === 'passed');
+          if (!hasPassed) {
+            alert('فحص الانحلالية بعد التلبيس مفعل ومطلوب، يرجى تسجيل فحص مطابق ومقبول 🟢 أولاً.');
+            return;
+          }
+        }
+        if (batch.active_optional_tests.includes('coating_uniformity')) {
+          const hasPassed = batch.qc_runs.some(r => r.test_type === 'coating_uniformity' && r.status === 'passed');
+          if (!hasPassed) {
+            alert('فحص تجانس المحتوى بعد التلبيس مفعل ومطلوب، يرجى تسجيل فحص مطابق ومقبول 🟢 أولاً.');
+            return;
+          }
+        }
+      }
+    }
+
     // Check 3: Final stage completion needs passed Microbiology
     if (isBlisterStage) {
       let willBeDone = 0;
@@ -1554,14 +1715,25 @@
     
     // Determine required tests
     const isTabletOrCapsule = (form === 'solid' || form === 'capsule');
-    const requiredTests = isTabletOrCapsule 
-      ? ['assay', 'dissolution', 'uniformity', 'microbiology'] 
-      : ['assay', 'microbiology'];
+    const requiredTests = [];
+    requiredTests.push('assay');
+    
+    if (isTabletOrCapsule) {
+      if (batch.isCoated && Array.isArray(batch.active_optional_tests)) {
+        if (batch.active_optional_tests.includes('coating_dissolution')) requiredTests.push('coating_dissolution');
+        if (batch.active_optional_tests.includes('coating_uniformity')) requiredTests.push('coating_uniformity');
+      }
+      requiredTests.push('dissolution');
+      requiredTests.push('uniformity');
+    }
+    requiredTests.push('microbiology');
 
     const testLabels = {
       assay: 'المعايرة (Assay)',
-      dissolution: 'الانحلالية (Dissolution)',
-      uniformity: 'تجانس المحتوى (Uniformity)',
+      dissolution: 'الانحلالية بالضغط',
+      uniformity: 'تجانس المحتوى بالضغط',
+      coating_dissolution: 'انحلالية التلبيس (اختياري)',
+      coating_uniformity: 'تجانس التلبيس (اختياري)',
       microbiology: 'الزرع الجرثومي (Microbiology)'
     };
 
@@ -1586,6 +1758,12 @@
     let allLotsReleased = true;
     let anyLotFailed = false;
 
+    // Set of lotNames that have already been rendered in rowspan for each testType
+    const skippedLotsForTest = {};
+    requiredTests.forEach(test => {
+      skippedLotsForTest[test] = new Set();
+    });
+
     for (let i = 1; i <= lCountVal; i++) {
       const lotName = `Lot ${i}`;
       tableHtml += `<tr><td style="font-weight: bold; color: var(--cyan);">${lotName}</td>`;
@@ -1594,35 +1772,70 @@
       let lotFailedAny = false;
 
       requiredTests.forEach(testType => {
-        // Find latest status of this test for this lot
+        // Calculate status for this lot individually
         const runsForLot = (batch.qc_runs || []).filter(r => r.test_type === testType && Array.isArray(r.target_lots) && r.target_lots.includes(lotName));
-        
-        let status = 'pending';
-        let detailText = '';
-        
         if (runsForLot.length > 0) {
           const hasPassed = runsForLot.some(r => r.status === 'passed');
           const hasFailed = runsForLot.some(r => r.status === 'failed');
-          
           if (hasPassed) {
-            status = 'passed';
-            const passedRun = runsForLot.find(r => r.status === 'passed');
-            if ((testType === 'assay' || testType === 'dissolution' || testType === 'uniformity') && passedRun.assay_val !== undefined && passedRun.assay_val !== null) {
-              detailText = ` (${passedRun.assay_val}%)`;
-            }
+            // lot passed this test
           } else if (hasFailed) {
-            status = 'failed';
+            lotFailedAny = true;
+          } else {
+            lotPassedAll = false;
+          }
+        } else {
+          lotPassedAll = false;
+        }
+
+        // If this lot's cell is merged with a previous row, do NOT render td
+        if (skippedLotsForTest[testType].has(lotName)) {
+          return;
+        }
+
+        let status = 'pending';
+        let detailText = '';
+        let sampleText = '';
+        let activeRun = null;
+
+        if (runsForLot.length > 0) {
+          activeRun = runsForLot[runsForLot.length - 1]; // latest run
+          status = activeRun.status;
+          if (activeRun.assay_val !== undefined && activeRun.assay_val !== null && activeRun.assay_val !== '') {
+            detailText = ` (${activeRun.assay_val})`;
+          }
+          if (activeRun.sample_no) {
+            sampleText = `<br><span style="font-size: 0.65rem; opacity: 0.75;">عينة: ${activeRun.sample_no}</span>`;
           }
         }
 
+        // Calculate contiguous rowspan
+        let rowspan = 1;
+        if (activeRun && Array.isArray(activeRun.target_lots)) {
+          let nextIdx = i + 1;
+          while (nextIdx <= lCountVal) {
+            const nextLotName = `Lot ${nextIdx}`;
+            const nextLotRuns = (batch.qc_runs || []).filter(r => r.test_type === testType && Array.isArray(r.target_lots) && r.target_lots.includes(nextLotName));
+            const nextLotActiveRun = nextLotRuns.length > 0 ? nextLotRuns[nextLotRuns.length - 1] : null;
+
+            if (nextLotActiveRun && nextLotActiveRun.run_id === activeRun.run_id) {
+              rowspan++;
+              skippedLotsForTest[testType].add(nextLotName);
+              nextIdx++;
+            } else {
+              break;
+            }
+          }
+        }
+
+        const rowspanAttr = rowspan > 1 ? ` rowspan="${rowspan}" style="vertical-align: middle; text-align: center;"` : '';
+
         if (status === 'passed') {
-          tableHtml += `<td><span class="qc-badge-status passed">مطابق 🟢${detailText}</span></td>`;
+          tableHtml += `<td${rowspanAttr}><span class="qc-badge-status passed">مطابق 🟢${detailText}${sampleText}</span></td>`;
         } else if (status === 'failed') {
-          tableHtml += `<td><span class="qc-badge-status failed">غير مطابق 🔴</span></td>`;
-          lotFailedAny = true;
+          tableHtml += `<td${rowspanAttr}><span class="qc-badge-status failed">غير مطابق 🔴${detailText}${sampleText}</span></td>`;
         } else {
-          tableHtml += `<td><span class="qc-badge-status pending">قيد الانتظار 🟡</span></td>`;
-          lotPassedAll = false;
+          tableHtml += `<td${rowspanAttr}><span class="qc-badge-status pending">قيد الانتظار ⏳</span></td>`;
         }
       });
 
@@ -1674,6 +1887,31 @@
     const stageId = stage.id;
     const form = batch.pharmaForm || 'solid';
     
+    // Clear or Populate Coating Config Box dynamically
+    if (elCoatingConfigContainer) {
+      if (stageId === 'coating') {
+        const hasDiss = Array.isArray(batch.active_optional_tests) && batch.active_optional_tests.includes('coating_dissolution');
+        const hasUnif = Array.isArray(batch.active_optional_tests) && batch.active_optional_tests.includes('coating_uniformity');
+        elCoatingConfigContainer.innerHTML = `
+          <div class="coating-config-box" style="margin-bottom: 1rem; padding: 10px; border: 1px dashed rgba(255,255,255,0.1); border-radius: 4px; background: rgba(255,255,255,0.02);">
+            <h6 style="font-weight: bold; margin-bottom: 0.5rem; color: var(--cyan); font-size: 0.85rem;">تفعيل الفحوصات لمرحلة التلبيس (اختياري):</h6>
+            <div style="display: flex; flex-direction: column; gap: 8px;">
+              <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.82rem;">
+                <input type="checkbox" id="chk-opt-diss" ${hasDiss ? 'checked' : ''} onchange="toggleCoatingOptionalTest('coating_dissolution', this.checked)">
+                <span>إدراج فحص الانحلالية (Dissolution) بعد التلبيس</span>
+              </label>
+              <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.82rem;">
+                <input type="checkbox" id="chk-opt-unif" ${hasUnif ? 'checked' : ''} onchange="toggleCoatingOptionalTest('coating_uniformity', this.checked)">
+                <span>إدراج فحص تجانس المحتوى (Content Uniformity) بعد التلبيس</span>
+              </label>
+            </div>
+          </div>
+        `;
+      } else {
+        elCoatingConfigContainer.innerHTML = '';
+      }
+    }
+
     let optionsHtml = '';
     if (stageId === 'preparation') {
       optionsHtml = `<option value="assay">المعايرة الكيميائية (Assay)</option>`;
@@ -1686,6 +1924,17 @@
       } else if (form === 'suppository' || form === 'cream') {
         optionsHtml = `<option value="microbiology">الزرع الجرثومي (Microbiology)</option>`;
       }
+    } else if (stageId === 'coating') {
+      let tempOpts = '';
+      if (Array.isArray(batch.active_optional_tests)) {
+        if (batch.active_optional_tests.includes('coating_dissolution')) {
+          tempOpts += `<option value="coating_dissolution">الانحلالية بالتلبيس (Dissolution)</option>`;
+        }
+        if (batch.active_optional_tests.includes('coating_uniformity')) {
+          tempOpts += `<option value="coating_uniformity">تجانس التلبيس (Uniformity)</option>`;
+        }
+      }
+      optionsHtml = tempOpts;
     } else if (stageId === 'blistering' || stageId === 'packaging') {
       optionsHtml = `<option value="microbiology">الزرع الجرثومي (Microbiology)</option>`;
     }
@@ -1742,7 +1991,7 @@
     if (!elInputQCTestType || !elQCAssayValueGroup || !elInputQCAssayVal) return;
     const testVal = elInputQCTestType.value;
     
-    if (testVal === 'assay' || testVal === 'dissolution' || testVal === 'uniformity') {
+    if (testVal === 'assay' || testVal === 'dissolution' || testVal === 'uniformity' || testVal === 'coating_dissolution' || testVal === 'coating_uniformity') {
       elQCAssayValueGroup.style.display = 'block';
       elInputQCAssayVal.required = true;
       
@@ -1750,12 +1999,12 @@
         if (testVal === 'assay') {
           elLabelQCValueInput.textContent = 'تركيز المادة الفعالة المكتشفة (Assay Potency %) *';
           elInputQCAssayVal.placeholder = 'مثال: 99.5';
-        } else if (testVal === 'dissolution') {
+        } else if (testVal === 'dissolution' || testVal === 'coating_dissolution') {
           elLabelQCValueInput.textContent = 'نسبة الانحلالية المكتشفة (Dissolution %) *';
-          elInputQCAssayVal.placeholder = 'مثال: 85.0';
-        } else if (testVal === 'uniformity') {
+          elInputQCAssayVal.placeholder = 'مثال: 85.0% - 95.0%';
+        } else if (testVal === 'uniformity' || testVal === 'coating_uniformity') {
           elLabelQCValueInput.textContent = 'نسبة تجانس المحتوى المكتشفة (Content Uniformity %) *';
-          elInputQCAssayVal.placeholder = 'مثال: 100.2';
+          elInputQCAssayVal.placeholder = 'مثال: 98.0% - 102.0%';
         }
       }
     } else {
@@ -1779,8 +2028,14 @@
     }
 
     const test_type = elInputQCTestType.value;
-    const status = elInputQCStatus.value;
-    const assay_val = (test_type === 'assay' || test_type === 'dissolution' || test_type === 'uniformity') ? (parseFloat(elInputQCAssayVal.value) || 0) : null;
+    const status = elInputQCCompliant.checked ? 'passed' : 'failed';
+    const assay_val = (test_type === 'assay' || test_type === 'dissolution' || test_type === 'uniformity' || test_type === 'coating_dissolution' || test_type === 'coating_uniformity') ? elInputQCAssayVal.value.trim() : null;
+    const sample_no = elInputQCSampleNo ? elInputQCSampleNo.value.trim() : '';
+    
+    if (!sample_no) {
+      alert('يرجى إدخال رقم عينة المختبر قبل الحفظ.');
+      return;
+    }
 
     const newRun = {
       run_id: 'qc-run-' + Date.now(),
@@ -1789,6 +2044,7 @@
       status,
       target_lots: targetLots,
       assay_val,
+      sample_no,
       timestamp: new Date().toLocaleString('en-US')
     };
 
@@ -1815,6 +2071,7 @@
     saveBatches(true);
 
     if (elInputQCAssayVal) elInputQCAssayVal.value = '';
+    if (elInputQCSampleNo) elInputQCSampleNo.value = '';
 
     // Refresh views
     renderQCLotsClearanceTable(batch);
@@ -1834,6 +2091,24 @@
     checkboxes.forEach(cb => {
       cb.checked = source.checked;
     });
+  };
+
+  window.toggleCoatingOptionalTest = function(testId, isEnabled) {
+    const batch = batches.find(b => b && String(b.id) === String(activeBatchId));
+    if (!batch) return;
+    if (!Array.isArray(batch.active_optional_tests)) batch.active_optional_tests = [];
+    if (isEnabled) {
+      if (!batch.active_optional_tests.includes(testId)) {
+        batch.active_optional_tests.push(testId);
+      }
+    } else {
+      batch.active_optional_tests = batch.active_optional_tests.filter(id => id !== testId);
+    }
+    batch.version = (batch.version || 0) + 1;
+    batch.updatedAt = Date.now();
+    saveBatches(true);
+    renderQCLotsClearanceTable(batch);
+    renderQCForm(batch);
   };
 
   function renderQCRunsHistory(batch) {
@@ -1860,13 +2135,22 @@
       item.style.marginBottom = '0.25rem';
       item.style.fontSize = '0.78rem';
       
-      const testName = testLabels[run.test_type] || run.test_type;
-      const detailText = ((run.test_type === 'assay' || run.test_type === 'dissolution' || run.test_type === 'uniformity') && run.assay_val) ? ` (${run.assay_val}%)` : '';
-      
+      const testLabelsExt = {
+        assay: 'المعايرة (Assay)',
+        dissolution: 'الانحلالية بالضغط',
+        uniformity: 'تجانس المحتوى بالضغط',
+        coating_dissolution: 'انحلالية التلبيس (اختياري)',
+        coating_uniformity: 'تجانس التلبيس (اختياري)',
+        microbiology: 'الزرع الجرثومي (Microbiology)'
+      };
+      const testName = testLabelsExt[run.test_type] || run.test_type;
+      const detailText = ((run.test_type === 'assay' || run.test_type === 'dissolution' || run.test_type === 'uniformity' || run.test_type === 'coating_dissolution' || run.test_type === 'coating_uniformity') && run.assay_val) ? ` (${run.assay_val}%)` : '';
+      const sampleText = run.sample_no ? ` | عينة: ${run.sample_no}` : '';
+
       item.innerHTML = `
         <div style="display: flex; flex-direction: column; gap: 2px;">
           <strong>${testName}${detailText}</strong>
-          <span style="color: var(--text-dim); font-size: 0.72rem;">اللوتات: [${(run.target_lots || []).join(', ')}] | النتيجة: [${run.status === 'passed' ? 'مطابق 🟢' : 'غير مطابق 🔴'}]</span>
+          <span style="color: var(--text-dim); font-size: 0.72rem;">اللوتات: [${(run.target_lots || []).join(', ')}] | النتيجة: [${run.status === 'passed' ? 'مطابق 🟢' : 'غير مطابق 🔴'}]${sampleText}</span>
         </div>
         <div style="display: flex; align-items: center; gap: 10px;">
           <span style="color: var(--text-dim); font-size: 0.72rem;">${run.timestamp || ''}</span>
