@@ -1383,7 +1383,7 @@
       if (willBeDone >= (maxAllowedTotal - 0.05)) {
         const hasPassedMicro = batch.qc_runs.some(r => r.test_type === 'microbiology' && r.status === 'passed');
         if (!hasPassedMicro) {
-          alert('لا يمكن إغلاق مرحلة التغليف والتعبئة النهائية وإفراج الباتش إلا بعد تسجيل فحص الزرع الجرثومي (Microbiology) ومطابقته بنجاح 🟢.');
+          alert(`لا يمكن إغلاق مرحلة [${stage.name}] النهائية وإفراج الباتش إلا بعد تسجيل فحص الزرع الجرثومي (Microbiology) ومطابقته بنجاح 🟢.`);
           return;
         }
       }
@@ -1683,6 +1683,8 @@
           <option value="dissolution">الانحلالية (Dissolution)</option>
           <option value="uniformity">تجانس المحتوى (Content Uniformity)</option>
         `;
+      } else if (form === 'suppository' || form === 'cream') {
+        optionsHtml = `<option value="microbiology">الزرع الجرثومي (Microbiology)</option>`;
       }
     } else if (stageId === 'blistering' || stageId === 'packaging') {
       optionsHtml = `<option value="microbiology">الزرع الجرثومي (Microbiology)</option>`;
