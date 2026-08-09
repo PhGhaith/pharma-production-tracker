@@ -1711,8 +1711,8 @@
   function evaluateQCCompliance(rangeStr, resultStr) {
     if (!rangeStr || !resultStr) return true;
     
-    const rangeNums = rangeStr.match(/[-+]?[0-9]*\.?[0-9]+/g);
-    const resultNums = resultStr.match(/[-+]?[0-9]*\.?[0-9]+/g);
+    const rangeNums = rangeStr.match(/[0-9]*\.?[0-9]+/g);
+    const resultNums = resultStr.match(/[0-9]*\.?[0-9]+/g);
     
     if (!rangeNums || rangeNums.length === 0 || !resultNums || resultNums.length === 0) {
       return true;
