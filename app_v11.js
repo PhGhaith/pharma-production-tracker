@@ -168,6 +168,7 @@
   const elQCLotsClearanceTableContainer = document.getElementById('qc-lots-clearance-table-container');
   const elQCBatchStatusBadge = document.getElementById('qc-batch-status-badge');
   const elQCRunsLoggedList = document.getElementById('qc-runs-logged-list');
+  const elQCGlobalConfigContainer = document.getElementById('qc-global-config-container');
   const elCoatingConfigContainer = document.getElementById('coating-config-container');
   const elCarryOverConfigContainer = document.getElementById('carry-over-config-container');
 
@@ -1626,10 +1627,21 @@
     // Check 2: Blistering/Packaging stage needs passed Dissolution & Uniformity (for Tablets/Capsules)
     if (stage.id === 'blistering' || stage.id === 'packaging') {
       if (batch.pharmaForm === 'solid' || batch.pharmaForm === 'capsule') {
-        const hasPassedDiss = batch.qc_runs.some(r => r.test_type === 'dissolution' && r.status === 'passed');
-        const hasPassedUnif = batch.qc_runs.some(r => r.test_type === 'uniformity' && r.status === 'passed');
+        if (!Array.isArray(batch.active_qc_tests)) {
+          batch.active_qc_tests = ['dissolution', 'uniformity'];
+        }
+        const hasDiss = batch.active_qc_tests.includes('dissolution');
+        const hasUnif = batch.active_qc_tests.includes('uniformity');
+
+        const hasPassedDiss = !hasDiss || batch.qc_runs.some(r => r.test_type === 'dissolution' && r.status === 'passed');
+        const hasPassedUnif = !hasUnif || batch.qc_runs.some(r => r.test_type === 'uniformity' && r.status === 'passed');
         if (!hasPassedDiss || !hasPassedUnif) {
-          alert('يجب تسجيل فحوصات الانحلالية (Dissolution) وتجانس المحتوى (Content Uniformity) ومطابقتها بنجاح 🟢 في مرحلة الضغط/التعبئة أولاً قبل إدخال إنجاز هذه المرحلة.');
+          let alertMsg = 'يجب تسجيل فحوصات ';
+          const missing = [];
+          if (hasDiss && !batch.qc_runs.some(r => r.test_type === 'dissolution' && r.status === 'passed')) missing.push('الانحلالية (Dissolution)');
+          if (hasUnif && !batch.qc_runs.some(r => r.test_type === 'uniformity' && r.status === 'passed')) missing.push('تجانس المحتوى (Content Uniformity)');
+          alertMsg += missing.join(' و ') + ' ومطابقتها بنجاح 🟢 في مرحلة الضغط/التعبئة أولاً قبل إدخال إنجاز هذه المرحلة.';
+          alert(alertMsg);
           return;
         }
       }
@@ -1637,15 +1649,21 @@
 
     // Check 2.5: Coating stage optional tests (if enabled, they must pass before completing coating stage)
     if (stage.id === 'coating') {
+      if (!Array.isArray(batch.active_qc_tests)) {
+        batch.active_qc_tests = ['dissolution', 'uniformity'];
+      }
+      const globalDiss = batch.active_qc_tests.includes('dissolution');
+      const globalUnif = batch.active_qc_tests.includes('uniformity');
+
       if (Array.isArray(batch.active_optional_tests)) {
-        if (batch.active_optional_tests.includes('coating_dissolution')) {
+        if (batch.active_optional_tests.includes('coating_dissolution') && globalDiss) {
           const hasPassed = batch.qc_runs.some(r => r.test_type === 'coating_dissolution' && r.status === 'passed');
           if (!hasPassed) {
             alert('فحص الانحلالية بعد التلبيس مفعل ومطلوب، يرجى تسجيل فحص مطابق ومقبول 🟢 أولاً.');
             return;
           }
         }
-        if (batch.active_optional_tests.includes('coating_uniformity')) {
+        if (batch.active_optional_tests.includes('coating_uniformity') && globalUnif) {
           const hasPassed = batch.qc_runs.some(r => r.test_type === 'coating_uniformity' && r.status === 'passed');
           if (!hasPassed) {
             alert('فحص تجانس المحتوى بعد التلبيس مفعل ومطلوب، يرجى تسجيل فحص مطابق ومقبول 🟢 أولاً.');
@@ -1929,16 +1947,22 @@
     
     // Determine required tests
     const isTabletOrCapsule = (form === 'solid' || form === 'capsule');
+    if (!Array.isArray(batch.active_qc_tests)) {
+      batch.active_qc_tests = ['dissolution', 'uniformity'];
+    }
+    const hasDiss = batch.active_qc_tests.includes('dissolution');
+    const hasUnif = batch.active_qc_tests.includes('uniformity');
+
     const requiredTests = [];
     requiredTests.push('assay');
     
     if (isTabletOrCapsule) {
       if (batch.isCoated && Array.isArray(batch.active_optional_tests)) {
-        if (batch.active_optional_tests.includes('coating_dissolution')) requiredTests.push('coating_dissolution');
-        if (batch.active_optional_tests.includes('coating_uniformity')) requiredTests.push('coating_uniformity');
+        if (batch.active_optional_tests.includes('coating_dissolution') && hasDiss) requiredTests.push('coating_dissolution');
+        if (batch.active_optional_tests.includes('coating_uniformity') && hasUnif) requiredTests.push('coating_uniformity');
       }
-      requiredTests.push('dissolution');
-      requiredTests.push('uniformity');
+      if (hasDiss) requiredTests.push('dissolution');
+      if (hasUnif) requiredTests.push('uniformity');
     }
     requiredTests.push('microbiology');
 
@@ -2041,7 +2065,13 @@
         if (runsForLot.length > 0) {
           activeRun = runsForLot[runsForLot.length - 1]; // latest run
           status = activeRun.status;
-          if (activeRun.assay_val !== undefined && activeRun.assay_val !== null && activeRun.assay_val !== '') {
+          if (Array.isArray(activeRun.ingredients) && activeRun.ingredients.length > 0) {
+            let ingText = '';
+            activeRun.ingredients.forEach(ing => {
+              ingText += `<div style="margin-top: 2.5px; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 2.5px;">${ing.name}: <strong>${ing.assay_val}</strong> (مجال: ${ing.qc_range})</div>`;
+            });
+            detailText = `<br><span style="font-size: 0.70rem; opacity: 0.85; display: inline-block; text-align: right; direction: rtl; width: 100%;">${ingText}</span>`;
+          } else if (activeRun.assay_val !== undefined && activeRun.assay_val !== null && activeRun.assay_val !== '') {
             if (activeRun.qc_range) {
               detailText = `<br><span style="font-size: 0.72rem; opacity: 0.85; display: inline-block; margin-top: 3px;">النتيجة: <strong>${activeRun.assay_val}</strong><br>المجال: <strong>${activeRun.qc_range}</strong></span>`;
             } else {
@@ -2131,26 +2161,90 @@
     const stageId = stage.id;
     const form = batch.pharmaForm || 'solid';
     
+    // Render dynamic Global QC Config box
+    if (elQCGlobalConfigContainer) {
+      if (!Array.isArray(batch.active_qc_tests)) {
+        batch.active_qc_tests = ['dissolution', 'uniformity'];
+      }
+      const globalDiss = batch.active_qc_tests.includes('dissolution');
+      const globalUnif = batch.active_qc_tests.includes('uniformity');
+      const ingCount = parseInt(batch.active_ingredients_count, 10) || 1;
+
+      let optionalTestsHtml = '';
+      if (form === 'solid' || form === 'capsule') {
+        optionalTestsHtml = `
+          <div style="margin-top: 10px; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 8px;">
+            <span style="font-size: 0.78rem; color: var(--text-dim); display: block; margin-bottom: 5px;">خيارات الفحوصات المطلوبة للتشغيلة الأساسية:</span>
+            <div style="display: flex; gap: 15px; flex-wrap: wrap;">
+              <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 0.8rem;">
+                <input type="checkbox" id="chk-qc-opt-diss" ${globalDiss ? 'checked' : ''} onchange="window.toggleQCOptionalTest('dissolution', this.checked)">
+                <span>فحص الانحلالية (Dissolution)</span>
+              </label>
+              <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 0.8rem;">
+                <input type="checkbox" id="chk-qc-opt-unif" ${globalUnif ? 'checked' : ''} onchange="window.toggleQCOptionalTest('uniformity', this.checked)">
+                <span>فحص تجانس المحتوى (Content Uniformity)</span>
+              </label>
+            </div>
+          </div>
+        `;
+      }
+
+      elQCGlobalConfigContainer.innerHTML = `
+        <div class="coating-config-box" style="margin-bottom: 1.25rem; padding: 12px; border: 1px dashed var(--primary); border-radius: 6px; background: rgba(59, 130, 246, 0.02);">
+          <h6 style="font-weight: bold; margin-bottom: 0.6rem; color: var(--primary); font-size: 0.85rem;">إعدادات تحاليل الجودة والفاعلية (QC Ingredients & Test Settings):</h6>
+          <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+            <label for="qc-active-ingredients-count" style="font-size: 0.82rem; color: #ffffff;">عدد المواد الفعالة في المستحضر:</label>
+            <select id="qc-active-ingredients-count" onchange="window.changeIngredientsCount(this.value)" style="background: var(--bg-dark); color: #fff; border: 1px solid rgba(255,255,255,0.15); padding: 3px 8px; border-radius: 4px; font-size: 0.8rem; outline: none; cursor: pointer;">
+              <option value="1" ${ingCount === 1 ? 'selected' : ''}>مادة فعالة واحدة (1)</option>
+              <option value="2" ${ingCount === 2 ? 'selected' : ''}>مادتين (2)</option>
+              <option value="3" ${ingCount === 3 ? 'selected' : ''}>ثلاث مواد (3)</option>
+              <option value="4" ${ingCount === 4 ? 'selected' : ''}>أربع مواد (4)</option>
+            </select>
+          </div>
+          ${optionalTestsHtml}
+        </div>
+      `;
+    }
+
+    const hasDissGlobal = Array.isArray(batch.active_qc_tests) ? batch.active_qc_tests.includes('dissolution') : true;
+    const hasUnifGlobal = Array.isArray(batch.active_qc_tests) ? batch.active_qc_tests.includes('uniformity') : true;
+
     // Clear or Populate Coating Config Box dynamically
     if (elCoatingConfigContainer) {
       if (batch.isCoated) {
         const hasDiss = Array.isArray(batch.active_optional_tests) && batch.active_optional_tests.includes('coating_dissolution');
         const hasUnif = Array.isArray(batch.active_optional_tests) && batch.active_optional_tests.includes('coating_uniformity');
-        elCoatingConfigContainer.innerHTML = `
-          <div class="coating-config-box" style="margin-bottom: 1.25rem; padding: 12px; border: 1px dashed rgba(59, 130, 246, 0.4); border-radius: 6px; background: rgba(59, 130, 246, 0.04);">
-            <h6 style="font-weight: bold; margin-bottom: 0.5rem; color: var(--cyan); font-size: 0.85rem;">تفعيل الفحوصات الاختيارية لمرحلة التلبيس (Coating Tests Checklist):</h6>
-            <div style="display: flex; flex-direction: column; gap: 8px;">
-              <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.82rem;">
-                <input type="checkbox" id="chk-opt-diss" ${hasDiss ? 'checked' : ''} onchange="toggleCoatingOptionalTest('coating_dissolution', this.checked)">
-                <span>إدراج فحص الانحلالية (Dissolution) بعد التلبيس</span>
-              </label>
-              <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.82rem;">
-                <input type="checkbox" id="chk-opt-unif" ${hasUnif ? 'checked' : ''} onchange="toggleCoatingOptionalTest('coating_uniformity', this.checked)">
-                <span>إدراج فحص تجانس المحتوى (Content Uniformity) بعد التلبيس</span>
-              </label>
+        
+        let coatingCheckboxesHtml = '';
+        if (hasDissGlobal) {
+          coatingCheckboxesHtml += `
+            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.82rem;">
+              <input type="checkbox" id="chk-opt-diss" ${hasDiss ? 'checked' : ''} onchange="toggleCoatingOptionalTest('coating_dissolution', this.checked)">
+              <span>إدراج فحص الانحلالية (Dissolution) بعد التلبيس</span>
+            </label>
+          `;
+        }
+        if (hasUnifGlobal) {
+          coatingCheckboxesHtml += `
+            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.82rem;">
+              <input type="checkbox" id="chk-opt-unif" ${hasUnif ? 'checked' : ''} onchange="toggleCoatingOptionalTest('coating_uniformity', this.checked)">
+              <span>إدراج فحص تجانس المحتوى (Content Uniformity) بعد التلبيس</span>
+            </label>
+          `;
+        }
+
+        if (coatingCheckboxesHtml) {
+          elCoatingConfigContainer.innerHTML = `
+            <div class="coating-config-box" style="margin-bottom: 1.25rem; padding: 12px; border: 1px dashed rgba(59, 130, 246, 0.4); border-radius: 6px; background: rgba(59, 130, 246, 0.04);">
+              <h6 style="font-weight: bold; margin-bottom: 0.5rem; color: var(--cyan); font-size: 0.85rem;">تفعيل الفحوصات الاختيارية لمرحلة التلبيس (Coating Tests Checklist):</h6>
+              <div style="display: flex; flex-direction: column; gap: 8px;">
+                ${coatingCheckboxesHtml}
+              </div>
             </div>
-          </div>
-        `;
+          `;
+        } else {
+          elCoatingConfigContainer.innerHTML = '';
+        }
       } else {
         elCoatingConfigContainer.innerHTML = '';
       }
@@ -2164,26 +2258,41 @@
         const hasDiss = batch.active_carry_over_tests.includes('carry_dissolution');
         const hasUnif = batch.active_carry_over_tests.includes('carry_uniformity');
         const hasMicro = batch.active_carry_over_tests.includes('carry_microbiology');
+
+        let carryCheckboxesHtml = `
+          <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.82rem;">
+            <input type="checkbox" id="chk-carry-assay" ${hasAssay ? 'checked' : ''} onchange="toggleCarryOverOptionalTest('carry_assay', this.checked)">
+            <span>إدراج فحص المعايرة (Assay) للكمية المنقولة</span>
+          </label>
+        `;
+        if (hasDissGlobal) {
+          carryCheckboxesHtml += `
+            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.82rem;">
+              <input type="checkbox" id="chk-carry-diss" ${hasDiss ? 'checked' : ''} onchange="toggleCarryOverOptionalTest('carry_dissolution', this.checked)">
+              <span>إدراج فحص الانحلالية (Dissolution) للكمية المنقولة</span>
+            </label>
+          `;
+        }
+        if (hasUnifGlobal) {
+          carryCheckboxesHtml += `
+            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.82rem;">
+              <input type="checkbox" id="chk-carry-unif" ${hasUnif ? 'checked' : ''} onchange="toggleCarryOverOptionalTest('carry_uniformity', this.checked)">
+              <span>إدراج فحص تجانس المحتوى (Content Uniformity) للكمية المنقولة</span>
+            </label>
+          `;
+        }
+        carryCheckboxesHtml += `
+          <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.82rem;">
+            <input type="checkbox" id="chk-carry-micro" ${hasMicro ? 'checked' : ''} onchange="toggleCarryOverOptionalTest('carry_microbiology', this.checked)">
+            <span>إدراج فحص الزرع الجرثومي (Microbiology) للكمية المنقولة</span>
+          </label>
+        `;
+
         elCarryOverConfigContainer.innerHTML = `
           <div class="coating-config-box" style="margin-bottom: 1.25rem; padding: 12px; border: 1px dashed rgba(245, 158, 11, 0.4); border-radius: 6px; background: rgba(245, 158, 11, 0.04);">
             <h6 style="font-weight: bold; margin-bottom: 0.5rem; color: var(--amber); font-size: 0.85rem;">تفعيل فحوصات الكمية المنقولة للـ QC (اختياري):</h6>
             <div style="display: flex; flex-direction: column; gap: 8px;">
-              <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.82rem;">
-                <input type="checkbox" id="chk-carry-assay" ${hasAssay ? 'checked' : ''} onchange="toggleCarryOverOptionalTest('carry_assay', this.checked)">
-                <span>إدراج فحص المعايرة (Assay) للكمية المنقولة</span>
-              </label>
-              <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.82rem;">
-                <input type="checkbox" id="chk-carry-diss" ${hasDiss ? 'checked' : ''} onchange="toggleCarryOverOptionalTest('carry_dissolution', this.checked)">
-                <span>إدراج فحص الانحلالية (Dissolution) للكمية المنقولة</span>
-              </label>
-              <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.82rem;">
-                <input type="checkbox" id="chk-carry-unif" ${hasUnif ? 'checked' : ''} onchange="toggleCarryOverOptionalTest('carry_uniformity', this.checked)">
-                <span>إدراج فحص تجانس المحتوى (Content Uniformity) للكمية المنقولة</span>
-              </label>
-              <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.82rem;">
-                <input type="checkbox" id="chk-carry-micro" ${hasMicro ? 'checked' : ''} onchange="toggleCarryOverOptionalTest('carry_microbiology', this.checked)">
-                <span>إدراج فحص الزرع الجرثومي (Microbiology) للكمية المنقولة</span>
-              </label>
+              ${carryCheckboxesHtml}
             </div>
           </div>
         `;
@@ -2197,16 +2306,17 @@
       activeTests = ['assay'];
     } else if (stageId === 'compression' || stageId === 'filling') {
       if (form === 'solid' || form === 'capsule') {
-        activeTests = ['dissolution', 'uniformity'];
+        if (hasDissGlobal) activeTests.push('dissolution');
+        if (hasUnifGlobal) activeTests.push('uniformity');
       } else if (form === 'suppository' || form === 'cream') {
         activeTests = ['microbiology'];
       }
     } else if (stageId === 'coating') {
       if (Array.isArray(batch.active_optional_tests)) {
-        if (batch.active_optional_tests.includes('coating_dissolution')) {
+        if (batch.active_optional_tests.includes('coating_dissolution') && hasDissGlobal) {
           activeTests.push('coating_dissolution');
         }
-        if (batch.active_optional_tests.includes('coating_uniformity')) {
+        if (batch.active_optional_tests.includes('coating_uniformity') && hasUnifGlobal) {
           activeTests.push('coating_uniformity');
         }
       }
@@ -2252,21 +2362,27 @@
             </div>
           `;
         } else {
+          const ingCount = parseInt(batch.active_ingredients_count, 10) || 1;
           containerHtml += `
             <div class="qc-test-row-container" style="margin-top: 1.25rem; border-top: 1px dashed rgba(255,255,255,0.08); padding-top: 1rem;">
               <h6 style="font-weight: bold; color: var(--cyan); margin-bottom: 0.5rem; font-size: 0.85rem;">${metadata.title}:</h6>
-              <div class="form-grid" style="grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1rem; display: grid;">
+          `;
+          for (let k = 1; k <= ingCount; k++) {
+            const ingLabel = ingCount > 1 ? ` - المادة الفعالة ${k}` : '';
+            containerHtml += `
+              <div class="form-grid" style="grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1rem; display: grid; margin-bottom: 10px;">
                 <div class="form-group">
-                  <label for="input-qc-range-${testType}">${metadata.rangeLabel} *</label>
-                  <input type="text" id="input-qc-range-${testType}" data-test-type="${testType}" class="qc-dynamic-range" required placeholder="${metadata.rangePlaceholder}" style="width: 100%; box-sizing: border-box;">
+                  <label for="input-qc-range-${testType}-${k}">${metadata.rangeLabel}${ingLabel} *</label>
+                  <input type="text" id="input-qc-range-${testType}-${k}" data-test-type="${testType}" data-ing-idx="${k}" class="qc-dynamic-range" required placeholder="${metadata.rangePlaceholder}" style="width: 100%; box-sizing: border-box;">
                 </div>
                 <div class="form-group">
-                  <label for="input-qc-result-${testType}">النتيجة الفعلية المكتشفة *</label>
-                  <input type="text" id="input-qc-result-${testType}" data-test-type="${testType}" class="qc-dynamic-result" required placeholder="${metadata.resultPlaceholder}" style="width: 100%; box-sizing: border-box;">
+                  <label for="input-qc-result-${testType}-${k}">النتيجة الفعلية المكتشفة${ingLabel} *</label>
+                  <input type="text" id="input-qc-result-${testType}-${k}" data-test-type="${testType}" data-ing-idx="${k}" class="qc-dynamic-result" required placeholder="${metadata.resultPlaceholder}" style="width: 100%; box-sizing: border-box;">
                 </div>
               </div>
-            </div>
-          `;
+            `;
+          }
+          containerHtml += `</div>`;
         }
       });
 
@@ -2387,33 +2503,61 @@
           logSummaryParts.push(`[${label}]: ${status === 'passed' ? 'مطابق 🟢' : 'غير مطابق 🔴'}`);
         }
       } else {
-        const rangeEl = document.getElementById(`input-qc-range-${test_type}`);
-        const resultEl = document.getElementById(`input-qc-result-${test_type}`);
-        if (rangeEl && resultEl) {
-          const qc_range = rangeEl.value.trim();
-          const assay_val = resultEl.value.trim();
-          if (!qc_range || !assay_val) {
-            alert(`يرجى تعبئة حقل المجال والنتيجة لفحص ${testLabels[test_type] || test_type}`);
-            return;
-          }
-          const isCompliant = evaluateQCCompliance(qc_range, assay_val);
-          const status = isCompliant ? 'passed' : 'failed';
-          const newRun = {
-            run_id: 'qc-run-' + Date.now() + '-' + Math.random().toString(36).substr(2, 5),
-            stage_id: batch.stages[activeStageIndex].id,
-            test_type,
-            status,
-            assay_val,
-            qc_range,
-            sample_no,
-            timestamp: new Date().toLocaleString('ar-EG')
-          };
-          newRun.target_lots = targetLots;
-          batch.qc_runs.push(newRun);
-          savedTestsCount++;
+        const ingCount = parseInt(batch.active_ingredients_count, 10) || 1;
+        const ingredientsData = [];
+        let allPassed = true;
+        let mainAssayVal = '';
+        let mainQCRange = '';
 
-          const label = testLabels[test_type] || test_type;
-          logSummaryParts.push(`[${label}]: نتيجة ${assay_val} (${status === 'passed' ? 'مطابق 🟢' : 'غير مطابق 🔴'})`);
+        for (let k = 1; k <= ingCount; k++) {
+          const rangeEl = document.getElementById(`input-qc-range-${test_type}-${k}`);
+          const resultEl = document.getElementById(`input-qc-result-${test_type}-${k}`);
+          if (rangeEl && resultEl) {
+            const qc_range = rangeEl.value.trim();
+            const assay_val = resultEl.value.trim();
+            if (!qc_range || !assay_val) {
+              alert(`يرجى تعبئة المجال والنتيجة للمادة الفعالة ${k} لفحص ${testLabels[test_type] || test_type}`);
+              return;
+            }
+            const isCompliant = evaluateQCCompliance(qc_range, assay_val);
+            if (!isCompliant) allPassed = false;
+            ingredientsData.push({
+              name: `المادة الفعالة ${k}`,
+              qc_range,
+              assay_val,
+              status: isCompliant ? 'passed' : 'failed'
+            });
+
+            if (k === 1) {
+              mainAssayVal = assay_val;
+              mainQCRange = qc_range;
+            }
+          }
+        }
+
+        const newRun = {
+          run_id: 'qc-run-' + Date.now() + '-' + Math.random().toString(36).substr(2, 5),
+          stage_id: batch.stages[activeStageIndex].id,
+          test_type,
+          status: allPassed ? 'passed' : 'failed',
+          assay_val: mainAssayVal,
+          qc_range: mainQCRange,
+          sample_no,
+          timestamp: new Date().toLocaleString('ar-EG')
+        };
+        if (ingCount > 1) {
+          newRun.ingredients = ingredientsData;
+        }
+        newRun.target_lots = targetLots;
+        batch.qc_runs.push(newRun);
+        savedTestsCount++;
+
+        const label = testLabels[test_type] || test_type;
+        if (ingCount > 1) {
+          const statusText = allPassed ? 'مطابق 🟢' : 'غير مطابق 🔴';
+          logSummaryParts.push(`[${label}]: ${statusText} لـ (${ingCount}) مواد فعالة`);
+        } else {
+          logSummaryParts.push(`[${label}]: نتيجة ${mainAssayVal} (${allPassed ? 'مطابق 🟢' : 'غير مطابق 🔴'})`);
         }
       }
     }
@@ -2469,6 +2613,45 @@
     saveBatches(true);
     renderQCLotsClearanceTable(batch);
     renderQCForm(batch);
+  };
+
+  window.changeIngredientsCount = function(count) {
+    const batch = batches.find(b => b && String(b.id) === String(activeBatchId));
+    if (batch) {
+      batch.active_ingredients_count = parseInt(count, 10) || 1;
+      batch.version = (batch.version || 0) + 1;
+      batch.updatedAt = Date.now();
+      saveBatches(true);
+      
+      // Re-render QC components
+      renderQCLotsClearanceTable(batch);
+      renderQCForm(batch);
+      renderHistoryList(batch);
+    }
+  };
+
+  window.toggleQCOptionalTest = function(testKey, isEnabled) {
+    const batch = batches.find(b => b && String(b.id) === String(activeBatchId));
+    if (batch) {
+      if (!Array.isArray(batch.active_qc_tests)) {
+        batch.active_qc_tests = ['dissolution', 'uniformity'];
+      }
+      if (isEnabled) {
+        if (!batch.active_qc_tests.includes(testKey)) {
+          batch.active_qc_tests.push(testKey);
+        }
+      } else {
+        batch.active_qc_tests = batch.active_qc_tests.filter(k => k !== testKey);
+      }
+      batch.version = (batch.version || 0) + 1;
+      batch.updatedAt = Date.now();
+      saveBatches(true);
+      
+      // Re-render QC components
+      renderQCLotsClearanceTable(batch);
+      renderQCForm(batch);
+      renderHistoryList(batch);
+    }
   };
 
   window.toggleCarryOverOptionalTest = function(testId, isEnabled) {
