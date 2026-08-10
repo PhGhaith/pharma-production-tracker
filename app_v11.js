@@ -254,6 +254,25 @@
     });
   }
 
+  function sanitizeBatchesCoatingName(batchesList) {
+    if (!Array.isArray(batchesList)) return;
+    batchesList.forEach(batch => {
+      if (batch) {
+        if (Array.isArray(batch.stages)) {
+          batch.stages.forEach(stage => {
+            if (stage && stage.name) {
+              stage.name = stage.name.replace('التلبيس بالفيلم (Film Coating)', 'التلبيس (Coating)');
+              stage.name = stage.name.replace('التلبيس بالفيلم', 'التلبيس');
+            }
+          });
+        }
+        if (batch.pharmaFormLabel) {
+          batch.pharmaFormLabel = batch.pharmaFormLabel.replace('التلبيس بالفيلم', 'التلبيس');
+        }
+      }
+    });
+  }
+
   function loadBatchesLocal() {
     // 1. Try master key
     const masterSaved = localStorage.getItem(MASTER_STORAGE_KEY);
@@ -262,6 +281,7 @@
         const parsed = JSON.parse(masterSaved);
         if (Array.isArray(parsed) && parsed.length > 0) {
           batches = parsed;
+          sanitizeBatchesCoatingName(batches);
           return;
         }
       } catch (e) {}
@@ -289,14 +309,17 @@
 
     if (recoveredMap.size > 0) {
       batches = Array.from(recoveredMap.values());
+      sanitizeBatchesCoatingName(batches);
       localStorage.setItem(MASTER_STORAGE_KEY, JSON.stringify(batches));
       return;
     }
 
     batches = [...window.DEFAULT_BATCHES];
+    sanitizeBatchesCoatingName(batches);
   }
 
   function saveBatches(triggerCloudUpload = true) {
+    sanitizeBatchesCoatingName(batches);
     localStorage.setItem(MASTER_STORAGE_KEY, JSON.stringify(batches));
     if (triggerCloudUpload) {
       pushToCloud(true); // Force push immediately for user actions
@@ -427,6 +450,7 @@
           }
         } else if (Array.isArray(cloudData)) {
           const mergedList = mergeBatches(batches, cloudData);
+          sanitizeBatchesCoatingName(mergedList);
           const currentLocalHash = JSON.stringify(batches);
           const currentCloudHash = JSON.stringify(cloudData);
           const mergedHash = JSON.stringify(mergedList);
