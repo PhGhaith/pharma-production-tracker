@@ -168,6 +168,7 @@
   const elQCBatchStatusBadge = document.getElementById('qc-batch-status-badge');
   const elQCRunsLoggedList = document.getElementById('qc-runs-logged-list');
   const elCoatingConfigContainer = document.getElementById('coating-config-container');
+  const elCarryOverConfigContainer = document.getElementById('carry-over-config-container');
 
   const FORM_LABELS_MAP = {
     solid: 'أقراص صلبة',
@@ -1263,7 +1264,13 @@
     const term = getTerminology(batch.pharmaForm);
 
     if (detailFormName) detailFormName.textContent = batch.pharmaFormLabel || FORM_LABELS_MAP[batch.pharmaForm] || '-';
-    if (detailTotalWeight) detailTotalWeight.textContent = `${batch.totalWeightKg} kg`;
+    if (detailTotalWeight) {
+      if (batch.carryOverKg > 0) {
+        detailTotalWeight.innerHTML = `${batch.totalWeightKg} kg <span style="color: var(--amber); font-weight: bold; margin-right: 5px;">+ ${batch.carryOverKg} kg منقولة</span>`;
+      } else {
+        detailTotalWeight.textContent = `${batch.totalWeightKg} kg`;
+      }
+    }
 
     const lCountVal = parseFloat(batch.lotsCount) || 1;
     const lotWeight = (batch.totalWeightKg / lCountVal).toFixed(2);
@@ -1300,7 +1307,23 @@
       detailTotalBlistersLabel.textContent = term.packLabel;
     }
     if (detailTotalBlisters) {
-      detailTotalBlisters.textContent = `${PharmaMath.formatNumber(mathTotal.totalBlisters)} ${term.packName}`;
+      if (batch.carryOverKg > 0) {
+        const carryMath = PharmaMath.kgToBlistersAndLots(
+          batch.carryOverKg,
+          batch.isCoated,
+          batch.preCoatingMg,
+          batch.postCoatingMg,
+          batch.unitsPerBlister,
+          batch.totalWeightKg,
+          batch.lotsCount
+        );
+        detailTotalBlisters.innerHTML = `
+          ${PharmaMath.formatNumber(mathTotal.totalBlisters)} ${term.packName}
+          <span style="color: var(--amber); font-weight: bold; margin-right: 5px;">+ ${PharmaMath.formatNumber(carryMath.totalBlisters)} ${term.packName} منقولة</span>
+        `;
+      } else {
+        detailTotalBlisters.textContent = `${PharmaMath.formatNumber(mathTotal.totalBlisters)} ${term.packName}`;
+      }
     }
 
     if (!Array.isArray(batch.qc_runs)) batch.qc_runs = [];
@@ -1356,10 +1379,14 @@
       card.className = `stage-step-card ${isSelected ? 'active' : ''} ${isCompleted ? 'completed' : ''}`;
       card.onclick = () => selectStage(idx);
 
+      let statusWeightHtml = `${stage.doneKg} / ${maxAllowedTotal} kg`;
+      if (batch.carryOverKg > 0) {
+        statusWeightHtml += ` <span style="color: var(--amber); font-weight: bold;">+ ${batch.carryOverKg} kg</span>`;
+      }
       card.innerHTML = `
         <div class="step-number">${idx + 1}</div>
         <span class="step-name">${stage.name}</span>
-        <span class="step-status">${stage.doneKg} / ${maxAllowedTotal} kg</span>
+        <span class="step-status">${statusWeightHtml}</span>
       `;
 
       stagesTimeline.appendChild(card);
@@ -1442,8 +1469,32 @@
 
     const totalMath = PharmaMath.kgToBlistersAndLots(maxAllowedTotal, batch.isCoated, batch.preCoatingMg, batch.postCoatingMg, batch.unitsPerBlister, batch.totalWeightKg, batch.lotsCount);
 
-    if (logStageTotalKg) logStageTotalKg.textContent = `${maxAllowedTotal} kg`;
-    if (logStageTotalBlisters) logStageTotalBlisters.textContent = `(${totalMath.equivalentLots.toFixed(2)} Lot | ${PharmaMath.formatNumber(totalMath.totalBlisters)} ${unitLabel})`;
+    if (logStageTotalKg) {
+      if (batch.carryOverKg > 0) {
+        logStageTotalKg.innerHTML = `${maxAllowedTotal} kg <span style="color: var(--amber); font-weight: bold; margin-right: 5px;">+ ${batch.carryOverKg} kg منقولة</span>`;
+      } else {
+        logStageTotalKg.textContent = `${maxAllowedTotal} kg`;
+      }
+    }
+    if (logStageTotalBlisters) {
+      if (batch.carryOverKg > 0) {
+        const carryMath = PharmaMath.kgToBlistersAndLots(
+          batch.carryOverKg,
+          batch.isCoated,
+          batch.preCoatingMg,
+          batch.postCoatingMg,
+          batch.unitsPerBlister,
+          batch.totalWeightKg,
+          batch.lotsCount
+        );
+        logStageTotalBlisters.innerHTML = `
+          (${totalMath.equivalentLots.toFixed(2)} Lot | ${PharmaMath.formatNumber(totalMath.totalBlisters)} ${unitLabel})
+          <span style="color: var(--amber); font-weight: bold; margin-right: 5px;">+ ${PharmaMath.formatNumber(carryMath.totalBlisters)} ${unitLabel} منقولة</span>
+        `;
+      } else {
+        logStageTotalBlisters.textContent = `(${totalMath.equivalentLots.toFixed(2)} Lot | ${PharmaMath.formatNumber(totalMath.totalBlisters)} ${unitLabel})`;
+      }
+    }
 
     if (logStageAcceptedKg) logStageAcceptedKg.textContent = `${stageAccKg} kg`;
     if (logStageAcceptedBlisters) logStageAcceptedBlisters.textContent = `(${PharmaMath.formatNumber(accMath.totalBlisters)} ${unitLabel} مقبول)`;
@@ -1789,14 +1840,40 @@
       skippedLotsForTest[test] = new Set();
     });
 
+    const lotNames = [];
     for (let i = 1; i <= lCountVal; i++) {
-      const lotName = `Lot ${i}`;
-      tableHtml += `<tr><td style="font-weight: bold; color: var(--cyan);">${lotName}</td>`;
+      lotNames.push(`Lot ${i}`);
+    }
+    if (batch.carryOverKg > 0) {
+      lotNames.push('الكمية المنقولة');
+    }
+
+    function isTestRequiredForCarryOver(testType, b) {
+      if (!b.active_carry_over_tests) return false;
+      if (testType === 'assay') return b.active_carry_over_tests.includes('carry_assay');
+      if (testType === 'dissolution' || testType === 'coating_dissolution') return b.active_carry_over_tests.includes('carry_dissolution');
+      if (testType === 'uniformity' || testType === 'coating_uniformity') return b.active_carry_over_tests.includes('carry_uniformity');
+      if (testType === 'microbiology') return b.active_carry_over_tests.includes('carry_microbiology');
+      return false;
+    }
+
+    lotNames.forEach((lotName, idx) => {
+      const isCarryOver = lotName === 'الكمية المنقولة';
+      const cellColor = isCarryOver ? 'color: var(--amber);' : 'color: var(--cyan);';
+      tableHtml += `<tr><td style="font-weight: bold; ${cellColor}">${lotName}</td>`;
       
       let lotPassedAll = true;
       let lotFailedAny = false;
 
       requiredTests.forEach(testType => {
+        const isRequired = !isCarryOver || isTestRequiredForCarryOver(testType, batch);
+        
+        if (!isRequired) {
+          if (skippedLotsForTest[testType].has(lotName)) return;
+          tableHtml += `<td><span class="qc-badge-status pending" style="background: rgba(255,255,255,0.04); color: var(--text-dim); border-color: rgba(255,255,255,0.08); box-shadow: none;">غير مطلوب</span></td>`;
+          return;
+        }
+
         // Calculate status for this lot individually
         const runsForLot = (batch.qc_runs || []).filter(r => r.test_type === testType && Array.isArray(r.target_lots) && r.target_lots.includes(lotName));
         if (runsForLot.length > 0) {
@@ -1840,10 +1917,10 @@
 
         // Calculate contiguous rowspan
         let rowspan = 1;
-        if (activeRun && Array.isArray(activeRun.target_lots)) {
-          let nextIdx = i + 1;
-          while (nextIdx <= lCountVal) {
-            const nextLotName = `Lot ${nextIdx}`;
+        if (!isCarryOver && activeRun && Array.isArray(activeRun.target_lots)) {
+          let nextIdx = idx + 1;
+          while (nextIdx < lCountVal) {
+            const nextLotName = lotNames[nextIdx];
             const nextLotRuns = (batch.qc_runs || []).filter(r => r.test_type === testType && Array.isArray(r.target_lots) && r.target_lots.includes(nextLotName));
             const nextLotActiveRun = nextLotRuns.length > 0 ? nextLotRuns[nextLotRuns.length - 1] : null;
 
@@ -1881,7 +1958,7 @@
       }
 
       tableHtml += `<td>${releaseStatusHtml}</td></tr>`;
-    }
+    });
 
     tableHtml += `</tbody></table>`;
     elQCLotsClearanceTableContainer.innerHTML = tableHtml;
@@ -1938,6 +2015,42 @@
         `;
       } else {
         elCoatingConfigContainer.innerHTML = '';
+      }
+    }
+
+    // Clear or Populate Carry Over Config Box dynamically
+    if (elCarryOverConfigContainer) {
+      if (batch.carryOverKg > 0) {
+        if (!Array.isArray(batch.active_carry_over_tests)) batch.active_carry_over_tests = [];
+        const hasAssay = batch.active_carry_over_tests.includes('carry_assay');
+        const hasDiss = batch.active_carry_over_tests.includes('carry_dissolution');
+        const hasUnif = batch.active_carry_over_tests.includes('carry_uniformity');
+        const hasMicro = batch.active_carry_over_tests.includes('carry_microbiology');
+        elCarryOverConfigContainer.innerHTML = `
+          <div class="coating-config-box" style="margin-bottom: 1.25rem; padding: 12px; border: 1px dashed rgba(245, 158, 11, 0.4); border-radius: 6px; background: rgba(245, 158, 11, 0.04);">
+            <h6 style="font-weight: bold; margin-bottom: 0.5rem; color: var(--amber); font-size: 0.85rem;">تفعيل فحوصات الكمية المنقولة للـ QC (اختياري):</h6>
+            <div style="display: flex; flex-direction: column; gap: 8px;">
+              <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.82rem;">
+                <input type="checkbox" id="chk-carry-assay" ${hasAssay ? 'checked' : ''} onchange="toggleCarryOverOptionalTest('carry_assay', this.checked)">
+                <span>إدراج فحص المعايرة (Assay) للكمية المنقولة</span>
+              </label>
+              <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.82rem;">
+                <input type="checkbox" id="chk-carry-diss" ${hasDiss ? 'checked' : ''} onchange="toggleCarryOverOptionalTest('carry_dissolution', this.checked)">
+                <span>إدراج فحص الانحلالية (Dissolution) للكمية المنقولة</span>
+              </label>
+              <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.82rem;">
+                <input type="checkbox" id="chk-carry-unif" ${hasUnif ? 'checked' : ''} onchange="toggleCarryOverOptionalTest('carry_uniformity', this.checked)">
+                <span>إدراج فحص تجانس المحتوى (Content Uniformity) للكمية المنقولة</span>
+              </label>
+              <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.82rem;">
+                <input type="checkbox" id="chk-carry-micro" ${hasMicro ? 'checked' : ''} onchange="toggleCarryOverOptionalTest('carry_microbiology', this.checked)">
+                <span>إدراج فحص الزرع الجرثومي (Microbiology) للكمية المنقولة</span>
+              </label>
+            </div>
+          </div>
+        `;
+      } else {
+        elCarryOverConfigContainer.innerHTML = '';
       }
     }
 
@@ -2046,6 +2159,19 @@
           label.innerHTML = `
             <input type="checkbox" name="qc-target-lot" value="${lotName}" checked>
             <span>${lotName}</span>
+          `;
+          elQCLotsCheckboxesContainer.appendChild(label);
+        }
+
+        if (batch.carryOverKg > 0) {
+          const lotName = 'الكمية المنقولة';
+          const label = document.createElement('label');
+          label.className = 'qc-lots-checkbox-label';
+          label.style.background = 'rgba(245, 158, 11, 0.12)';
+          label.style.borderColor = 'rgba(245, 158, 11, 0.4)';
+          label.innerHTML = `
+            <input type="checkbox" name="qc-target-lot" value="${lotName}" checked>
+            <span style="color: var(--amber); font-weight: bold;">${lotName}</span>
           `;
           elQCLotsCheckboxesContainer.appendChild(label);
         }
@@ -2199,6 +2325,24 @@
       }
     } else {
       batch.active_optional_tests = batch.active_optional_tests.filter(id => id !== testId);
+    }
+    batch.version = (batch.version || 0) + 1;
+    batch.updatedAt = Date.now();
+    saveBatches(true);
+    renderQCLotsClearanceTable(batch);
+    renderQCForm(batch);
+  };
+
+  window.toggleCarryOverOptionalTest = function(testId, isEnabled) {
+    const batch = batches.find(b => b && String(b.id) === String(activeBatchId));
+    if (!batch) return;
+    if (!Array.isArray(batch.active_carry_over_tests)) batch.active_carry_over_tests = [];
+    if (isEnabled) {
+      if (!batch.active_carry_over_tests.includes(testId)) {
+        batch.active_carry_over_tests.push(testId);
+      }
+    } else {
+      batch.active_carry_over_tests = batch.active_carry_over_tests.filter(id => id !== testId);
     }
     batch.version = (batch.version || 0) + 1;
     batch.updatedAt = Date.now();
