@@ -1945,14 +1945,23 @@
     const form = batch.pharmaForm || 'solid';
     const lCountVal = Math.ceil(parseFloat(batch.lotsCount) || 1);
     
+    if (!Array.isArray(batch.active_ingredients_config)) {
+      const count = parseInt(batch.active_ingredients_count, 10) || 1;
+      batch.active_ingredients_config = [];
+      for (let i = 0; i < count; i++) {
+        batch.active_ingredients_config.push({
+          name: `المادة الفعالة ${i + 1}`,
+          has_diss: true,
+          has_unif: true
+        });
+      }
+    }
+
+    const hasDiss = batch.active_ingredients_config.some(ing => ing.has_diss);
+    const hasUnif = batch.active_ingredients_config.some(ing => ing.has_unif);
+
     // Determine required tests
     const isTabletOrCapsule = (form === 'solid' || form === 'capsule');
-    if (!Array.isArray(batch.active_qc_tests)) {
-      batch.active_qc_tests = ['dissolution', 'uniformity'];
-    }
-    const hasDiss = batch.active_qc_tests.includes('dissolution');
-    const hasUnif = batch.active_qc_tests.includes('uniformity');
-
     const requiredTests = [];
     requiredTests.push('assay');
     
@@ -2163,36 +2172,47 @@
     
     // Render dynamic Global QC Config box
     if (elQCGlobalConfigContainer) {
-      if (!Array.isArray(batch.active_qc_tests)) {
-        batch.active_qc_tests = ['dissolution', 'uniformity'];
+      if (!Array.isArray(batch.active_ingredients_config)) {
+        const count = parseInt(batch.active_ingredients_count, 10) || 1;
+        batch.active_ingredients_config = [];
+        for (let i = 0; i < count; i++) {
+          batch.active_ingredients_config.push({
+            name: `المادة الفعالة ${i + 1}`,
+            has_diss: true,
+            has_unif: true
+          });
+        }
       }
-      const globalDiss = batch.active_qc_tests.includes('dissolution');
-      const globalUnif = batch.active_qc_tests.includes('uniformity');
-      const ingCount = parseInt(batch.active_ingredients_count, 10) || 1;
+      const ingCount = batch.active_ingredients_config.length;
 
-      let optionalTestsHtml = '';
-      if (form === 'solid' || form === 'capsule') {
-        optionalTestsHtml = `
-          <div style="margin-top: 10px; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 8px;">
-            <span style="font-size: 0.78rem; color: var(--text-dim); display: block; margin-bottom: 5px;">خيارات الفحوصات المطلوبة للتشغيلة الأساسية:</span>
-            <div style="display: flex; gap: 15px; flex-wrap: wrap;">
-              <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 0.8rem;">
-                <input type="checkbox" id="chk-qc-opt-diss" ${globalDiss ? 'checked' : ''} onchange="window.toggleQCOptionalTest('dissolution', this.checked)">
-                <span>فحص الانحلالية (Dissolution)</span>
-              </label>
-              <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 0.8rem;">
-                <input type="checkbox" id="chk-qc-opt-unif" ${globalUnif ? 'checked' : ''} onchange="window.toggleQCOptionalTest('uniformity', this.checked)">
-                <span>فحص تجانس المحتوى (Content Uniformity)</span>
-              </label>
+      let ingredientsConfigHtml = '';
+      batch.active_ingredients_config.forEach((ing, i) => {
+        ingredientsConfigHtml += `
+          <div style="display: flex; align-items: center; gap: 10px; margin-top: 8px; flex-wrap: wrap; background: rgba(255,255,255,0.02); padding: 8px; border-radius: 4px; border: 1px solid rgba(255,255,255,0.04);">
+            <div style="flex: 1; min-width: 150px;">
+              <label style="font-size: 0.75rem; color: var(--text-dim); display: block; margin-bottom: 2px;">اسم المادة الفعالة ${i + 1}:</label>
+              <input type="text" value="${ing.name}" onchange="window.updateIngredientName(${i}, this.value)" placeholder="مثال: باراسيتامول" style="background: var(--bg-dark); color: #fff; border: 1px solid rgba(255,255,255,0.15); padding: 4px 8px; border-radius: 4px; font-size: 0.8rem; width: 100%; box-sizing: border-box;">
             </div>
+            ${(form === 'solid' || form === 'capsule') ? `
+              <div style="display: flex; gap: 15px; margin-top: 12px;">
+                <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 0.78rem; color: var(--text-dim);">
+                  <input type="checkbox" ${ing.has_diss ? 'checked' : ''} onchange="window.toggleIngredientTest(${i}, 'diss', this.checked)">
+                  <span>فحص الانحلالية</span>
+                </label>
+                <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 0.78rem; color: var(--text-dim);">
+                  <input type="checkbox" ${ing.has_unif ? 'checked' : ''} onchange="window.toggleIngredientTest(${i}, 'unif', this.checked)">
+                  <span>تجانس المحتوى</span>
+                </label>
+              </div>
+            ` : ''}
           </div>
         `;
-      }
+      });
 
       elQCGlobalConfigContainer.innerHTML = `
         <div class="coating-config-box" style="margin-bottom: 1.25rem; padding: 12px; border: 1px dashed var(--primary); border-radius: 6px; background: rgba(59, 130, 246, 0.02);">
           <h6 style="font-weight: bold; margin-bottom: 0.6rem; color: var(--primary); font-size: 0.85rem;">إعدادات تحاليل الجودة والفاعلية (QC Ingredients & Test Settings):</h6>
-          <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+          <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 10px;">
             <label for="qc-active-ingredients-count" style="font-size: 0.82rem; color: #ffffff;">عدد المواد الفعالة في المستحضر:</label>
             <select id="qc-active-ingredients-count" onchange="window.changeIngredientsCount(this.value)" style="background: var(--bg-dark); color: #fff; border: 1px solid rgba(255,255,255,0.15); padding: 3px 8px; border-radius: 4px; font-size: 0.8rem; outline: none; cursor: pointer;">
               <option value="1" ${ingCount === 1 ? 'selected' : ''}>مادة فعالة واحدة (1)</option>
@@ -2201,13 +2221,15 @@
               <option value="4" ${ingCount === 4 ? 'selected' : ''}>أربع مواد (4)</option>
             </select>
           </div>
-          ${optionalTestsHtml}
+          <div style="display: flex; flex-direction: column; gap: 6px;">
+            ${ingredientsConfigHtml}
+          </div>
         </div>
       `;
     }
 
-    const hasDissGlobal = Array.isArray(batch.active_qc_tests) ? batch.active_qc_tests.includes('dissolution') : true;
-    const hasUnifGlobal = Array.isArray(batch.active_qc_tests) ? batch.active_qc_tests.includes('uniformity') : true;
+    const hasDissGlobal = batch.active_ingredients_config.some(ing => ing.has_diss);
+    const hasUnifGlobal = batch.active_ingredients_config.some(ing => ing.has_unif);
 
     // Clear or Populate Coating Config Box dynamically
     if (elCoatingConfigContainer) {
@@ -2362,26 +2384,33 @@
             </div>
           `;
         } else {
-          const ingCount = parseInt(batch.active_ingredients_count, 10) || 1;
           containerHtml += `
             <div class="qc-test-row-container" style="margin-top: 1.25rem; border-top: 1px dashed rgba(255,255,255,0.08); padding-top: 1rem;">
               <h6 style="font-weight: bold; color: var(--cyan); margin-bottom: 0.5rem; font-size: 0.85rem;">${metadata.title}:</h6>
           `;
-          for (let k = 1; k <= ingCount; k++) {
-            const ingLabel = ingCount > 1 ? ` - المادة الفعالة ${k}` : '';
-            containerHtml += `
-              <div class="form-grid" style="grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1rem; display: grid; margin-bottom: 10px;">
-                <div class="form-group">
-                  <label for="input-qc-range-${testType}-${k}">${metadata.rangeLabel}${ingLabel} *</label>
-                  <input type="text" id="input-qc-range-${testType}-${k}" data-test-type="${testType}" data-ing-idx="${k}" class="qc-dynamic-range" required placeholder="${metadata.rangePlaceholder}" style="width: 100%; box-sizing: border-box;">
+          
+          batch.active_ingredients_config.forEach((ing, k) => {
+            // Check if this test is active for this specific ingredient
+            let isTestActiveForIng = false;
+            if (testType === 'assay') isTestActiveForIng = true;
+            else if (testType === 'dissolution' || testType === 'coating_dissolution') isTestActiveForIng = ing.has_diss;
+            else if (testType === 'uniformity' || testType === 'coating_uniformity') isTestActiveForIng = ing.has_unif;
+
+            if (isTestActiveForIng) {
+              containerHtml += `
+                <div class="form-grid" style="grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1rem; display: grid; margin-bottom: 10px;">
+                  <div class="form-group">
+                    <label for="input-qc-range-${testType}-${k}">${metadata.rangeLabel} - (${ing.name}) *</label>
+                    <input type="text" id="input-qc-range-${testType}-${k}" data-test-type="${testType}" data-ing-idx="${k}" class="qc-dynamic-range" required placeholder="${metadata.rangePlaceholder}" style="width: 100%; box-sizing: border-box;">
+                  </div>
+                  <div class="form-group">
+                    <label for="input-qc-result-${testType}-${k}">النتيجة الفعلية المكتشفة - (${ing.name}) *</label>
+                    <input type="text" id="input-qc-result-${testType}-${k}" data-test-type="${testType}" data-ing-idx="${k}" class="qc-dynamic-result" required placeholder="${metadata.resultPlaceholder}" style="width: 100%; box-sizing: border-box;">
+                  </div>
                 </div>
-                <div class="form-group">
-                  <label for="input-qc-result-${testType}-${k}">النتيجة الفعلية المكتشفة${ingLabel} *</label>
-                  <input type="text" id="input-qc-result-${testType}-${k}" data-test-type="${testType}" data-ing-idx="${k}" class="qc-dynamic-result" required placeholder="${metadata.resultPlaceholder}" style="width: 100%; box-sizing: border-box;">
-                </div>
-              </div>
-            `;
-          }
+              `;
+            }
+          });
           containerHtml += `</div>`;
         }
       });
@@ -2503,34 +2532,44 @@
           logSummaryParts.push(`[${label}]: ${status === 'passed' ? 'مطابق 🟢' : 'غير مطابق 🔴'}`);
         }
       } else {
-        const ingCount = parseInt(batch.active_ingredients_count, 10) || 1;
         const ingredientsData = [];
         let allPassed = true;
         let mainAssayVal = '';
         let mainQCRange = '';
+        let firstActiveIng = true;
 
-        for (let k = 1; k <= ingCount; k++) {
-          const rangeEl = document.getElementById(`input-qc-range-${test_type}-${k}`);
-          const resultEl = document.getElementById(`input-qc-result-${test_type}-${k}`);
-          if (rangeEl && resultEl) {
-            const qc_range = rangeEl.value.trim();
-            const assay_val = resultEl.value.trim();
-            if (!qc_range || !assay_val) {
-              alert(`يرجى تعبئة المجال والنتيجة للمادة الفعالة ${k} لفحص ${testLabels[test_type] || test_type}`);
-              return;
-            }
-            const isCompliant = evaluateQCCompliance(qc_range, assay_val);
-            if (!isCompliant) allPassed = false;
-            ingredientsData.push({
-              name: `المادة الفعالة ${k}`,
-              qc_range,
-              assay_val,
-              status: isCompliant ? 'passed' : 'failed'
-            });
+        for (let k = 0; k < batch.active_ingredients_config.length; k++) {
+          const ing = batch.active_ingredients_config[k];
+          
+          let isTestActiveForIng = false;
+          if (test_type === 'assay') isTestActiveForIng = true;
+          else if (test_type === 'dissolution' || test_type === 'coating_dissolution') isTestActiveForIng = ing.has_diss;
+          else if (test_type === 'uniformity' || test_type === 'coating_uniformity') isTestActiveForIng = ing.has_unif;
 
-            if (k === 1) {
-              mainAssayVal = assay_val;
-              mainQCRange = qc_range;
+          if (isTestActiveForIng) {
+            const rangeEl = document.getElementById(`input-qc-range-${test_type}-${k}`);
+            const resultEl = document.getElementById(`input-qc-result-${test_type}-${k}`);
+            if (rangeEl && resultEl) {
+              const qc_range = rangeEl.value.trim();
+              const assay_val = resultEl.value.trim();
+              if (!qc_range || !assay_val) {
+                alert(`يرجى تعبئة المجال والنتيجة للمادة (${ing.name}) لفحص ${testLabels[test_type] || test_type}`);
+                return;
+              }
+              const isCompliant = evaluateQCCompliance(qc_range, assay_val);
+              if (!isCompliant) allPassed = false;
+              ingredientsData.push({
+                name: ing.name,
+                qc_range,
+                assay_val,
+                status: isCompliant ? 'passed' : 'failed'
+              });
+
+              if (firstActiveIng) {
+                mainAssayVal = assay_val;
+                mainQCRange = qc_range;
+                firstActiveIng = false;
+              }
             }
           }
         }
@@ -2542,20 +2581,18 @@
           status: allPassed ? 'passed' : 'failed',
           assay_val: mainAssayVal,
           qc_range: mainQCRange,
+          ingredients: ingredientsData,
           sample_no,
           timestamp: new Date().toLocaleString('ar-EG')
         };
-        if (ingCount > 1) {
-          newRun.ingredients = ingredientsData;
-        }
         newRun.target_lots = targetLots;
         batch.qc_runs.push(newRun);
         savedTestsCount++;
 
         const label = testLabels[test_type] || test_type;
-        if (ingCount > 1) {
+        if (ingredientsData.length > 1) {
           const statusText = allPassed ? 'مطابق 🟢' : 'غير مطابق 🔴';
-          logSummaryParts.push(`[${label}]: ${statusText} لـ (${ingCount}) مواد فعالة`);
+          logSummaryParts.push(`[${label}]: ${statusText} لـ (${ingredientsData.length}) مواد فعالة`);
         } else {
           logSummaryParts.push(`[${label}]: نتيجة ${mainAssayVal} (${allPassed ? 'مطابق 🟢' : 'غير مطابق 🔴'})`);
         }
@@ -2618,7 +2655,23 @@
   window.changeIngredientsCount = function(count) {
     const batch = batches.find(b => b && String(b.id) === String(activeBatchId));
     if (batch) {
-      batch.active_ingredients_count = parseInt(count, 10) || 1;
+      const newCount = parseInt(count, 10) || 1;
+      batch.active_ingredients_count = newCount;
+      if (!Array.isArray(batch.active_ingredients_config)) {
+        batch.active_ingredients_config = [];
+      }
+      // Adjust configuration size
+      if (batch.active_ingredients_config.length < newCount) {
+        for (let i = batch.active_ingredients_config.length; i < newCount; i++) {
+          batch.active_ingredients_config.push({
+            name: `المادة الفعالة ${i + 1}`,
+            has_diss: true,
+            has_unif: true
+          });
+        }
+      } else if (batch.active_ingredients_config.length > newCount) {
+        batch.active_ingredients_config = batch.active_ingredients_config.slice(0, newCount);
+      }
       batch.version = (batch.version || 0) + 1;
       batch.updatedAt = Date.now();
       saveBatches(true);
@@ -2630,27 +2683,35 @@
     }
   };
 
-  window.toggleQCOptionalTest = function(testKey, isEnabled) {
+  window.updateIngredientName = function(index, nameVal) {
     const batch = batches.find(b => b && String(b.id) === String(activeBatchId));
-    if (batch) {
-      if (!Array.isArray(batch.active_qc_tests)) {
-        batch.active_qc_tests = ['dissolution', 'uniformity'];
-      }
-      if (isEnabled) {
-        if (!batch.active_qc_tests.includes(testKey)) {
-          batch.active_qc_tests.push(testKey);
-        }
-      } else {
-        batch.active_qc_tests = batch.active_qc_tests.filter(k => k !== testKey);
+    if (batch && batch.active_ingredients_config && batch.active_ingredients_config[index]) {
+      batch.active_ingredients_config[index].name = nameVal.trim() || `المادة الفعالة ${index + 1}`;
+      batch.version = (batch.version || 0) + 1;
+      batch.updatedAt = Date.now();
+      saveBatches(true);
+      
+      // Re-render
+      renderQCLotsClearanceTable(batch);
+      renderQCForm(batch);
+    }
+  };
+
+  window.toggleIngredientTest = function(index, testKey, isChecked) {
+    const batch = batches.find(b => b && String(b.id) === String(activeBatchId));
+    if (batch && batch.active_ingredients_config && batch.active_ingredients_config[index]) {
+      if (testKey === 'diss') {
+        batch.active_ingredients_config[index].has_diss = isChecked;
+      } else if (testKey === 'unif') {
+        batch.active_ingredients_config[index].has_unif = isChecked;
       }
       batch.version = (batch.version || 0) + 1;
       batch.updatedAt = Date.now();
       saveBatches(true);
       
-      // Re-render QC components
+      // Re-render
       renderQCLotsClearanceTable(batch);
       renderQCForm(batch);
-      renderHistoryList(batch);
     }
   };
 
