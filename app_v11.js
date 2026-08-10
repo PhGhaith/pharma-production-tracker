@@ -151,6 +151,7 @@
   const inputLogRejectedKg = document.getElementById('input-log-rejected-kg');
   const logConversionHint = document.getElementById('log-conversion-hint');
   const stageHistoryList = document.getElementById('stage-history-list');
+  const elStageCarryOverProgressContainer = document.getElementById('stage-carry-over-progress-container');
 
   // Correction Mode Controls
   const btnToggleEditMode = document.getElementById('btn-toggle-edit-mode');
@@ -1373,15 +1374,29 @@
         const prevStage = batch.stages[idx - 1];
         maxAllowedTotal = prevStage ? (prevStage.acceptedKg || 0) : 0;
       }
-      const isCompleted = stage.doneKg >= (maxAllowedTotal - 0.05) && maxAllowedTotal > 0;
+      
+      let carryAddedInPrior = false;
+      for (let p = 0; p < idx; p++) {
+        if (batch.stages[p].carryOverAdded) {
+          carryAddedInPrior = true;
+          break;
+        }
+      }
+      
+      let limitForStage = maxAllowedTotal;
+      if (!carryAddedInPrior && stage.carryOverAdded) {
+        limitForStage += batch.carryOverKg;
+      }
+
+      const isCompleted = stage.doneKg >= (limitForStage - 0.05) && limitForStage > 0;
 
       const card = document.createElement('div');
       card.className = `stage-step-card ${isSelected ? 'active' : ''} ${isCompleted ? 'completed' : ''}`;
       card.onclick = () => selectStage(idx);
 
-      let statusWeightHtml = `${stage.doneKg} / ${maxAllowedTotal} kg`;
-      if (batch.carryOverKg > 0) {
-        statusWeightHtml += ` <span style="color: var(--amber); font-weight: bold;">+ ${batch.carryOverKg} kg</span>`;
+      let statusWeightHtml = `${stage.doneKg} / ${limitForStage} kg`;
+      if (batch.carryOverKg > 0 && !carryAddedInPrior && !stage.carryOverAdded) {
+        statusWeightHtml += ` <span style="color: var(--amber); font-weight: bold;">(+ ${batch.carryOverKg} kg منقولة)</span>`;
       }
       card.innerHTML = `
         <div class="step-number">${idx + 1}</div>
@@ -1467,17 +1482,66 @@
       maxAllowedTotal = prevStage ? (prevStage.acceptedKg || 0) : 0;
     }
 
-    const totalMath = PharmaMath.kgToBlistersAndLots(maxAllowedTotal, batch.isCoated, batch.preCoatingMg, batch.postCoatingMg, batch.unitsPerBlister, batch.totalWeightKg, batch.lotsCount);
-
-    if (logStageTotalKg) {
-      if (batch.carryOverKg > 0) {
-        logStageTotalKg.innerHTML = `${maxAllowedTotal} kg <span style="color: var(--amber); font-weight: bold; margin-right: 5px;">+ ${batch.carryOverKg} kg منقولة</span>`;
-      } else {
-        logStageTotalKg.textContent = `${maxAllowedTotal} kg`;
+    let carryOverAlreadyAdded = false;
+    for (let idx = 0; idx < activeStageIndex; idx++) {
+      if (batch.stages[idx].carryOverAdded) {
+        carryOverAlreadyAdded = true;
+        break;
       }
     }
-    if (logStageTotalBlisters) {
+
+    // Populate stage-carry-over-progress-container dynamically
+    if (elStageCarryOverProgressContainer) {
       if (batch.carryOverKg > 0) {
+        if (carryOverAlreadyAdded) {
+          elStageCarryOverProgressContainer.innerHTML = `
+            <div style="color: var(--emerald); font-size: 0.85rem; font-weight: bold; margin-bottom: 0.5rem; display: flex; align-items: center; gap: 6px;">
+              <i data-lucide="check-circle" style="width: 16px; height: 16px; color: var(--emerald);"></i>
+              <span>تم إدراج إنجاز الكمية المنقولة (+ ${batch.carryOverKg} kg) في مرحلة سابقة.</span>
+            </div>
+          `;
+        } else if (stage.carryOverAdded) {
+          elStageCarryOverProgressContainer.innerHTML = `
+            <div style="color: var(--emerald); font-size: 0.85rem; font-weight: bold; margin-bottom: 0.5rem; display: flex; align-items: center; gap: 6px;">
+              <i data-lucide="check-circle" style="width: 16px; height: 16px; color: var(--emerald);"></i>
+              <span>تم إدراج الكمية المنقولة كإنجاز في هذه المرحلة الحالية (+ ${batch.carryOverKg} kg).</span>
+            </div>
+          `;
+        } else {
+          elStageCarryOverProgressContainer.innerHTML = `
+            <label style="display: flex; align-items: center; gap: 8px; font-size: 0.85rem; font-weight: bold; color: var(--amber); cursor: pointer;">
+              <input type="checkbox" id="chk-add-carry-over-progress" onchange="window.updateStageLoggerLimit()">
+              <span>إدراج الكمية المنقولة كإنجاز في هذه المرحلة (+ ${batch.carryOverKg} kg)</span>
+            </label>
+          `;
+        }
+      } else {
+        elStageCarryOverProgressContainer.innerHTML = '';
+      }
+    }
+
+    // Now compute the dynamic limit
+    let currentLimit = maxAllowedTotal;
+    const chkCarry = document.getElementById('chk-add-carry-over-progress');
+    const chkChecked = chkCarry ? chkCarry.checked : false;
+    if (!carryOverAlreadyAdded && (stage.carryOverAdded || chkChecked)) {
+      currentLimit += batch.carryOverKg;
+    }
+
+    const totalMath = PharmaMath.kgToBlistersAndLots(currentLimit, batch.isCoated, batch.preCoatingMg, batch.postCoatingMg, batch.unitsPerBlister, batch.totalWeightKg, batch.lotsCount);
+
+    if (logStageTotalKg) {
+      if (batch.carryOverKg > 0 && !carryOverAlreadyAdded && !stage.carryOverAdded && !chkChecked) {
+        logStageTotalKg.innerHTML = `${currentLimit} kg <span style="color: var(--amber); font-weight: bold; margin-right: 5px;">(+ ${batch.carryOverKg} kg منقولة متوفرة)</span>`;
+      } else if (batch.carryOverKg > 0 && (stage.carryOverAdded || chkChecked)) {
+        logStageTotalKg.innerHTML = `${currentLimit} kg <span style="color: var(--emerald); font-weight: bold; margin-right: 5px;">(شاملة ${batch.carryOverKg} kg منقولة 🟢)</span>`;
+      } else {
+        logStageTotalKg.textContent = `${currentLimit} kg`;
+      }
+    }
+
+    if (logStageTotalBlisters) {
+      if (batch.carryOverKg > 0 && !carryOverAlreadyAdded && !stage.carryOverAdded && !chkChecked) {
         const carryMath = PharmaMath.kgToBlistersAndLots(
           batch.carryOverKg,
           batch.isCoated,
@@ -1489,8 +1553,10 @@
         );
         logStageTotalBlisters.innerHTML = `
           (${totalMath.equivalentLots.toFixed(2)} Lot | ${PharmaMath.formatNumber(totalMath.totalBlisters)} ${unitLabel})
-          <span style="color: var(--amber); font-weight: bold; margin-right: 5px;">+ ${PharmaMath.formatNumber(carryMath.totalBlisters)} ${unitLabel} منقولة</span>
+          <span style="color: var(--amber); font-weight: bold; margin-right: 5px;">(+ ${PharmaMath.formatNumber(carryMath.totalBlisters)} ${unitLabel} منقولة)</span>
         `;
+      } else if (batch.carryOverKg > 0 && (stage.carryOverAdded || chkChecked)) {
+        logStageTotalBlisters.innerHTML = `(${totalMath.equivalentLots.toFixed(2)} Lot | ${PharmaMath.formatNumber(totalMath.totalBlisters)} ${unitLabel}) <span style="color: var(--emerald); font-weight: bold;">(شامل المنقولة 🟢)</span>`;
       } else {
         logStageTotalBlisters.textContent = `(${totalMath.equivalentLots.toFixed(2)} Lot | ${PharmaMath.formatNumber(totalMath.totalBlisters)} ${unitLabel})`;
       }
@@ -1618,11 +1684,23 @@
 
 
 
-      if ((newAccKg + newRejKg) > (maxAllowedTotal + 0.05)) {
+      let stageLimit = maxAllowedTotal;
+      let carryOverAlreadyAdded = false;
+      for (let idx = 0; idx < activeStageIndex; idx++) {
+        if (batch.stages[idx].carryOverAdded) {
+          carryOverAlreadyAdded = true;
+          break;
+        }
+      }
+      if (!carryOverAlreadyAdded && stage.carryOverAdded) {
+        stageLimit += batch.carryOverKg;
+      }
+
+      if ((newAccKg + newRejKg) > (stageLimit + 0.05)) {
         if (activeStageIndex > 0) {
-          alert(`الكمية الإجمالية المصححة لا يمكن أن تتجاوز ${maxAllowedTotal.toFixed(2)} kg (المحدودة بالكمية المقبولة في المرحلة السابقة: ${maxAllowedTotal.toFixed(2)} kg).`);
+          alert(`الكمية الإجمالية المصححة لا يمكن أن تتجاوز ${stageLimit.toFixed(2)} kg (المحدودة بالكمية المقبولة في المرحلة السابقة: ${maxAllowedTotal.toFixed(2)} kg + المنقولة إن وجدت).`);
         } else {
-          alert(`الكمية الإجمالية المصححة لا يمكن أن تتجاوز وزن الباتش الكلي ${maxAllowedTotal.toFixed(2)} kg.`);
+          alert(`الكمية الإجمالية المصححة لا يمكن أن تتجاوز وزن الباتش الكلي ${stageLimit.toFixed(2)} kg.`);
         }
         return;
       }
@@ -1631,7 +1709,7 @@
       stage.rejectedKg = newRejKg;
       stage.doneKg = newAccKg + newRejKg;
 
-      if (stage.doneKg >= (maxAllowedTotal - 0.05)) {
+      if (stage.doneKg >= (stageLimit - 0.05)) {
         stage.status = 'completed';
       } else if (stage.doneKg > 0) {
         stage.status = 'in_progress';
@@ -1680,30 +1758,51 @@
       addRejectedBlisters = rejMath.totalBlisters;
     }
 
+    const chkCarryProgress = document.getElementById('chk-add-carry-over-progress');
+    const shouldAddCarryOver = chkCarryProgress ? chkCarryProgress.checked : false;
+
+    let carryOverAlreadyAdded = false;
+    for (let idx = 0; idx < activeStageIndex; idx++) {
+      if (batch.stages[idx].carryOverAdded) {
+        carryOverAlreadyAdded = true;
+        break;
+      }
+    }
+
+    let stageLimit = maxAllowedTotal;
+    if (!carryOverAlreadyAdded && (shouldAddCarryOver || stage.carryOverAdded)) {
+      stageLimit += batch.carryOverKg;
+    }
+
     const addTotalKg = addAcceptedKg + addRejectedKg;
 
-    if (addTotalKg <= 0 && addAcceptedBlisters <= 0 && addRejectedBlisters <= 0) {
-      alert('يرجى إدخال كمية مقبولة أو مرفوضة أكبر من صفر.');
+    if (addTotalKg <= 0 && addAcceptedBlisters <= 0 && addRejectedBlisters <= 0 && !shouldAddCarryOver) {
+      alert('يرجى إدخال كمية مقبولة أو مرفوضة أكبر من صفر أو إدراج الكمية المنقولة.');
       return;
     }
 
-
-    const maxAddableKg = Math.max(0, maxAllowedTotal - stage.doneKg);
+    const maxAddableKg = Math.max(0, stageLimit - stage.doneKg);
 
     if (addTotalKg > (maxAddableKg + 0.05)) {
       if (activeStageIndex > 0) {
-        alert(`الكمية المتاحة كحد أقصى لهذه المرحلة هي ${maxAddableKg.toFixed(2)} kg (محدودة بالكمية المقبولة في المرحلة السابقة: ${maxAllowedTotal.toFixed(2)} kg).`);
+        alert(`الكمية المتاحة كحد أقصى لهذه المرحلة هي ${maxAddableKg.toFixed(2)} kg (محدودة بالكمية المقبولة في المرحلة السابقة: ${maxAllowedTotal.toFixed(2)} kg + المنقولة إن وجدت).`);
       } else {
         alert(`الكمية المتاحة كحد أقصى لهذه المرحلة هي ${maxAddableKg.toFixed(2)} kg.`);
       }
       return;
     }
 
-    stage.doneKg += addTotalKg;
-    stage.acceptedKg = (stage.acceptedKg || 0) + addAcceptedKg;
+    let finalAddAcceptedKg = addAcceptedKg;
+    if (!carryOverAlreadyAdded && shouldAddCarryOver) {
+      finalAddAcceptedKg += batch.carryOverKg;
+      stage.carryOverAdded = true;
+    }
+
+    stage.doneKg += (finalAddAcceptedKg - addAcceptedKg) + addTotalKg;
+    stage.acceptedKg = (stage.acceptedKg || 0) + finalAddAcceptedKg;
     stage.rejectedKg = (stage.rejectedKg || 0) + addRejectedKg;
 
-    if (stage.doneKg >= (maxAllowedTotal - 0.05)) {
+    if (stage.doneKg >= (stageLimit - 0.05)) {
       stage.status = 'completed';
     } else {
       stage.status = 'in_progress';
@@ -1713,13 +1812,26 @@
 
     if (!Array.isArray(batch.logs)) batch.logs = [];
     const uLabel = getUnitLabel(batch.pharmaForm);
+
+    let logMsg = '';
+    if (isBlisterStage) {
+      if (batch.pharmaForm === 'cream') {
+        logMsg = `تسجيل إنجاز بالتعبئة والتعبئة النهائية: (${addAcceptedBlisters} تيوب مقبول = ${addAcceptedKg} kg) و (${addRejectedBlisters} تيوب مرفوض = ${addRejectedKg} kg)`;
+      } else {
+        logMsg = `تسجيل إنجاز بالبليستر والتغليف: (${addAcceptedBlisters} ${term.packName} مقبول = ${addAcceptedKg} kg) و (${addRejectedBlisters} ${term.packName} مرفوض = ${addRejectedKg} kg)`;
+      }
+    } else {
+      logMsg = `تسجيل إنجاز بمرحلة [${stage.name}]: (${addAcceptedKg} kg مقبول = ${PharmaMath.formatNumber(addAcceptedBlisters)} ${uLabel}) و (${addRejectedKg} kg مرفوض = ${PharmaMath.formatNumber(addRejectedBlisters)} ${uLabel})`;
+    }
+
+    if (!carryOverAlreadyAdded && shouldAddCarryOver) {
+      logMsg += ` [شامل إدراج الكمية المنقولة من الباتش السابق: +${batch.carryOverKg} kg]`;
+    }
+    logMsg += '.';
+
     batch.logs.unshift({
       time: new Date().toLocaleString('en-US'),
-      text: isBlisterStage ?
-        (batch.pharmaForm === 'cream' ?
-          `تسجيل إنجاز بالتعبئة والتعبئة النهائية: (${addAcceptedBlisters} تيوب مقبول = ${addAcceptedKg} kg) و (${addRejectedBlisters} تيوب مرفوض = ${addRejectedKg} kg).` :
-          `تسجيل إنجاز بالبليستر والتغليف: (${addAcceptedBlisters} ${term.packName} مقبول = ${addAcceptedKg} kg) و (${addRejectedBlisters} ${term.packName} مرفوض = ${addRejectedKg} kg).`) :
-        `تسجيل إنجاز بمرحلة [${stage.name}]: (${addAcceptedKg} kg مقبول = ${PharmaMath.formatNumber(addAcceptedBlisters)} ${uLabel}) و (${addRejectedKg} kg مرفوض = ${PharmaMath.formatNumber(addRejectedBlisters)} ${uLabel}).`
+      text: logMsg
     });
 
     batch.version = (batch.version || 0) + 1;
@@ -2349,6 +2461,13 @@
     saveBatches(true);
     renderQCLotsClearanceTable(batch);
     renderQCForm(batch);
+  };
+
+  window.updateStageLoggerLimit = function() {
+    const batch = batches.find(b => b && String(b.id) === String(activeBatchId));
+    if (batch) {
+      renderStageLogger(batch);
+    }
   };
 
   function renderQCRunsHistory(batch) {
