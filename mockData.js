@@ -25,7 +25,7 @@ window.DEFAULT_BATCHES = [
       { id: "weighing", name: "الوزن الميداني للمواد الخام", status: "completed", doneKg: 100, acceptedKg: 100, rejectedKg: 0 },
       { id: "preparation", name: "التحضير والمزج المبدئي", status: "completed", doneKg: 100, acceptedKg: 99.5, rejectedKg: 0.5 },
       { id: "compression", name: "الضغط (Compression)", status: "in_progress", doneKg: 40, acceptedKg: 38, rejectedKg: 2 },
-      { id: "coating", name: "التلبيس بالفيلم (Film Coating)", status: "pending", doneKg: 0, acceptedKg: 0, rejectedKg: 0 },
+      { id: "coating", name: "التلبيس (Coating)", status: "pending", doneKg: 0, acceptedKg: 0, rejectedKg: 0 },
       { id: "blistering", name: "البليستر والتغليف النهائي", status: "pending", doneKg: 0, acceptedKg: 0, rejectedKg: 0 }
     ],
     logs: [

@@ -787,11 +787,11 @@
         } else if (currentStage.id === 'preparation') {
           materialState = 'مساحيق وبودرة ممزوجة (جاهزة للضغط)';
         } else if (currentStage.id === 'compression' && batch.isCoated) {
-          materialState = 'مضغوطات نواتية (بحاجة تلبيس بالفيلم)';
+          materialState = 'مضغوطات نواتية (بحاجة تلبيس)';
         } else if (currentStage.id === 'compression' && !batch.isCoated) {
           materialState = 'مضغوطات غير ملبسة (بحاجة بليستر/تغليف)';
         } else if (currentStage.id === 'coating') {
-          materialState = 'مضغوطات ملبسة بالفيلم (بحاجة بليستر/تغليف)';
+          materialState = 'مضغوطات ملبسة (بحاجة بليستر/تغليف)';
         } else if (currentStage.id === 'blistering') {
           materialState = 'بليسترات ومنتج شبه مكتمل بالتغليف';
         }
@@ -1177,7 +1177,7 @@
         { id: 'compression', name: 'الضغط (Compression)' }
       ];
       if (isCoated) {
-        stagesConfig.push({ id: 'coating', name: 'التلبيس بالفيلم (Film Coating)' });
+        stagesConfig.push({ id: 'coating', name: 'التلبيس (Coating)' });
       }
       stagesConfig.push({ id: 'blistering', name: 'البليستر والتغليف النهائي' });
     } else if (formType === 'capsule') {
