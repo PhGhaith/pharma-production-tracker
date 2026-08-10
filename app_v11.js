@@ -1490,6 +1490,10 @@
       }
     }
 
+    // First read the checkbox checked state BEFORE re-rendering (destroying) it
+    const chkCarryBefore = document.getElementById('chk-add-carry-over-progress');
+    const chkChecked = chkCarryBefore ? chkCarryBefore.checked : false;
+
     // Populate stage-carry-over-progress-container dynamically
     if (elStageCarryOverProgressContainer) {
       if (batch.carryOverKg > 0) {
@@ -1510,7 +1514,7 @@
         } else {
           elStageCarryOverProgressContainer.innerHTML = `
             <label style="display: flex; align-items: center; gap: 8px; font-size: 0.85rem; font-weight: bold; color: var(--amber); cursor: pointer;">
-              <input type="checkbox" id="chk-add-carry-over-progress" onchange="window.updateStageLoggerLimit()">
+              <input type="checkbox" id="chk-add-carry-over-progress" ${chkChecked ? 'checked' : ''} onchange="window.updateStageLoggerLimit()">
               <span>إدراج الكمية المنقولة كإنجاز في هذه المرحلة (+ ${batch.carryOverKg} kg)</span>
             </label>
           `;
@@ -1522,8 +1526,6 @@
 
     // Now compute the dynamic limit
     let currentLimit = maxAllowedTotal;
-    const chkCarry = document.getElementById('chk-add-carry-over-progress');
-    const chkChecked = chkCarry ? chkCarry.checked : false;
     if (!carryOverAlreadyAdded && (stage.carryOverAdded || chkChecked)) {
       currentLimit += batch.carryOverKg;
     }
