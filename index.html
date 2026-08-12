@@ -553,22 +553,16 @@
         <div class="modal-body">
           <div class="form-group" style="margin-bottom: 1.25rem;">
             <label for="select-user-role">اختر الدور الحالي (Role):</label>
-            <select id="select-user-role" style="background: var(--bg-dark); color: #fff; border: 1px solid rgba(255,255,255,0.15); padding: 8px 12px; border-radius: 4px; font-size: 0.9rem; width: 100%; box-sizing: border-box; outline: none; cursor: pointer; margin-top: 5px;">
-              <option value="admin">مشرف النظام (Admin) - كامل الصلاحيات 👑</option>
-              <option value="production">إدارة الإنتاج (Production Operator) - تسجيل إنجازات ومراحل الإنتاج ⚙️</option>
-              <option value="qc">قسم الجودة (QC Lab Analyst) - إدخال الفحوصات المخبرية وتخليص اللوتات 🧪</option>
+            <select id="select-user-role" style="background: #1e293b; color: #ffffff; border: 1px solid rgba(255,255,255,0.15); padding: 8px 12px; border-radius: 4px; font-size: 0.9rem; width: 100%; box-sizing: border-box; outline: none; cursor: pointer; margin-top: 5px;">
+              <option value="admin" style="background: #1e293b; color: #ffffff;">مشرف النظام (Admin) - كامل الصلاحيات 👑</option>
+              <option value="production" style="background: #1e293b; color: #ffffff;">إدارة الإنتاج (Production Operator) - تسجيل إنجازات ومراحل الإنتاج ⚙️</option>
+              <option value="qc" style="background: #1e293b; color: #ffffff;">قسم الجودة (QC Lab Analyst) - إدخال الفحوصات المخبرية وتخليص اللوتات 🧪</option>
             </select>
           </div>
 
           <div class="form-group" style="margin-bottom: 1.5rem;">
             <label for="input-role-pin">رمز المرور / الـ PIN Code الخاص بالدور *</label>
             <input type="password" id="input-role-pin" maxlength="4" style="direction: ltr; text-align: center; font-size: 1.5rem; letter-spacing: 10px; width: 100%; box-sizing: border-box; padding: 6px;" placeholder="••••" required>
-            <small class="help-text" style="margin-top: 0.5rem; display: block; color: var(--text-muted);">
-              الرموز الافتراضية للتجربة:<br>
-              - المشرف (Admin): <code style="color: var(--primary);">9999</code><br>
-              - إدارة الإنتاج (Production): <code style="color: var(--amber);">1234</code><br>
-              - قسم الجودة (QC): <code style="color: var(--cyan);">5555</code>
-            </small>
           </div>
           
           <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: 10px;">
@@ -587,7 +581,7 @@
   <!-- Scripts with cache-busting timestamp -->
   <script src="pharmaMath.js?v=15.1"></script>
   <script src="mockData.js?v=15.0"></script>
-  <script src="app_v11.js?v=5.0"></script>
+  <script src="app_v11.js?v=5.1"></script>
   <script>
     lucide.createIcons();
   </script>
