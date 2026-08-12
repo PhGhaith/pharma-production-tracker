@@ -2466,164 +2466,181 @@
 
   async function handleQCSubmit(e) {
     e.preventDefault();
-    const batch = batches.find(b => b && String(b.id) === String(activeBatchId));
-    if (!batch) return;
+    try {
+      const batch = batches.find(b => b && String(b.id) === String(activeBatchId));
+      if (!batch) return;
 
-    const checkedBoxes = document.querySelectorAll('input[name="qc-target-lot"]:checked');
-    const targetLots = Array.from(checkedBoxes).map(cb => cb.value);
-    
-    if (targetLots.length === 0) {
-      alert('يرجى اختيار لوت واحد على الأقل لربطه بالفحص المخبري.');
-      return;
-    }
+      const checkedBoxes = document.querySelectorAll('input[name="qc-target-lot"]:checked');
+      const targetLots = Array.from(checkedBoxes).map(cb => cb.value);
+      
+      if (targetLots.length === 0) {
+        alert('يرجى اختيار لوت واحد على الأقل لربطه بالفحص المخبري.');
+        return;
+      }
 
-    const sample_no = elInputQCSampleNo ? elInputQCSampleNo.value.trim() : '';
-    if (!sample_no) {
-      alert('يرجى إدخال رقم عينة المختبر قبل الحفظ.');
-      return;
-    }
+      const sample_no = elInputQCSampleNo ? elInputQCSampleNo.value.trim() : '';
+      if (!sample_no) {
+        alert('يرجى إدخال رقم عينة المختبر قبل الحفظ.');
+        return;
+      }
 
-    // Get all active test types rendered in the dynamic container
-    const activeTestTypes = new Set();
-    document.querySelectorAll('#qc-dynamic-tests-container [data-test-type]').forEach(el => {
-      activeTestTypes.add(el.getAttribute('data-test-type'));
-    });
+      // Get all active test types rendered in the dynamic container
+      const activeTestTypes = new Set();
+      document.querySelectorAll('#qc-dynamic-tests-container [data-test-type]').forEach(el => {
+        activeTestTypes.add(el.getAttribute('data-test-type'));
+      });
 
-    if (activeTestTypes.size === 0) {
-      alert('لا توجد فحوصات نشطة لحفظها.');
-      return;
-    }
+      if (activeTestTypes.size === 0) {
+        alert('لا توجد فحوصات نشطة لحفظها.');
+        return;
+      }
 
-    if (!Array.isArray(batch.qc_runs)) batch.qc_runs = [];
-    if (!Array.isArray(batch.logs)) batch.logs = [];
+      if (!Array.isArray(batch.qc_runs)) batch.qc_runs = [];
+      if (!Array.isArray(batch.logs)) batch.logs = [];
 
-    const testLabels = {
-      assay: 'المعايرة (Assay)',
-      dissolution: 'الانحلالية',
-      uniformity: 'تجانس المحتوى',
-      coating_dissolution: 'فحص الانحلالية',
-      coating_uniformity: 'فحص تجانس المحتوى',
-      microbiology: 'الزرع الجرثومي (Microbiology)'
-    };
+      if (!Array.isArray(batch.active_ingredients_config)) {
+        const count = parseInt(batch.active_ingredients_count, 10) || 1;
+        batch.active_ingredients_config = [];
+        for (let i = 0; i < count; i++) {
+          batch.active_ingredients_config.push({
+            name: `المادة الفعالة ${i + 1}`,
+            has_diss: true,
+            has_unif: true
+          });
+        }
+      }
 
-    let savedTestsCount = 0;
-    let logSummaryParts = [];
+      const testLabels = {
+        assay: 'المعايرة (Assay)',
+        dissolution: 'الانحلالية',
+        uniformity: 'تجانس المحتوى',
+        coating_dissolution: 'فحص الانحلالية',
+        coating_uniformity: 'فحص تجانس المحتوى',
+        microbiology: 'الزرع الجرثومي (Microbiology)'
+      };
 
-    for (let test_type of activeTestTypes) {
-      if (test_type === 'microbiology') {
-        const microEl = document.getElementById(`input-qc-micro-status-${test_type}`);
-        if (microEl) {
-          const status = microEl.value;
+      let savedTestsCount = 0;
+      let logSummaryParts = [];
+
+      for (let test_type of activeTestTypes) {
+        if (test_type === 'microbiology') {
+          const microEl = document.getElementById(`input-qc-micro-status-${test_type}`);
+          if (microEl) {
+            const status = microEl.value;
+            const newRun = {
+              run_id: 'qc-run-' + Date.now() + '-' + Math.random().toString(36).substr(2, 5),
+              stage_id: batch.stages[activeStageIndex].id,
+              test_type,
+              status,
+              assay_val: null,
+              qc_range: null,
+              sample_no,
+              timestamp: new Date().toLocaleString('ar-EG')
+            };
+            newRun.target_lots = targetLots;
+            batch.qc_runs.push(newRun);
+            savedTestsCount++;
+            
+            const label = testLabels[test_type] || test_type;
+            logSummaryParts.push(`[${label}]: ${status === 'passed' ? 'مطابق 🟢' : 'غير مطابق 🔴'}`);
+          }
+        } else {
+          const ingredientsData = [];
+          let allPassed = true;
+          let mainAssayVal = '';
+          let mainQCRange = '';
+          let firstActiveIng = true;
+
+          for (let k = 0; k < batch.active_ingredients_config.length; k++) {
+            const ing = batch.active_ingredients_config[k];
+            
+            let isTestActiveForIng = false;
+            if (test_type === 'assay') isTestActiveForIng = true;
+            else if (test_type === 'dissolution' || test_type === 'coating_dissolution') isTestActiveForIng = ing.has_diss;
+            else if (test_type === 'uniformity' || test_type === 'coating_uniformity') isTestActiveForIng = ing.has_unif;
+
+            if (isTestActiveForIng) {
+              const rangeEl = document.getElementById(`input-qc-range-${test_type}-${k}`);
+              const resultEl = document.getElementById(`input-qc-result-${test_type}-${k}`);
+              if (rangeEl && resultEl) {
+                const qc_range = rangeEl.value.trim();
+                const assay_val = resultEl.value.trim();
+                if (!qc_range || !assay_val) {
+                  alert(`يرجى تعبئة المجال والنتيجة للمادة (${ing.name}) لفحص ${testLabels[test_type] || test_type}`);
+                  return;
+                }
+                const isCompliant = evaluateQCCompliance(qc_range, assay_val);
+                if (!isCompliant) allPassed = false;
+                ingredientsData.push({
+                  name: ing.name,
+                  qc_range,
+                  assay_val,
+                  status: isCompliant ? 'passed' : 'failed'
+                });
+
+                if (firstActiveIng) {
+                  mainAssayVal = assay_val;
+                  mainQCRange = qc_range;
+                  firstActiveIng = false;
+                }
+              }
+            }
+          }
+
           const newRun = {
             run_id: 'qc-run-' + Date.now() + '-' + Math.random().toString(36).substr(2, 5),
             stage_id: batch.stages[activeStageIndex].id,
             test_type,
-            status,
-            assay_val: null,
-            qc_range: null,
+            status: allPassed ? 'passed' : 'failed',
+            assay_val: mainAssayVal,
+            qc_range: mainQCRange,
+            ingredients: ingredientsData,
             sample_no,
             timestamp: new Date().toLocaleString('ar-EG')
           };
           newRun.target_lots = targetLots;
           batch.qc_runs.push(newRun);
           savedTestsCount++;
-          
+
           const label = testLabels[test_type] || test_type;
-          logSummaryParts.push(`[${label}]: ${status === 'passed' ? 'مطابق 🟢' : 'غير مطابق 🔴'}`);
-        }
-      } else {
-        const ingredientsData = [];
-        let allPassed = true;
-        let mainAssayVal = '';
-        let mainQCRange = '';
-        let firstActiveIng = true;
-
-        for (let k = 0; k < batch.active_ingredients_config.length; k++) {
-          const ing = batch.active_ingredients_config[k];
-          
-          let isTestActiveForIng = false;
-          if (test_type === 'assay') isTestActiveForIng = true;
-          else if (test_type === 'dissolution' || test_type === 'coating_dissolution') isTestActiveForIng = ing.has_diss;
-          else if (test_type === 'uniformity' || test_type === 'coating_uniformity') isTestActiveForIng = ing.has_unif;
-
-          if (isTestActiveForIng) {
-            const rangeEl = document.getElementById(`input-qc-range-${test_type}-${k}`);
-            const resultEl = document.getElementById(`input-qc-result-${test_type}-${k}`);
-            if (rangeEl && resultEl) {
-              const qc_range = rangeEl.value.trim();
-              const assay_val = resultEl.value.trim();
-              if (!qc_range || !assay_val) {
-                alert(`يرجى تعبئة المجال والنتيجة للمادة (${ing.name}) لفحص ${testLabels[test_type] || test_type}`);
-                return;
-              }
-              const isCompliant = evaluateQCCompliance(qc_range, assay_val);
-              if (!isCompliant) allPassed = false;
-              ingredientsData.push({
-                name: ing.name,
-                qc_range,
-                assay_val,
-                status: isCompliant ? 'passed' : 'failed'
-              });
-
-              if (firstActiveIng) {
-                mainAssayVal = assay_val;
-                mainQCRange = qc_range;
-                firstActiveIng = false;
-              }
-            }
+          if (ingredientsData.length > 1) {
+            const statusText = allPassed ? 'مطابق 🟢' : 'غير مطابق 🔴';
+            logSummaryParts.push(`[${label}]: ${statusText} لـ (${ingredientsData.length}) مواد فعالة`);
+          } else {
+            logSummaryParts.push(`[${label}]: نتيجة ${mainAssayVal} (${allPassed ? 'مطابق 🟢' : 'غير مطابق 🔴'})`);
           }
         }
+      }
 
-        const newRun = {
-          run_id: 'qc-run-' + Date.now() + '-' + Math.random().toString(36).substr(2, 5),
-          stage_id: batch.stages[activeStageIndex].id,
-          test_type,
-          status: allPassed ? 'passed' : 'failed',
-          assay_val: mainAssayVal,
-          qc_range: mainQCRange,
-          ingredients: ingredientsData,
-          sample_no,
-          timestamp: new Date().toLocaleString('ar-EG')
-        };
-        newRun.target_lots = targetLots;
-        batch.qc_runs.push(newRun);
-        savedTestsCount++;
+      if (savedTestsCount > 0) {
+        batch.logs.unshift({
+          time: new Date().toLocaleString('ar-EG'),
+          text: `مراقبة الجودة (QC): تسجيل عينات (${sample_no}) للوتات (${targetLots.join(', ')}) بـ: ${logSummaryParts.join(' | ')}.`
+        });
 
-        const label = testLabels[test_type] || test_type;
-        if (ingredientsData.length > 1) {
-          const statusText = allPassed ? 'مطابق 🟢' : 'غير مطابق 🔴';
-          logSummaryParts.push(`[${label}]: ${statusText} لـ (${ingredientsData.length}) مواد فعالة`);
+        batch.version = (batch.version || 0) + 1;
+        batch.updatedAt = Date.now();
+        saveBatches(true);
+
+        // Clear dynamic inputs
+        document.querySelectorAll('#qc-dynamic-tests-container input').forEach(inp => inp.value = '');
+        if (elInputQCSampleNo) elInputQCSampleNo.value = '';
+
+        // Refresh views
+        renderQCLotsClearanceTable(batch);
+        renderQCForm(batch);
+        renderHistoryList(batch);
+        renderApp();
+
+        if (window.showToast) {
+          window.showToast('تم حفظ نتائج الفحوصات المخبرية بنجاح 🟢', 'success');
         } else {
-          logSummaryParts.push(`[${label}]: نتيجة ${mainAssayVal} (${allPassed ? 'مطابق 🟢' : 'غير مطابق 🔴'})`);
+          alert('تم حفظ نتائج الفحوصات المخبرية بنجاح 🟢');
         }
       }
-    }
-
-    if (savedTestsCount > 0) {
-      batch.logs.unshift({
-        time: new Date().toLocaleString('ar-EG'),
-        text: `مراقبة الجودة (QC): تسجيل عينات (${sample_no}) للوتات (${targetLots.join(', ')}) بـ: ${logSummaryParts.join(' | ')}.`
-      });
-
-      batch.version = (batch.version || 0) + 1;
-      batch.updatedAt = Date.now();
-      saveBatches(true);
-
-      // Clear dynamic inputs
-      document.querySelectorAll('#qc-dynamic-tests-container input').forEach(inp => inp.value = '');
-      if (elInputQCSampleNo) elInputQCSampleNo.value = '';
-
-      // Refresh views
-      renderQCLotsClearanceTable(batch);
-      renderQCForm(batch);
-      renderHistoryList(batch);
-      renderApp();
-
-      if (window.showToast) {
-        window.showToast('تم حفظ نتائج الفحوصات المخبرية بنجاح 🟢', 'success');
-      } else {
-        alert('تم حفظ نتائج الفحوصات المخبرية بنجاح 🟢');
-      }
+    } catch (error) {
+      console.error("Error in handleQCSubmit:", error);
+      alert("حدث خطأ أثناء حفظ الفحص المخبري: " + error.message);
     }
   }
 
