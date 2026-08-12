@@ -40,6 +40,7 @@
   let isSavingToCloud = false;
   let isEditCorrectionMode = false;
   let currentViewMode = localStorage.getItem('pharma_view_mode') || 'grid';
+  let currentUserRole = localStorage.getItem('current_user_role') || 'admin';
   
   // Rate limit protection
   let lastAutoPushTime = 0;
@@ -159,6 +160,16 @@
   const btnSubmitStageLog = document.getElementById('btn-submit-stage-log');
   const submitStageBtnText = document.getElementById('submit-stage-btn-text');
   const btnCancelEditMode = document.getElementById('btn-cancel-edit-mode');
+
+  // Role Switcher Controls
+  const btnRoleSwitcher = document.getElementById('btn-role-switcher');
+  const roleSwitcherText = document.getElementById('role-switcher-text');
+  const modalRoleSwitcher = document.getElementById('modal-role-switcher');
+  const closeRoleSwitcherModal = document.getElementById('close-role-switcher-modal');
+  const cancelRoleSwitcherModal = document.getElementById('cancel-role-switcher-modal');
+  const selectUserRole = document.getElementById('select-user-role');
+  const inputRolePin = document.getElementById('input-role-pin');
+  const btnSaveRoleSelection = document.getElementById('btn-save-role-selection');
 
   // QC DOM references
   const elFormAddQCRun = document.getElementById('form-add-qc-run');
@@ -548,6 +559,18 @@
     renderStats();
     renderBatchesGrid();
     renderQuarantineView();
+    updateRoleSwitcherButtonText();
+
+    // Toggle add batch button visibility
+    const btnNewBatch = document.getElementById('btn-new-batch');
+    if (btnNewBatch) {
+      if (currentUserRole === 'qc') {
+        btnNewBatch.classList.add('hidden');
+      } else {
+        btnNewBatch.classList.remove('hidden');
+      }
+    }
+
     if (window.lucide) window.lucide.createIcons();
   }
 
@@ -970,6 +993,33 @@
       elFormAddQCRun.addEventListener('submit', handleQCSubmit);
     }
 
+    // Role Switcher Modal Event Listeners
+    if (btnRoleSwitcher) {
+      btnRoleSwitcher.addEventListener('click', () => {
+        if (modalRoleSwitcher) {
+          if (selectUserRole) selectUserRole.value = currentUserRole;
+          if (inputRolePin) inputRolePin.value = '';
+          modalRoleSwitcher.classList.remove('hidden');
+        }
+      });
+    }
+
+    if (closeRoleSwitcherModal) {
+      closeRoleSwitcherModal.addEventListener('click', () => {
+        if (modalRoleSwitcher) modalRoleSwitcher.classList.add('hidden');
+      });
+    }
+
+    if (cancelRoleSwitcherModal) {
+      cancelRoleSwitcherModal.addEventListener('click', () => {
+        if (modalRoleSwitcher) modalRoleSwitcher.classList.add('hidden');
+      });
+    }
+
+    if (btnSaveRoleSelection) {
+      btnSaveRoleSelection.addEventListener('click', handleSaveRoleSelection);
+    }
+
     if (btnResetCache) {
       btnResetCache.addEventListener('click', handleResetCache);
     }
@@ -1359,6 +1409,14 @@
     renderQCForm(batch);
     renderHistoryList(batch);
 
+    if (btnDeleteBatch) {
+      if (currentUserRole === 'qc') {
+        btnDeleteBatch.classList.add('hidden');
+      } else {
+        btnDeleteBatch.classList.remove('hidden');
+      }
+    }
+
     if (elModalBatchDetail) elModalBatchDetail.classList.remove('hidden');
     if (window.lucide) window.lucide.createIcons();
   }
@@ -1594,6 +1652,39 @@
 
     if (logStageRejectedKg) logStageRejectedKg.textContent = `${stageRejKg} kg`;
     if (logStageRejectedBlisters) logStageRejectedBlisters.textContent = `(${PharmaMath.formatNumber(rejMath.totalBlisters)} ${unitLabel} مرفوض/إعادة تشغيل)`;
+
+    // Role Authorization for Production Logger
+    const isQC = currentUserRole === 'qc';
+    if (isQC) {
+      if (inputLogAcceptedKg) inputLogAcceptedKg.disabled = true;
+      if (inputLogRejectedKg) inputLogRejectedKg.disabled = true;
+      if (btnSubmitStageLog) {
+        btnSubmitStageLog.disabled = true;
+        btnSubmitStageLog.style.opacity = '0.5';
+        btnSubmitStageLog.title = 'تتطلب صلاحية إدارة الإنتاج أو المشرف';
+      }
+      if (btnToggleEditMode) {
+        btnToggleEditMode.disabled = true;
+        btnToggleEditMode.style.opacity = '0.5';
+        btnToggleEditMode.title = 'تتطلب صلاحية إدارة الإنتاج أو المشرف';
+      }
+      // disable carry over progress checkbox if present
+      const chkCarry = document.getElementById('chk-add-carry-over-progress');
+      if (chkCarry) chkCarry.disabled = true;
+    } else {
+      if (inputLogAcceptedKg) inputLogAcceptedKg.disabled = false;
+      if (inputLogRejectedKg) inputLogRejectedKg.disabled = false;
+      if (btnSubmitStageLog) {
+        btnSubmitStageLog.disabled = false;
+        btnSubmitStageLog.style.opacity = '1';
+        btnSubmitStageLog.title = '';
+      }
+      if (btnToggleEditMode) {
+        btnToggleEditMode.disabled = false;
+        btnToggleEditMode.style.opacity = '1';
+        btnToggleEditMode.title = '';
+      }
+    }
   }
 
   function handleUpdateStageSubmit(e) {
@@ -1605,6 +1696,11 @@
     if (!stage) return;
     const isBlisterStage = activeStageIndex === batch.stages.length - 1;
     const term = getTerminology(batch.pharmaForm);
+
+    if (currentUserRole === 'qc') {
+      alert('عذراً، لا تملك صلاحيات إدارة الإنتاج لتسجيل الإنجاز.');
+      return;
+    }
 
     // QC Gate Validation Checks
     if (!Array.isArray(batch.qc_runs)) batch.qc_runs = [];
@@ -2460,6 +2556,51 @@
         }
       }
     }
+
+    // Role Authorization for QC Form and Configs
+    const isProduction = currentUserRole === 'production';
+    if (isProduction) {
+      // Disable inputs and select elements inside form-add-qc-run
+      if (elFormAddQCRun) {
+        elFormAddQCRun.querySelectorAll('input, select, button').forEach(el => el.disabled = true);
+        const btnSubmitQC = document.getElementById('btn-submit-qc-run');
+        if (btnSubmitQC) {
+          btnSubmitQC.disabled = true;
+          btnSubmitQC.style.opacity = '0.5';
+          btnSubmitQC.title = 'تتطلب صلاحية إدارة الجودة أو المشرف';
+        }
+      }
+      
+      // Also disable editing the QC configs (ingredient names, checkboxes, etc.)
+      if (elQCGlobalConfigContainer) {
+        elQCGlobalConfigContainer.querySelectorAll('input, select').forEach(el => el.disabled = true);
+      }
+      if (elCoatingConfigContainer) {
+        elCoatingConfigContainer.querySelectorAll('input').forEach(el => el.disabled = true);
+      }
+      if (elCarryOverConfigContainer) {
+        elCarryOverConfigContainer.querySelectorAll('input').forEach(el => el.disabled = true);
+      }
+    } else {
+      if (elFormAddQCRun) {
+        elFormAddQCRun.querySelectorAll('input, select, button').forEach(el => el.disabled = false);
+        const btnSubmitQC = document.getElementById('btn-submit-qc-run');
+        if (btnSubmitQC) {
+          btnSubmitQC.disabled = false;
+          btnSubmitQC.style.opacity = '1';
+          btnSubmitQC.title = '';
+        }
+      }
+      if (elQCGlobalConfigContainer) {
+        elQCGlobalConfigContainer.querySelectorAll('input, select').forEach(el => el.disabled = false);
+      }
+      if (elCoatingConfigContainer) {
+        elCoatingConfigContainer.querySelectorAll('input').forEach(el => el.disabled = false);
+      }
+      if (elCarryOverConfigContainer) {
+        elCarryOverConfigContainer.querySelectorAll('input').forEach(el => el.disabled = false);
+      }
+    }
   }
 
 
@@ -2467,6 +2608,11 @@
   async function handleQCSubmit(e) {
     e.preventDefault();
     try {
+      if (currentUserRole === 'production') {
+        alert('عذراً، لا تملك صلاحيات إدارة الجودة لتسجيل الفحوصات المخبرية.');
+        return;
+      }
+
       const batch = batches.find(b => b && String(b.id) === String(activeBatchId));
       if (!batch) return;
 
@@ -2813,6 +2959,10 @@
   }
 
   window.deleteQCRun = function(runId) {
+    if (currentUserRole === 'production') {
+      alert('عذراً، لا تملك صلاحيات إدارة الجودة لحذف الفحوصات المخبرية.');
+      return;
+    }
     const batch = batches.find(b => b && String(b.id) === String(activeBatchId));
     if (!batch || !Array.isArray(batch.qc_runs)) return;
 
@@ -2854,6 +3004,61 @@
       }
     }
   };
+
+  function handleSaveRoleSelection() {
+    const selectedRole = selectUserRole.value;
+    const pin = inputRolePin.value.trim();
+    
+    // PIN Validation Map
+    const rolePinMap = {
+      admin: '9999',
+      production: '1234',
+      qc: '5555'
+    };
+    
+    if (rolePinMap[selectedRole] && pin !== rolePinMap[selectedRole]) {
+      alert('رمز المرور (PIN) غير صحيح لهذا الدور، يرجى المحاولة مجدداً.');
+      return;
+    }
+    
+    currentUserRole = selectedRole;
+    localStorage.setItem('current_user_role', currentUserRole);
+    
+    if (modalRoleSwitcher) {
+      modalRoleSwitcher.classList.add('hidden');
+    }
+    
+    // Update the button text with current role name
+    updateRoleSwitcherButtonText();
+    
+    // Re-render everything to apply permissions
+    renderApp();
+    if (activeBatchId) {
+      const activeBatch = batches.find(b => b && String(b.id) === String(activeBatchId));
+      if (activeBatch) {
+        renderWorkflowTimeline(activeBatch);
+        renderStageLogger(activeBatch);
+        renderQCForm(activeBatch);
+        renderQCLotsClearanceTable(activeBatch);
+      }
+    }
+    
+    if (window.showToast) {
+      window.showToast('تم تطبيق الصلاحيات والدور الجديد بنجاح 🟢', 'success');
+    } else {
+      alert('تم تطبيق الصلاحيات والدور الجديد بنجاح 🟢');
+    }
+  }
+
+  function updateRoleSwitcherButtonText() {
+    if (!roleSwitcherText) return;
+    const roleNames = {
+      admin: 'الصلاحية: مشرف 👑',
+      production: 'الصلاحية: الإنتاج ⚙️',
+      qc: 'الصلاحية: الجودة 🧪'
+    };
+    roleSwitcherText.textContent = roleNames[currentUserRole] || 'الصلاحية: مشرف 👑';
+  }
 
   document.addEventListener('DOMContentLoaded', init);
 })();

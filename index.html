@@ -97,6 +97,12 @@
         </button>
         <input type="file" id="input-backup-file" accept=".json" class="hidden">
 
+        <!-- Role Switcher Button -->
+        <button id="btn-role-switcher" class="btn btn-secondary" style="border-color: var(--primary); color: var(--primary);" title="تغيير صلاحيات الحساب والدور الحالي">
+          <i data-lucide="user-check"></i>
+          <span id="role-switcher-text">الصلاحية: مشرف 👑</span>
+        </button>
+
         <button id="btn-new-batch" class="btn btn-primary">
           <i data-lucide="plus-circle"></i>
           <span>إضافة تشغيلة جديدة (Batch)</span>
@@ -530,12 +536,58 @@
       </div>
     </div>
 
+    <!-- Modal: Role Switcher -->
+    <div id="modal-role-switcher" class="modal-overlay hidden">
+      <div class="modal-card" style="max-width: 450px;">
+        <div class="modal-header">
+          <div class="modal-title">
+            <i data-lucide="shield-check" style="color: var(--primary);"></i>
+            <div>
+              <h3>تحديد صلاحيات الحساب والدور الحالي</h3>
+              <p>تغيير الصلاحيات للتحكم بالإنتاج أو الجودة</p>
+            </div>
+          </div>
+          <button class="btn-close-modal" id="close-role-switcher-modal">&times;</button>
+        </div>
+        
+        <div class="modal-body">
+          <div class="form-group" style="margin-bottom: 1.25rem;">
+            <label for="select-user-role">اختر الدور الحالي (Role):</label>
+            <select id="select-user-role" style="background: var(--bg-dark); color: #fff; border: 1px solid rgba(255,255,255,0.15); padding: 8px 12px; border-radius: 4px; font-size: 0.9rem; width: 100%; box-sizing: border-box; outline: none; cursor: pointer; margin-top: 5px;">
+              <option value="admin">مشرف النظام (Admin) - كامل الصلاحيات 👑</option>
+              <option value="production">إدارة الإنتاج (Production Operator) - تسجيل إنجازات ومراحل الإنتاج ⚙️</option>
+              <option value="qc">قسم الجودة (QC Lab Analyst) - إدخال الفحوصات المخبرية وتخليص اللوتات 🧪</option>
+            </select>
+          </div>
+
+          <div class="form-group" style="margin-bottom: 1.5rem;">
+            <label for="input-role-pin">رمز المرور / الـ PIN Code الخاص بالدور *</label>
+            <input type="password" id="input-role-pin" maxlength="4" style="direction: ltr; text-align: center; font-size: 1.5rem; letter-spacing: 10px; width: 100%; box-sizing: border-box; padding: 6px;" placeholder="••••" required>
+            <small class="help-text" style="margin-top: 0.5rem; display: block; color: var(--text-muted);">
+              الرموز الافتراضية للتجربة:<br>
+              - المشرف (Admin): <code style="color: var(--primary);">9999</code><br>
+              - إدارة الإنتاج (Production): <code style="color: var(--amber);">1234</code><br>
+              - قسم الجودة (QC): <code style="color: var(--cyan);">5555</code>
+            </small>
+          </div>
+          
+          <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: 10px;">
+            <button type="button" class="btn btn-secondary" id="cancel-role-switcher-modal">إلغاء</button>
+            <button type="button" class="btn btn-primary" id="btn-save-role-selection">
+              <i data-lucide="check-circle-2"></i>
+              <span>تطبيق الصلاحيات</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
   </div>
 
   <!-- Scripts with cache-busting timestamp -->
   <script src="pharmaMath.js?v=15.1"></script>
   <script src="mockData.js?v=15.0"></script>
-  <script src="app_v11.js?v=4.1"></script>
+  <script src="app_v11.js?v=5.0"></script>
   <script>
     lucide.createIcons();
   </script>
