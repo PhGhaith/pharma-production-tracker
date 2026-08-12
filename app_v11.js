@@ -468,6 +468,46 @@
           const mergedHash = JSON.stringify(mergedList);
 
           if (currentLocalHash !== mergedHash) {
+            // Find what changed to show notification toast messages
+            const oldBatchesMap = new Map();
+            batches.forEach(b => {
+              if (b && b.id) oldBatchesMap.set(String(b.id), b);
+            });
+
+            const notificationsToShow = [];
+
+            mergedList.forEach(nb => {
+              if (!nb || nb.deleted === true) return;
+              const ob = oldBatchesMap.get(String(nb.id));
+              if (!ob) {
+                // New batch added
+                notificationsToShow.push(`🆕 تم إضافة تشغيلة جديدة: ${nb.productName} (رقم ${nb.batchNo})`);
+              } else if ((nb.version || 0) > (ob.version || 0)) {
+                // Batch updated. Let's look at new logs
+                const newLogsCount = (nb.logs || []).length - (ob.logs || []).length;
+                if (newLogsCount > 0) {
+                  for (let i = 0; i < newLogsCount; i++) {
+                    const log = nb.logs[i];
+                    if (log && log.text) {
+                      notificationsToShow.push(`🔔 ${log.text}`);
+                    }
+                  }
+                } else {
+                  // General update
+                  notificationsToShow.push(`🔄 تم تحديث بيانات التشغيلة: ${nb.productName} (رقم ${nb.batchNo})`);
+                }
+              }
+            });
+
+            // Check for deleted batches
+            batches.forEach(ob => {
+              if (!ob || ob.deleted === true) return;
+              const nb = mergedList.find(b => b && String(b.id) === String(ob.id));
+              if (!nb || nb.deleted === true) {
+                notificationsToShow.push(`🗑️ تم حذف/إلغاء التشغيلة: ${ob.productName} (رقم ${ob.batchNo})`);
+              }
+            });
+
             batches = mergedList;
             localStorage.setItem(MASTER_STORAGE_KEY, JSON.stringify(batches));
             renderApp();
@@ -482,6 +522,13 @@
                 closeBatchDetailModal();
               }
             }
+
+            // Show toast notifications
+            notificationsToShow.reverse().forEach(msg => {
+              if (window.showToast) {
+                window.showToast(msg, 'info', 6000);
+              }
+            });
           }
 
           // No auto-push on background sync to prevent HTTP 429 Rate Limits.
@@ -3059,6 +3106,78 @@
     };
     roleSwitcherText.textContent = roleNames[currentUserRole] || 'الصلاحية: مشرف 👑';
   }
+
+  window.showToast = function(message, type = 'info', duration = 5000) {
+    const container = document.getElementById('toast-container');
+    if (!container) return;
+
+    const toast = document.createElement('div');
+    toast.className = `toast toast-${type}`;
+    toast.style.pointerEvents = 'auto';
+    toast.style.background = 'rgba(30, 41, 59, 0.95)';
+    toast.style.backdropFilter = 'blur(10px)';
+    toast.style.border = '1px solid rgba(255, 255, 255, 0.1)';
+    toast.style.marginBottom = '8px';
+    
+    // Customize border color based on type
+    if (type === 'success') {
+      toast.style.borderRight = '4px solid var(--emerald)';
+    } else if (type === 'error') {
+      toast.style.borderRight = '4px solid var(--rose)';
+    } else if (type === 'warning') {
+      toast.style.borderRight = '4px solid var(--amber)';
+    } else {
+      toast.style.borderRight = '4px solid var(--cyan)';
+    }
+
+    toast.style.color = '#fff';
+    toast.style.padding = '12px 16px';
+    toast.style.borderRadius = '6px';
+    toast.style.boxShadow = '0 10px 15px -3px rgba(0, 0, 0, 0.3), 0 4px 6px -2px rgba(0, 0, 0, 0.15)';
+    toast.style.fontSize = '0.85rem';
+    toast.style.display = 'flex';
+    toast.style.alignItems = 'center';
+    toast.style.gap = '10px';
+    toast.style.opacity = '0';
+    toast.style.transform = 'translateX(-50px)';
+    toast.style.transition = 'all 0.4s cubic-bezier(0.16, 1, 0.3, 1)';
+
+    let iconHtml = '';
+    if (type === 'success') {
+      iconHtml = '<i data-lucide="check-circle" style="color: var(--emerald); width: 18px; height: 18px; flex-shrink: 0;"></i>';
+    } else if (type === 'error') {
+      iconHtml = '<i data-lucide="x-circle" style="color: var(--rose); width: 18px; height: 18px; flex-shrink: 0;"></i>';
+    } else if (type === 'warning') {
+      iconHtml = '<i data-lucide="alert-triangle" style="color: var(--amber); width: 18px; height: 18px; flex-shrink: 0;"></i>';
+    } else {
+      iconHtml = '<i data-lucide="bell" style="color: var(--cyan); width: 18px; height: 18px; flex-shrink: 0;"></i>';
+    }
+
+    toast.innerHTML = `
+      ${iconHtml}
+      <div style="flex-grow: 1; line-height: 1.4;">${message}</div>
+      <button style="background: none; border: none; color: var(--text-dim); cursor: pointer; font-size: 1.1rem; padding: 0 4px; line-height: 1;" onclick="this.parentElement.remove()">&times;</button>
+    `;
+
+    container.appendChild(toast);
+    
+    if (window.lucide) window.lucide.createIcons();
+
+    // Trigger slide-in animation
+    setTimeout(() => {
+      toast.style.opacity = '1';
+      toast.style.transform = 'translateX(0)';
+    }, 50);
+
+    // Slide-out and remove
+    setTimeout(() => {
+      toast.style.opacity = '0';
+      toast.style.transform = 'translateX(-50px)';
+      setTimeout(() => {
+        toast.remove();
+      }, 400);
+    }, duration);
+  };
 
   document.addEventListener('DOMContentLoaded', init);
 })();
