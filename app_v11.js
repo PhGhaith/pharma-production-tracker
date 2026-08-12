@@ -41,6 +41,7 @@
   let isEditCorrectionMode = false;
   let currentViewMode = localStorage.getItem('pharma_view_mode') || 'grid';
   let currentUserRole = localStorage.getItem('current_user_role') || 'admin';
+  let notificationsHistory = JSON.parse(localStorage.getItem('notifications_history') || '[]');
   
   // Rate limit protection
   let lastAutoPushTime = 0;
@@ -170,6 +171,15 @@
   const selectUserRole = document.getElementById('select-user-role');
   const inputRolePin = document.getElementById('input-role-pin');
   const btnSaveRoleSelection = document.getElementById('btn-save-role-selection');
+
+  // Notifications Drawer Controls
+  const btnNotificationsDrawer = document.getElementById('btn-notifications-drawer');
+  const notificationsBadge = document.getElementById('notifications-badge');
+  const drawerNotifications = document.getElementById('drawer-notifications');
+  const closeNotificationsDrawer = document.getElementById('close-notifications-drawer');
+  const notificationsDrawerList = document.getElementById('notifications-drawer-list');
+  const btnClearNotifications = document.getElementById('btn-clear-notifications');
+  const notificationsHistoryCount = document.getElementById('notifications-history-count');
 
   // QC DOM references
   const elFormAddQCRun = document.getElementById('form-add-qc-run');
@@ -524,11 +534,32 @@
             }
 
             // Show toast notifications
+            let soundPlayed = false;
             notificationsToShow.reverse().forEach(msg => {
+              // Push to history
+              notificationsHistory.unshift({
+                text: msg,
+                timestamp: new Date().toLocaleTimeString('ar-EG'),
+                unread: true
+              });
+
               if (window.showToast) {
                 window.showToast(msg, 'info', 6000);
               }
+              
+              if (!soundPlayed) {
+                playNotificationSound();
+                soundPlayed = true; // only play sound once per sync cycle to avoid noise
+              }
             });
+
+            if (notificationsToShow.length > 0) {
+              localStorage.setItem('notifications_history', JSON.stringify(notificationsHistory));
+              updateNotificationsBadge();
+              if (drawerNotifications && !drawerNotifications.classList.contains('hidden')) {
+                renderNotificationsDrawer();
+              }
+            }
           }
 
           // No auto-push on background sync to prevent HTTP 429 Rate Limits.
@@ -607,6 +638,7 @@
     renderBatchesGrid();
     renderQuarantineView();
     updateRoleSwitcherButtonText();
+    updateNotificationsBadge();
 
     // Toggle add batch button visibility
     const btnNewBatch = document.getElementById('btn-new-batch');
@@ -1065,6 +1097,37 @@
 
     if (btnSaveRoleSelection) {
       btnSaveRoleSelection.addEventListener('click', handleSaveRoleSelection);
+    }
+
+    // Notifications Drawer Event Listeners
+    if (btnNotificationsDrawer) {
+      btnNotificationsDrawer.addEventListener('click', () => {
+        if (drawerNotifications) {
+          // Mark all notifications as read when drawer is opened
+          notificationsHistory.forEach(n => n.unread = false);
+          localStorage.setItem('notifications_history', JSON.stringify(notificationsHistory));
+          updateNotificationsBadge();
+          renderNotificationsDrawer();
+          drawerNotifications.classList.remove('hidden');
+        }
+      });
+    }
+
+    if (closeNotificationsDrawer) {
+      closeNotificationsDrawer.addEventListener('click', () => {
+        if (drawerNotifications) drawerNotifications.classList.add('hidden');
+      });
+    }
+
+    if (btnClearNotifications) {
+      btnClearNotifications.addEventListener('click', () => {
+        if (confirm('هل أنت متأكد من مسح جميع سجلات الإشعارات؟')) {
+          notificationsHistory = [];
+          localStorage.removeItem('notifications_history');
+          updateNotificationsBadge();
+          renderNotificationsDrawer();
+        }
+      });
     }
 
     if (btnResetCache) {
@@ -3178,6 +3241,89 @@
       }, 400);
     }, duration);
   };
+
+  function updateNotificationsBadge() {
+    if (!notificationsBadge) return;
+    const unreadCount = notificationsHistory.filter(n => n.unread).length;
+    if (unreadCount > 0) {
+      notificationsBadge.textContent = unreadCount;
+      notificationsBadge.classList.remove('hidden');
+    } else {
+      notificationsBadge.classList.add('hidden');
+    }
+  }
+
+  function renderNotificationsDrawer() {
+    if (!notificationsDrawerList) return;
+    notificationsDrawerList.innerHTML = '';
+
+    if (notificationsHistory.length === 0) {
+      notificationsDrawerList.innerHTML = '<p style="color: var(--text-dim); font-size: 0.85rem; text-align: center; margin-top: 2rem;">لا توجد إشعارات حالياً.</p>';
+      if (notificationsHistoryCount) notificationsHistoryCount.textContent = 'لا توجد إشعارات';
+      return;
+    }
+
+    notificationsHistory.forEach(item => {
+      const card = document.createElement('div');
+      card.style.background = 'rgba(255, 255, 255, 0.03)';
+      card.style.border = '1px solid rgba(255, 255, 255, 0.05)';
+      
+      // Highlight unread notifications
+      if (item.unread) {
+        card.style.borderRight = '3px solid var(--cyan)';
+        card.style.background = 'rgba(6, 182, 212, 0.04)';
+      } else {
+        card.style.borderRight = '3px solid rgba(255, 255, 255, 0.15)';
+      }
+
+      card.style.borderRadius = '4px';
+      card.style.padding = '10px 12px';
+      card.style.fontSize = '0.8rem';
+      card.style.color = '#e2e8f0';
+      card.style.display = 'flex';
+      card.style.flexDirection = 'column';
+      card.style.gap = '4px';
+
+      card.innerHTML = `
+        <div style="line-height: 1.4;">${item.text}</div>
+        <span style="font-size: 0.7rem; color: var(--text-dim); align-self: flex-end;">${item.timestamp}</span>
+      `;
+      notificationsDrawerList.appendChild(card);
+    });
+
+    if (notificationsHistoryCount) {
+      notificationsHistoryCount.textContent = `إجمالي الإشعارات: ${notificationsHistory.length}`;
+    }
+  }
+
+  function playNotificationSound() {
+    try {
+      const AudioContext = window.AudioContext || window.webkitAudioContext;
+      if (!AudioContext) return;
+      const ctx = new AudioContext();
+      
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      
+      osc.type = 'sine';
+      const now = ctx.currentTime;
+      
+      // double bell sound: C5 followed by G5 chime
+      osc.frequency.setValueAtTime(523.25, now); // C5
+      osc.frequency.setValueAtTime(783.99, now + 0.12); // G5
+      
+      gain.gain.setValueAtTime(0.12, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.6); // fade out over 0.6s
+      
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      
+      osc.start(now);
+      osc.stop(now + 0.6);
+    } catch (err) {
+      console.warn("Web Audio playback failed:", err);
+    }
+  }
 
   document.addEventListener('DOMContentLoaded', init);
 })();

@@ -100,6 +100,13 @@
         </button>
         <input type="file" id="input-backup-file" accept=".json" class="hidden">
 
+        <!-- Notifications Center Button -->
+        <button id="btn-notifications-drawer" class="btn btn-secondary" style="border-color: var(--cyan); color: var(--cyan); position: relative; padding: 8px 12px;" title="فتح مركز الإشعارات">
+          <i data-lucide="bell"></i>
+          <span>الإشعارات</span>
+          <span id="notifications-badge" class="hidden" style="position: absolute; top: -5px; right: -5px; background: var(--rose); color: white; border-radius: 50%; width: 18px; height: 18px; font-size: 0.68rem; display: flex; align-items: center; justify-content: center; font-weight: bold; border: 2px solid var(--bg-card);">0</span>
+        </button>
+
         <!-- Role Switcher Button -->
         <button id="btn-role-switcher" class="btn btn-secondary" style="border-color: var(--primary); color: var(--primary);" title="تغيير صلاحيات الحساب والدور الحالي">
           <i data-lucide="user-check"></i>
@@ -579,12 +586,37 @@
       </div>
     </div>
 
+    <!-- Notifications Drawer -->
+    <div id="drawer-notifications" class="modal-overlay hidden" style="justify-content: flex-start; background: rgba(0, 0, 0, 0.4); backdrop-filter: blur(2px);">
+      <div class="modal-card" style="max-width: 380px; height: 100vh; border-radius: 0; margin: 0; display: flex; flex-direction: column; background: rgba(15, 23, 42, 0.98); border-right: 1px solid rgba(255,255,255,0.08); box-sizing: border-box;">
+        <div class="modal-header" style="border-bottom: 1px solid rgba(255,255,255,0.08); padding: 16px;">
+          <div class="modal-title" style="display: flex; align-items: center; gap: 8px;">
+            <i data-lucide="bell" style="color: var(--cyan); width: 22px; height: 22px;"></i>
+            <div>
+              <h3 style="margin: 0; font-size: 1.05rem; font-weight: bold; color: #fff;">مركز الإشعارات اللحظية</h3>
+              <p style="margin: 0; font-size: 0.75rem; color: var(--text-dim);">آخر النشاطات والتحديثات المستلمة</p>
+            </div>
+          </div>
+          <button class="btn-close-modal" id="close-notifications-drawer" style="font-size: 1.5rem; background: none; border: none; color: #fff; cursor: pointer;">&times;</button>
+        </div>
+        
+        <div class="modal-body" id="notifications-drawer-list" style="flex-grow: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 8px; box-sizing: border-box;">
+          <!-- Notifications injected here -->
+        </div>
+
+        <div class="modal-footer" style="border-top: 1px solid rgba(255,255,255,0.08); padding: 12px; display: flex; justify-content: space-between; align-items: center; background: rgba(0,0,0,0.2); box-sizing: border-box;">
+          <button type="button" class="btn btn-secondary btn-sm" id="btn-clear-notifications" style="color: var(--rose); border-color: rgba(244, 63, 94, 0.3); padding: 4px 8px; font-size: 0.75rem;">مسح الكل</button>
+          <span style="font-size: 0.72rem; color: var(--text-dim);" id="notifications-history-count">لا توجد إشعارات</span>
+        </div>
+      </div>
+    </div>
+
   </div>
 
   <!-- Scripts with cache-busting timestamp -->
   <script src="pharmaMath.js?v=15.1"></script>
   <script src="mockData.js?v=15.0"></script>
-  <script src="app_v11.js?v=6.0"></script>
+  <script src="app_v11.js?v=7.0"></script>
   <script>
     lucide.createIcons();
   </script>
