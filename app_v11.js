@@ -3561,6 +3561,7 @@
     if (window.showToast) {
       window.showToast(`تم إرسال إشعار للمخبر بنجاح لتحليل التحضير (Assay) للباتش [${batch.batchNo}]! 🟢`, 'success');
     }
+    pushToCloud(true);
   };
 
   window.notifyQCDissUnif = function(batchId) {
@@ -3584,6 +3585,7 @@
     if (window.showToast) {
       window.showToast(`تم إرسال إشعار للمخبر بنجاح لتحليل الانحلالية والتجانس للباتش [${batch.batchNo}]! 🟢`, 'success');
     }
+    pushToCloud(true);
   };
 
   window.notifyQCToReleaseLot = function(lotId) {
@@ -3607,6 +3609,7 @@
     if (window.showToast) {
       window.showToast(`تم إرسال إشعار للمخبر بنجاح لتحليل وإفراج اللوت [${lot.Lot_Number}]! 🟢`, 'success');
     }
+    pushToCloud(true);
   };
 
   window.showToast = function(message, type = 'info', duration = 5000) {
