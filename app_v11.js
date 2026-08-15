@@ -776,10 +776,12 @@
                   <i data-lucide="eye" style="width: 12px; height: 12px; display: inline-block; vertical-align: middle;"></i>
                   <span style="vertical-align: middle;">تفاصيل</span>
                 </button>
+                ${currentUserRole !== 'qc' ? `
                 <button class="btn btn-secondary btn-sm" onclick="deleteBatch('${batch.id}')" style="padding: 4px 8px; font-size: 0.75rem; border-color: var(--rose); color: var(--rose);">
                   <i data-lucide="trash-2" style="width: 12px; height: 12px; display: inline-block; vertical-align: middle;"></i>
                   <span style="vertical-align: middle;">حذف</span>
                 </button>
+                ` : ''}
               </div>
             </td>
           </tr>
@@ -841,9 +843,11 @@
             </div>
             <div class="header-right-actions">
               <span class="pharma-badge ${batch.pharmaForm}">${batch.pharmaFormLabel || FORM_LABELS_MAP[batch.pharmaForm] || '-'}</span>
+              ${currentUserRole !== 'qc' ? `
               <button class="btn-icon-delete" title="إلغاء وحذف الباتش" onclick="event.stopPropagation(); deleteBatch('${batch.id}');">
                 <i data-lucide="trash-2"></i>
               </button>
+              ` : ''}
             </div>
           </div>
 
@@ -1538,6 +1542,10 @@
   }
 
   window.deleteBatch = function(batchId) {
+    if (currentUserRole === 'qc') {
+      alert('عذراً، لا تملك الصلاحية لحذف التشغيلات/الأضابير التصنيعية.');
+      return;
+    }
     const batch = batches.find(b => b && String(b.id) === String(batchId));
     const batchName = batch ? batch.productName : '';
     
