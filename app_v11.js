@@ -1822,32 +1822,33 @@
         if (logConversionHint) logConversionHint.textContent = 'يتم إدخال الوزن بالكيلوغرام وتقوم المنظومة بتحويلها تلقائياً إلى أعداد ظروف/تيوبات ولوتات وتحديث كافة أجهزة المعمل.';
       }
 
-      // Weighing Formulation Dynamic View toggle
-      if (activeStageIndex === 0) {
-        if (elWeighingFormulationContainer) elWeighingFormulationContainer.classList.remove('hidden');
-        if (inputLogAcceptedKg) {
-          inputLogAcceptedKg.readOnly = true;
-          inputLogAcceptedKg.style.background = 'rgba(255,255,255,0.05)';
-          inputLogAcceptedKg.style.cursor = 'not-allowed';
+    }
+
+    // Weighing Formulation Dynamic View toggle (Runs in both Edit and Normal Modes)
+    if (activeStageIndex === 0) {
+      if (elWeighingFormulationContainer) elWeighingFormulationContainer.classList.remove('hidden');
+      if (inputLogAcceptedKg) {
+        inputLogAcceptedKg.readOnly = true;
+        inputLogAcceptedKg.style.background = 'rgba(255,255,255,0.05)';
+        inputLogAcceptedKg.style.cursor = 'not-allowed';
+      }
+      if (elWeighingFormulationTbody) {
+        elWeighingFormulationTbody.innerHTML = '';
+        if (stage.formulation && stage.formulation.length > 0) {
+          stage.formulation.forEach(row => {
+            addWeighingFormulationRow(row.Lot_ID || row.lotId, row.Quantity || row.qty);
+          });
+        } else {
+          addWeighingFormulationRow('', 0);
         }
-        if (elWeighingFormulationTbody) {
-          elWeighingFormulationTbody.innerHTML = '';
-          if (stage.formulation && stage.formulation.length > 0) {
-            stage.formulation.forEach(row => {
-              addWeighingFormulationRow(row.Lot_ID, row.Quantity);
-            });
-          } else {
-            addWeighingFormulationRow('', 0);
-          }
-        }
-        updateWeighingFormulationTotal();
-      } else {
-        if (elWeighingFormulationContainer) elWeighingFormulationContainer.classList.add('hidden');
-        if (inputLogAcceptedKg) {
-          inputLogAcceptedKg.readOnly = false;
-          inputLogAcceptedKg.style.background = '';
-          inputLogAcceptedKg.style.cursor = '';
-        }
+      }
+      updateWeighingFormulationTotal();
+    } else {
+      if (elWeighingFormulationContainer) elWeighingFormulationContainer.classList.add('hidden');
+      if (inputLogAcceptedKg) {
+        inputLogAcceptedKg.readOnly = false;
+        inputLogAcceptedKg.style.background = '';
+        inputLogAcceptedKg.style.cursor = '';
       }
     }
 
