@@ -618,7 +618,10 @@
                 const activeBatch = batches.find(b => b && String(b.id) === String(activeBatchId));
                 if (activeBatch) {
                   renderWorkflowTimeline(activeBatch);
-                  renderStageLogger(activeBatch);
+                  const isEditingForm = formUpdateStage && formUpdateStage.contains(document.activeElement);
+                  if (!isEditingForm) {
+                    renderStageLogger(activeBatch);
+                  }
                   renderHistoryList(activeBatch);
                 } else {
                   closeBatchDetailModal();
@@ -631,7 +634,7 @@
                 // Push to history
                 notificationsHistory.unshift({
                   text: msg,
-                  timestamp: new Date().toLocaleTimeString('ar-EG'),
+                  timestamp: new Date().toLocaleTimeString('en-US'),
                   unread: true
                 });
 
@@ -1965,20 +1968,20 @@
       const rows = elWeighingFormulationTbody.querySelectorAll('tr');
       let isValid = true;
       for (let i = 0; i < rows.length; i++) {
-        const select = rows[i].querySelector('.wms-lot-select');
+        const lotEl = rows[i].querySelector('.wms-lot-id-hidden') || rows[i].querySelector('.wms-lot-select');
         const input = rows[i].querySelector('.wms-qty-input');
-        const lotId = select.value;
+        const lotId = lotEl ? lotEl.value : '';
         const qty = parseFloat(input.value) || 0;
 
         if (!lotId || qty <= 0) {
-          alert('يرجى اختيار لوط صالح وتحديد الكمية الموزونة لجميع أسطر المواد الخام!');
+          alert('يرجى اختيار لوت صالح وتحديد الكمية الموزونة لجميع أسطر المواد الخام!');
           isValid = false;
           break;
         }
 
         const lot = stockLots.find(l => l && String(l.Lot_ID) === String(lotId));
         if (!lot) {
-          alert('اللوط المحدد غير موجود بالمستودع!');
+          alert('اللوت المحدد غير موجود بالمستودع!');
           isValid = false;
           break;
         }
@@ -2278,7 +2281,7 @@
         logMsg = `تسجيل إنجاز بالبليستر والتغليف: (${addAcceptedBlisters} ${term.packName} مقبول = ${addAcceptedKg} kg) و (${addRejectedBlisters} ${term.packName} مرفوض = ${addRejectedKg} kg)`;
       }
     } else if (activeStageIndex === 0) {
-      const detailsStr = formulationRows.map(r => `${r.lotName} (لوط: ${r.lotNumber}) بوزن ${r.qty} ${r.unit}`).join('، ');
+      const detailsStr = formulationRows.map(r => `${r.lotName} (لوت: ${r.lotNumber}) بوزن ${r.qty} ${r.unit}`).join('، ');
       logMsg = `تسجيل إنجاز بالوزن الميداني للمواد الخام: إجمالي مقبول ${addAcceptedKg} kg. تفاصيل المواد الموزونة المصروفة: [ ${detailsStr} ]`;
     } else {
       logMsg = `تسجيل إنجاز بمرحلة [${stage.name}]: (${addAcceptedKg} kg مقبول = ${PharmaMath.formatNumber(addAcceptedBlisters)} ${uLabel}) و (${addRejectedKg} kg مرفوض = ${PharmaMath.formatNumber(addRejectedBlisters)} ${uLabel})`;
@@ -3001,7 +3004,7 @@
               assay_val: null,
               qc_range: null,
               sample_no,
-              timestamp: new Date().toLocaleString('ar-EG')
+              timestamp: new Date().toLocaleString('en-US')
             };
             newRun.target_lots = targetLots;
             batch.qc_runs.push(newRun);
@@ -3062,7 +3065,7 @@
             qc_range: mainQCRange,
             ingredients: ingredientsData,
             sample_no,
-            timestamp: new Date().toLocaleString('ar-EG')
+            timestamp: new Date().toLocaleString('en-US')
           };
           newRun.target_lots = targetLots;
           batch.qc_runs.push(newRun);
@@ -3080,7 +3083,7 @@
 
       if (savedTestsCount > 0) {
         batch.logs.unshift({
-          time: new Date().toLocaleString('ar-EG'),
+          time: new Date().toLocaleString('en-US'),
           text: `مراقبة الجودة (QC): تسجيل عينات (${sample_no}) للوتات (${targetLots.join(', ')}) بـ: ${logSummaryParts.join(' | ')}.`
         });
 
@@ -3732,20 +3735,32 @@
       if (currentUserRole === 'admin' || currentUserRole === 'qc') {
         const btnClass = 'btn btn-secondary btn-sm';
         const style = 'padding: 2px 6px; font-size: 0.72rem; margin: 0 2px;';
+        let deleteBtnHtml = '';
+        if (currentUserRole === 'admin') {
+          deleteBtnHtml = `
+            <button class="${btnClass}" style="${style} border-color: var(--rose); color: var(--rose);" onclick="deleteStockLot('${lot.Lot_ID}')" title="حذف اللوت نهائياً">
+              <i data-lucide="trash-2" style="width: 12px; height: 12px; display: inline-block; vertical-align: middle;"></i>
+            </button>
+          `;
+        }
+        
         if (lot.Status === 'Quarantine') {
           actionsHtml = `
             <button class="${btnClass}" style="${style} border-color: var(--emerald); color: var(--emerald);" onclick="changeLotStatus('${lot.Lot_ID}', 'Released')">إفراج ✅</button>
             <button class="${btnClass}" style="${style} border-color: var(--rose); color: var(--rose);" onclick="changeLotStatus('${lot.Lot_ID}', 'Rejected')">رفض ❌</button>
+            ${deleteBtnHtml}
           `;
         } else if (lot.Status === 'Released') {
           actionsHtml = `
             <button class="${btnClass}" style="${style} border-color: var(--amber); color: var(--amber);" onclick="changeLotStatus('${lot.Lot_ID}', 'Quarantine')">حجر 🔒</button>
             <button class="${btnClass}" style="${style} border-color: var(--rose); color: var(--rose);" onclick="changeLotStatus('${lot.Lot_ID}', 'Rejected')">رفض ❌</button>
+            ${deleteBtnHtml}
           `;
         } else if (lot.Status === 'Rejected') {
           actionsHtml = `
             <button class="${btnClass}" style="${style} border-color: var(--amber); color: var(--amber);" onclick="changeLotStatus('${lot.Lot_ID}', 'Quarantine')">حجر 🔒</button>
             <button class="${btnClass}" style="${style} border-color: var(--emerald); color: var(--emerald);" onclick="changeLotStatus('${lot.Lot_ID}', 'Released')">إفراج ✅</button>
+            ${deleteBtnHtml}
           `;
         }
       }
@@ -3790,7 +3805,28 @@
     renderWMSViews();
 
     if (window.showToast) {
-      window.showToast(`تم تغيير حالة اللوط [${lot.Lot_Number}] للمادة [${lot.Material_Name}] إلى ${newStatus} بنجاح 🧪`, 'success');
+      window.showToast(`تم تغيير حالة اللوت [${lot.Lot_Number}] للمادة [${lot.Material_Name}] إلى ${newStatus} بنجاح 🧪`, 'success');
+    }
+  };
+
+  window.deleteStockLot = function(lotId) {
+    const lot = stockLots.find(l => l && String(l.Lot_ID) === String(lotId));
+    if (!lot) return;
+
+    if (!confirm(`هل أنت متأكد من حذف اللوت نهائياً من المستودع؟\nالمادة: ${lot.Material_Name}\nرقم اللوت: ${lot.Lot_Number}`)) {
+      return;
+    }
+
+    // Remove from stockLots
+    stockLots = stockLots.filter(l => l && String(l.Lot_ID) !== String(lotId));
+    // Remove related transactions
+    wmsTransactions = wmsTransactions.filter(tx => tx && String(tx.Lot_ID) !== String(lotId));
+
+    saveWMS(true);
+    renderWMSViews();
+
+    if (window.showToast) {
+      window.showToast('تم حذف اللوت والعمليات المرتبطة به نهائياً 🗑️', 'success');
     }
   };
 
@@ -3822,7 +3858,7 @@
         QC_Status_Change: '<span style="color: #c084fc; font-weight: bold;">قرار جودة جودي 🧪</span>'
       };
 
-      const dateStr = new Date(tx.Timestamp).toLocaleString('ar-EG');
+      const dateStr = new Date(tx.Timestamp).toLocaleString('en-US');
 
       tr.innerHTML = `
         <td style="padding: 10px; font-family: monospace; font-size: 0.75rem; color: var(--text-dim);">${tx.Tx_ID}</td>
@@ -3879,7 +3915,7 @@
                 tempIndices.code = c;
               } else if (tempIndices.name === -1 && isMatch(val, ['اسم المادة', 'اسم المادة الخام', 'اسم المكون', 'material name', 'material_name', 'name'])) {
                 tempIndices.name = c;
-              } else if (tempIndices.lot === -1 && isMatch(val, ['الفئة', 'اللوط', 'لوط', 'رقم اللوط', 'الوجبة', 'الدفعة', 'رقم التشغيلة', 'رقم الدفعة', 'lot', 'lot number', 'lot_number', 'batch', 'batch number', 'batch_no'])) {
+              } else if (tempIndices.lot === -1 && isMatch(val, ['الفئة', 'اللوت', 'لوت', 'رقم اللوت', 'الوجبة', 'الدفعة', 'رقم التشغيلة', 'رقم الدفعة', 'lot', 'lot number', 'lot_number', 'batch', 'batch number', 'batch_no'])) {
                 tempIndices.lot = c;
               } else if (tempIndices.qty === -1 && isMatch(val, ['الكمية', 'الكمية المتوفرة', 'الرصيد', 'الوزن', 'quantity', 'qty', 'balance', 'weight'])) {
                 tempIndices.qty = c;
@@ -3903,7 +3939,7 @@
         }
 
         if (headerRowIndex === -1 || rows.length === 0) {
-          alert('تعذر التعرف التلقائي على أعمدة الجدول في ملف الأكسل! يرجى التأكد من أن الملف يحتوي على أعمدة: رمز المادة، اسم المادة، رقم اللوط، والكمية.');
+          alert('تعذر التعرف التلقائي على أعمدة الجدول في ملف الأكسل! يرجى التأكد من أن الملف يحتوي على أعمدة: رمز المادة، اسم المادة، رقم اللوت، والكمية.');
           e.target.value = '';
           return;
         }
@@ -3970,6 +4006,10 @@
 
   function confirmExcelImport() {
     if (wmsExcelImportTemp.length === 0) return;
+
+    // Filter out previous initial balance stock lots and transactions to prevent duplication
+    stockLots = stockLots.filter(l => l && l.Storage_Location !== 'مستورد افتتاحي');
+    wmsTransactions = wmsTransactions.filter(tx => tx && tx.Tx_Type !== 'Initial_Balance');
 
     wmsExcelImportTemp.forEach(row => {
       const lotId = 'lot-init-' + Date.now() + '-' + Math.random().toString(36).substr(2, 5);
@@ -4113,7 +4153,7 @@
       recommendationHtml += `
         <li style="margin-bottom: 4px;">
           صرف <strong style="color: var(--emerald);">${take.toFixed(3)} ${lot.Unit}</strong> 
-          من اللوط <strong style="color: var(--amber);">${lot.Lot_Number}</strong> 
+          من اللوت <strong style="color: var(--amber);">${lot.Lot_Number}</strong> 
           (تاريخ الانتهاء: <span style="color: var(--rose); font-weight: bold;">${lot.Expiry_Date}</span>، المتوفر: ${lot.Current_Qty} ${lot.Unit})
         </li>
       `;
@@ -4191,47 +4231,137 @@
   function addWeighingFormulationRow(selectedLotId = '', qty = 0) {
     if (!elWeighingFormulationTbody) return;
     const tr = document.createElement('tr');
+    tr.style.borderBottom = '1px solid rgba(255, 255, 255, 0.05)';
     
-    const select = document.createElement('select');
-    select.required = true;
-    select.className = 'wms-lot-select';
-    select.style.width = '100%';
-    select.style.background = '#1e293b';
-    select.style.color = '#fff';
-    select.style.border = '1px solid rgba(255,255,255,0.15)';
-    select.style.padding = '6px';
-    select.style.borderRadius = '4px';
+    // Searchable Select Container
+    const container = document.createElement('div');
+    container.className = 'wms-searchable-select-container';
+    container.style.position = 'relative';
+    container.style.width = '100%';
 
-    select.innerHTML = '<option value="">-- اختر المادة واللوط المفرج عنه --</option>';
-    
+    const inputSearch = document.createElement('input');
+    inputSearch.type = 'text';
+    inputSearch.className = 'wms-lot-search-input';
+    inputSearch.placeholder = 'ابحث باسم المادة، كودها، أو رقم اللوت...';
+    inputSearch.style.width = '100%';
+    inputSearch.style.background = '#1e293b';
+    inputSearch.style.color = '#fff';
+    inputSearch.style.border = '1px solid rgba(255,255,255,0.15)';
+    inputSearch.style.padding = '6px';
+    inputSearch.style.borderRadius = '4px';
+    inputSearch.style.boxSizing = 'border-box';
+    inputSearch.autocomplete = 'off';
+
+    const hiddenLotId = document.createElement('input');
+    hiddenLotId.type = 'hidden';
+    hiddenLotId.className = 'wms-lot-id-hidden';
+    hiddenLotId.value = selectedLotId;
+
+    const dropdown = document.createElement('div');
+    dropdown.className = 'wms-autocomplete-dropdown hidden';
+    dropdown.style.position = 'absolute';
+    dropdown.style.top = '100%';
+    dropdown.style.left = '0';
+    dropdown.style.right = '0';
+    dropdown.style.background = '#0b0f19';
+    dropdown.style.border = '1px solid rgba(6, 182, 212, 0.3)';
+    dropdown.style.borderRadius = '4px';
+    dropdown.style.maxHeight = '180px';
+    dropdown.style.overflowY = 'auto';
+    dropdown.style.zIndex = '9999';
+    dropdown.style.boxShadow = '0 10px 25px rgba(0,0,0,0.8)';
+    dropdown.style.marginTop = '2px';
+
     const releasedLots = stockLots.filter(l => l && l.Status === 'Released' && l.Current_Qty > 0);
-    releasedLots.forEach(lot => {
-      const opt = document.createElement('option');
-      opt.value = lot.Lot_ID;
-      opt.textContent = `${lot.Material_Name} [Code: ${lot.Material_Code}] - Lot: ${lot.Lot_Number} (الرصيد: ${lot.Current_Qty} ${lot.Unit})`;
-      if (String(lot.Lot_ID) === String(selectedLotId)) {
-        opt.selected = true;
+
+    // Set initial value if selectedLotId is provided
+    if (selectedLotId) {
+      const initialLot = releasedLots.find(l => String(l.Lot_ID) === String(selectedLotId));
+      if (initialLot) {
+        inputSearch.value = `${initialLot.Material_Name} [Code: ${initialLot.Material_Code}] - L: ${initialLot.Lot_Number} (الرصيد: ${initialLot.Current_Qty} ${initialLot.Unit})`;
+      } else {
+        inputSearch.value = `لوت غير معروف (${selectedLotId})`;
       }
-      select.appendChild(opt);
+    }
+
+    function populateDropdown(query = '') {
+      dropdown.innerHTML = '';
+      const filtered = releasedLots.filter(lot => {
+        const text = `${lot.Material_Name} ${lot.Material_Code} ${lot.Lot_Number}`.toLowerCase();
+        return text.includes(query.toLowerCase());
+      });
+
+      if (filtered.length === 0) {
+        dropdown.innerHTML = '<div style="padding: 8px; color: var(--text-dim); text-align: center; font-size: 0.8rem;">لا توجد لوتات مفرجة مطابقة للبحث</div>';
+        return;
+      }
+
+      filtered.forEach(lot => {
+        const item = document.createElement('div');
+        item.style.padding = '8px';
+        item.style.cursor = 'pointer';
+        item.style.borderBottom = '1px solid rgba(255,255,255,0.05)';
+        item.style.fontSize = '0.78rem';
+        item.style.transition = 'background 0.2s';
+        item.innerHTML = `<strong>${lot.Material_Name}</strong> <span style="color: var(--text-dim);">[Code: ${lot.Material_Code}]</span><br><span style="color: var(--amber);">Lot: ${lot.Lot_Number}</span> <span style="color: var(--emerald); float: left;">الرصيد: ${lot.Current_Qty} ${lot.Unit}</span>`;
+        
+        item.addEventListener('mouseenter', () => {
+          item.style.background = 'rgba(6, 182, 212, 0.15)';
+        });
+        item.addEventListener('mouseleave', () => {
+          item.style.background = '';
+        });
+
+        item.addEventListener('mousedown', (e) => {
+          e.preventDefault(); // Prevent input blur from firing before selection
+          inputSearch.value = `${lot.Material_Name} [Code: ${lot.Material_Code}] - L: ${lot.Lot_Number} (الرصيد: ${lot.Current_Qty} ${lot.Unit})`;
+          hiddenLotId.value = lot.Lot_ID;
+          dropdown.classList.add('hidden');
+          updateWeighingFormulationTotal();
+        });
+
+        dropdown.appendChild(item);
+      });
+    }
+
+    inputSearch.addEventListener('focus', () => {
+      dropdown.classList.remove('hidden');
+      populateDropdown(inputSearch.value);
     });
 
-    const input = document.createElement('input');
-    input.type = 'number';
-    input.step = '0.001';
-    input.required = true;
-    input.value = qty > 0 ? qty : '';
-    input.placeholder = 'الكمية';
-    input.className = 'wms-qty-input';
-    input.style.width = '100%';
-    input.style.background = '#1e293b';
-    input.style.color = '#fff';
-    input.style.border = '1px solid rgba(255,255,255,0.15)';
-    input.style.padding = '6px';
-    input.style.borderRadius = '4px';
-    input.style.boxSizing = 'border-box';
+    inputSearch.addEventListener('blur', () => {
+      // Delay closing dropdown slightly so that mousedown events can register
+      setTimeout(() => {
+        dropdown.classList.add('hidden');
+      }, 200);
+    });
 
-    input.addEventListener('input', updateWeighingFormulationTotal);
-    select.addEventListener('change', updateWeighingFormulationTotal);
+    inputSearch.addEventListener('input', (e) => {
+      hiddenLotId.value = ''; // Reset ID on manual modification until they select again
+      dropdown.classList.remove('hidden');
+      populateDropdown(e.target.value);
+      updateWeighingFormulationTotal();
+    });
+
+    container.appendChild(inputSearch);
+    container.appendChild(hiddenLotId);
+    container.appendChild(dropdown);
+
+    const inputQty = document.createElement('input');
+    inputQty.type = 'number';
+    inputQty.step = '0.001';
+    inputQty.required = true;
+    inputQty.value = qty > 0 ? qty : '';
+    inputQty.placeholder = 'الكمية';
+    inputQty.className = 'wms-qty-input';
+    inputQty.style.width = '100%';
+    inputQty.style.background = '#1e293b';
+    inputQty.style.color = '#fff';
+    inputQty.style.border = '1px solid rgba(255,255,255,0.15)';
+    inputQty.style.padding = '6px';
+    inputQty.style.borderRadius = '4px';
+    inputQty.style.boxSizing = 'border-box';
+    inputQty.addEventListener('input', updateWeighingFormulationTotal);
 
     const btnDel = document.createElement('button');
     btnDel.type = 'button';
@@ -4246,9 +4376,9 @@
     });
 
     const tdSelect = document.createElement('td');
-    tdSelect.appendChild(select);
+    tdSelect.appendChild(container);
     const tdInput = document.createElement('td');
-    tdInput.appendChild(input);
+    tdInput.appendChild(inputQty);
     const tdAction = document.createElement('td');
     tdAction.style.textAlign = 'center';
     tdAction.appendChild(btnDel);

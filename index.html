@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="ar" dir="rtl">
+<html lang="en" dir="rtl">
 <head>
   <script>
     window.onerror = function(message, source, lineno, colno, error) {
@@ -232,7 +232,7 @@
             </div>
             <div class="stat-info">
               <span class="stat-label">المخزون المفرج عنه (Released)</span>
-              <h2><span id="wms-stat-released-count">0</span> <small>لوط</small></h2>
+              <h2><span id="wms-stat-released-count">0</span> <small>لوت</small></h2>
               <span class="stat-desc" id="wms-stat-released-weight">0.00 kg</span>
             </div>
           </div>
@@ -243,7 +243,7 @@
             </div>
             <div class="stat-info">
               <span class="stat-label">المخزون المحجور (Quarantine)</span>
-              <h2><span id="wms-stat-quarantine-count">0</span> <small>لوط</small></h2>
+              <h2><span id="wms-stat-quarantine-count">0</span> <small>لوت</small></h2>
               <span class="stat-desc" id="wms-stat-quarantine-weight">0.00 kg</span>
             </div>
           </div>
@@ -254,7 +254,7 @@
             </div>
             <div class="stat-info">
               <span class="stat-label">المخزون المرفوض (Rejected)</span>
-              <h2><span id="wms-stat-rejected-count">0</span> <small>لوط</small></h2>
+              <h2><span id="wms-stat-rejected-count">0</span> <small>لوت</small></h2>
               <span class="stat-desc" id="wms-stat-rejected-weight">0.00 kg</span>
             </div>
           </div>
@@ -288,7 +288,7 @@
             <h3>الأرصدة الحالية في المستودعات</h3>
             <div class="search-box" style="max-width: 300px; margin: 0;">
               <i data-lucide="search" class="search-icon"></i>
-              <input type="text" id="wms-stock-search" placeholder="ابحث باسم المادة أو كود المادة أو اللوط...">
+              <input type="text" id="wms-stock-search" placeholder="ابحث باسم المادة أو كود المادة أو اللوت...">
             </div>
           </div>
           <div class="table-container" style="overflow-x: auto; background: var(--bg-card); border-radius: 8px; border: 1px solid rgba(255,255,255,0.08);">
@@ -297,12 +297,12 @@
                 <tr style="background: rgba(255,255,255,0.02); border-bottom: 1px solid rgba(255,255,255,0.08);">
                   <th style="padding: 12px; text-align: right;">رمز المادة</th>
                   <th style="padding: 12px; text-align: right;">اسم المادة</th>
-                  <th style="padding: 12px; text-align: right;">رقم التشغيلة (الفئة/اللوط)</th>
+                  <th style="padding: 12px; text-align: right;">رقم التشغيلة (الفئة/اللوت)</th>
                   <th style="padding: 12px; text-align: right;">الكمية المتوفرة</th>
                   <th style="padding: 12px; text-align: right;">تاريخ انتهاء الصلاحية</th>
                   <th style="padding: 12px; text-align: right;">الموقع</th>
                   <th style="padding: 12px; text-align: right;">حالة المادة جودياً</th>
-                  <th style="padding: 12px; text-align: center; width: 180px;">إجراءات الجودة (QC)</th>
+                  <th style="padding: 12px; text-align: center; width: 220px;">إجراءات الجودة والتحكم</th>
                 </tr>
               </thead>
               <tbody id="wms-stock-tbody">
@@ -322,7 +322,7 @@
             <i data-lucide="file-spreadsheet" style="width: 48px; height: 48px; color: var(--cyan);"></i>
             <div style="text-align: center; display: flex; flex-direction: column; align-items: center; gap: 8px;">
               <p style="margin: 0; font-weight: bold;">اضغط هنا لتحميل أو سحب ملف الأكسل الافتتاحي (.xlsx / .xls / .csv)</p>
-              <p style="margin: 0; font-size: 0.72rem; color: var(--text-dim);">يتم جلب الأعمدة آلياً: رمز المادة، اسم المادة، الوحدة، الكمية، الفئة (اللوط)، وتاريخ انتهاء الصلاحية</p>
+              <p style="margin: 0; font-size: 0.72rem; color: var(--text-dim);">يتم جلب الأعمدة آلياً: رمز المادة، اسم المادة، الوحدة، الكمية، الفئة (اللوت)، وتاريخ انتهاء الصلاحية</p>
               <button type="button" class="btn btn-secondary btn-sm" id="wms-btn-download-template" style="padding: 4px 10px; font-size: 0.75rem; border-color: var(--cyan); color: var(--cyan); background: rgba(6, 182, 212, 0.05); margin-top: 4px; display: inline-flex; align-items: center; gap: 6px;">
                 <i data-lucide="download" style="width: 14px; height: 14px;"></i> تحميل نموذج ملف الأكسل الفارغ المعتمد 📥
               </button>
@@ -342,7 +342,7 @@
                   <tr style="background: rgba(255,255,255,0.03);">
                     <th style="padding: 10px; text-align: right;">رمز المادة</th>
                     <th style="padding: 10px; text-align: right;">اسم المادة</th>
-                    <th style="padding: 10px; text-align: right;">اللوط (الفئة)</th>
+                    <th style="padding: 10px; text-align: right;">اللوت (الفئة)</th>
                     <th style="padding: 10px; text-align: right;">الكمية</th>
                     <th style="padding: 10px; text-align: right;">الوحدة</th>
                     <th style="padding: 10px; text-align: right;">تاريخ الصلاحية</th>
@@ -378,7 +378,7 @@
                 <input type="text" id="wms-in-name" placeholder="مثال: Paracetamol Powder" required style="width: 100%; box-sizing: border-box; padding: 8px; border-radius: 4px; background: #1e293b; border: 1px solid rgba(255,255,255,0.15); color: #fff;">
               </div>
               <div class="form-group">
-                <label>رقم التشغيلة / اللوط (Lot No / الفئة) *</label>
+                <label>رقم التشغيلة / اللوت (Lot No / الفئة) *</label>
                 <input type="text" id="wms-in-lot" placeholder="مثال: LOT-PA-901" required style="width: 100%; box-sizing: border-box; padding: 8px; border-radius: 4px; background: #1e293b; border: 1px solid rgba(255,255,255,0.15); color: #fff;">
               </div>
               <div class="form-group">
@@ -464,7 +464,7 @@
                   <th style="padding: 12px; text-align: right;">معرف الحركة</th>
                   <th style="padding: 12px; text-align: right;">نوع الحركة</th>
                   <th style="padding: 12px; text-align: right;">اسم المادة</th>
-                  <th style="padding: 12px; text-align: right;">رقم اللوط</th>
+                  <th style="padding: 12px; text-align: right;">رقم اللوت</th>
                   <th style="padding: 12px; text-align: right;">الكمية المتأثرة</th>
                   <th style="padding: 12px; text-align: right;">الوحدة</th>
                   <th style="padding: 12px; text-align: right;">كود مرجعي</th>
@@ -706,7 +706,7 @@
               <!-- Dynamic formulation weight block (only visible during Weighing stage) -->
               <div id="weighing-formulation-container" class="hidden" style="margin-top: 1rem; border-top: 1px dashed rgba(255,255,255,0.1); padding-top: 1.25rem;">
                 <h5 style="color: var(--cyan); margin: 0 0 10px 0; display: flex; align-items: center; gap: 6px;">
-                  <i data-lucide="scale" style="width: 16px; height: 16px;"></i> تسجيل تفاصيل وزنات المواد الخام وصرف اللوطات المفرج عنها:
+                  <i data-lucide="scale" style="width: 16px; height: 16px;"></i> تسجيل تفاصيل وزنات المواد الخام وصرف اللوتات المفرج عنها:
                 </h5>
                 <table class="weighing-formulation-table">
                   <thead>
