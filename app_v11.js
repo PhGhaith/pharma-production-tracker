@@ -3589,6 +3589,31 @@
     const stockSearch = document.getElementById('wms-stock-search');
     if (stockSearch) stockSearch.addEventListener('input', renderStockLots);
 
+    // Clear All WMS Stock
+    const btnClearAll = document.getElementById('wms-btn-clear-all');
+    if (btnClearAll) {
+      btnClearAll.addEventListener('click', () => {
+        if (!confirm('⚠️ تحذير حرج: هل أنت متأكد من تفريغ كامل رصيد المستودع وحذف جميع المواد واللوتات وسجل الحركات نهائياً؟\nلا يمكن التراجع عن هذا الإجراء!')) {
+          return;
+        }
+        
+        const pin = prompt('الرجاء إدخال رمز تأكيد الحذف (الـ PIN code لمدير النظام):');
+        if (pin !== '9999') {
+          alert('رمز التأكيد غير صحيح! تم إلغاء العملية.');
+          return;
+        }
+        
+        stockLots = [];
+        wmsTransactions = [];
+        saveWMS(true);
+        renderWMSViews();
+        
+        if (window.showToast) {
+          window.showToast('تم تفريغ كافة أرصدة وحركات المستودع بالكامل 🗑️', 'success');
+        }
+      });
+    }
+
     // Formulation dynamically adding rows
     if (btnAddFormulationRow) {
       btnAddFormulationRow.addEventListener('click', () => {
@@ -3652,6 +3677,12 @@
         view.classList.add('hidden');
       }
     });
+
+    // Clear button visibility based on active tab and admin role
+    const btnClearAll = document.getElementById('wms-btn-clear-all');
+    if (btnClearAll) {
+      btnClearAll.style.display = (currentWMSTab === 'stock' && currentUserRole === 'admin') ? 'inline-flex' : 'none';
+    }
 
     // Render corresponding sub-view data
     if (currentWMSTab === 'stock') {
@@ -3944,6 +3975,19 @@
           return;
         }
 
+        function formatExcelDate(val) {
+          if (val === undefined || val === null) return '';
+          const num = Number(val);
+          if (!isNaN(num) && num > 30000 && num < 80000) {
+            const date = new Date((num - 25569) * 86400 * 1000);
+            const y = date.getFullYear();
+            const m = String(date.getMonth() + 1).padStart(2, '0');
+            const d = String(date.getDate()).padStart(2, '0');
+            return `${y}-${m}-${d}`;
+          }
+          return String(val).trim();
+        }
+
         wmsExcelImportTemp = [];
         for (let r = headerRowIndex + 1; r < rows.length; r++) {
           const row = rows[r];
@@ -3955,7 +3999,9 @@
           const qtyVal = colIndices.qty !== -1 ? row[colIndices.qty] : 0;
           const qty = parseFloat(qtyVal) || 0;
           const lotNum = colIndices.lot !== -1 && row[colIndices.lot] !== undefined && row[colIndices.lot] !== null ? String(row[colIndices.lot]).trim() : '';
-          const expDate = colIndices.exp !== -1 && row[colIndices.exp] !== undefined && row[colIndices.exp] !== null ? String(row[colIndices.exp]).trim() : '';
+          
+          const rawExp = colIndices.exp !== -1 && row[colIndices.exp] !== undefined && row[colIndices.exp] !== null ? row[colIndices.exp] : '';
+          const expDate = formatExcelDate(rawExp);
 
           if (code && name) {
             wmsExcelImportTemp.push({

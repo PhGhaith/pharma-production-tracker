@@ -286,9 +286,14 @@
         <div id="wms-view-stock" class="wms-sub-view">
           <div class="section-header" style="margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center;">
             <h3>الأرصدة الحالية في المستودعات</h3>
-            <div class="search-box" style="max-width: 300px; margin: 0;">
-              <i data-lucide="search" class="search-icon"></i>
-              <input type="text" id="wms-stock-search" placeholder="ابحث باسم المادة أو كود المادة أو اللوت...">
+            <div style="display: flex; align-items: center; gap: 10px;">
+              <button class="btn btn-secondary btn-sm" id="wms-btn-clear-all" style="border-color: var(--rose); color: var(--rose); display: none;">
+                <i data-lucide="trash-2" style="width: 14px; height: 14px; display: inline-block; vertical-align: middle;"></i> تفريغ كامل المخزن ⚠️
+              </button>
+              <div class="search-box" style="max-width: 300px; margin: 0;">
+                <i data-lucide="search" class="search-icon"></i>
+                <input type="text" id="wms-stock-search" placeholder="ابحث باسم المادة أو كود المادة أو اللوت...">
+              </div>
             </div>
           </div>
           <div class="table-container" style="overflow-x: auto; background: var(--bg-card); border-radius: 8px; border: 1px solid rgba(255,255,255,0.08);">
