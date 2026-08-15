@@ -3592,6 +3592,33 @@
         addWeighingFormulationRow('', 0);
       });
     }
+
+    // Download WMS template
+    const btnDownloadTemplate = document.getElementById('wms-btn-download-template');
+    if (btnDownloadTemplate) {
+      btnDownloadTemplate.addEventListener('click', () => {
+        const headers = ['رمز المادة', 'اسم المادة', 'الفئة (رقم التشغيلة)', 'الكمية', 'الوحدة', 'تاريخ انتهاء الصلاحية'];
+        const sampleRows = [
+          ['MC-021', 'Lactose Monohydrate', 'LOT-LAC-09', '1250', 'kg', '2029-08-30'],
+          ['MC-033', 'Microcrystalline Cellulose (MCC)', 'LOT-MCC-24', '800', 'kg', '2029-05-15'],
+          ['MC-104', 'Paracetamol Powder', 'LOT-PARA-88', '5000', 'kg', '2028-11-20']
+        ];
+        
+        let csvContent = '\uFEFF'; // UTF-8 BOM for proper Arabic encoding in Excel
+        csvContent += headers.join(',') + '\n';
+        sampleRows.forEach(r => {
+          csvContent += r.join(',') + '\n';
+        });
+        
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.setAttribute('download', 'pharma_wms_opening_balance_template.csv');
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      });
+    }
   }
 
   function renderWMSViews() {
@@ -3816,6 +3843,18 @@
     const file = e.target.files[0];
     if (!file) return;
 
+    function getValueByAlternativeKeys(row, keys) {
+      for (const key of keys) {
+        if (row[key] !== undefined && row[key] !== null) return row[key];
+        const cleanKey = key.toLowerCase().trim().replace(/_/g, ' ');
+        for (const rowKey in row) {
+          const cleanRowKey = rowKey.toLowerCase().trim().replace(/_/g, ' ');
+          if (cleanRowKey === cleanKey && row[rowKey] !== undefined && row[rowKey] !== null) return row[rowKey];
+        }
+      }
+      return '';
+    }
+
     const reader = new FileReader();
     reader.onload = function(evt) {
       try {
@@ -3832,12 +3871,13 @@
 
         wmsExcelImportTemp = [];
         rawJson.forEach(row => {
-          const code = row['رمز المادة'] || row['Material_Code'] || '';
-          const name = row['اسم المادة'] || row['Material_Name'] || '';
-          const unit = row['الوحدة'] || row['Unit'] || 'kg';
-          const qty = parseFloat(row['الكمية']) || parseFloat(row['Quantity']) || 0;
-          const lotNum = row['الفئة'] || row['Lot_Number'] || row['Lot'] || '';
-          const expDate = row['تاريخ انتهاء الصلاحية'] || row['Expiry_Date'] || '';
+          const code = getValueByAlternativeKeys(row, ['رمز المادة', 'كود المادة', 'المادة', 'material code', 'material_code', 'code']);
+          const name = getValueByAlternativeKeys(row, ['اسم المادة', 'اسم المادة الخام', 'اسم المكون', 'material name', 'material_name', 'name']);
+          const unit = getValueByAlternativeKeys(row, ['الوحدة', 'الواحدة', 'unit']) || 'kg';
+          const qtyVal = getValueByAlternativeKeys(row, ['الكمية', 'الكمية المتوفرة', 'الرصيد', 'الوزن', 'quantity', 'qty', 'balance', 'weight']);
+          const qty = parseFloat(qtyVal) || 0;
+          const lotNum = getValueByAlternativeKeys(row, ['الفئة', 'اللوط', 'لوط', 'رقم اللوط', 'الوجبة', 'الدفعة', 'رقم التشغيلة', 'رقم الدفعة', 'lot', 'lot number', 'lot_number', 'batch', 'batch number', 'batch_no']);
+          const expDate = getValueByAlternativeKeys(row, ['تاريخ انتهاء الصلاحية', 'تاريخ الصلاحية', 'تاريخ الانتهاء', 'الصلاحية', 'الانتهاء', 'expiry date', 'expiry_date', 'expiry', 'exp date', 'exp_date']);
 
           if (code && name && lotNum) {
             wmsExcelImportTemp.push({
@@ -3850,6 +3890,14 @@
             });
           }
         });
+
+        if (wmsExcelImportTemp.length === 0) {
+          alert('لم يتم العثور على أي صفوف تطابق الأعمدة المطلوبة في ملف الأكسل! يرجى التأكد من احتواء الملف على أعمدة: رمز المادة، اسم المادة، الفئة (اللوط/رقم التشغيلة)، الكمية، وتاريخ انتهاء الصلاحية.');
+          const preview = document.getElementById('wms-excel-preview-container');
+          if (preview) preview.classList.add('hidden');
+          e.target.value = '';
+          return;
+        }
 
         const previewTbody = document.getElementById('wms-excel-preview-tbody');
         if (previewTbody) {
