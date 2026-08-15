@@ -79,9 +79,9 @@
 
   // Navigation Tabs
   const viewTabProduction = document.getElementById('view-tab-production');
-  const viewTabQuarantine = document.getElementById('view-tab-quarantine');
+  const viewTabWarehouse = document.getElementById('view-tab-warehouse');
   const viewProductionContainer = document.getElementById('view-production-container');
-  const viewQuarantineContainer = document.getElementById('view-quarantine-container');
+  const viewWarehouseContainer = document.getElementById('view-warehouse-container');
 
   // Views
   const elBatchesGrid = document.getElementById('batches-grid');
@@ -181,6 +181,11 @@
   const btnClearNotifications = document.getElementById('btn-clear-notifications');
   const notificationsHistoryCount = document.getElementById('notifications-history-count');
 
+  // Weighing Formulation elements
+  const elWeighingFormulationContainer = document.getElementById('weighing-formulation-container');
+  const elWeighingFormulationTbody = document.getElementById('weighing-formulation-tbody');
+  const btnAddFormulationRow = document.getElementById('btn-add-formulation-row');
+
   // QC DOM references
   const elFormAddQCRun = document.getElementById('form-add-qc-run');
   const elQCDynamicTestsContainer = document.getElementById('qc-dynamic-tests-container');
@@ -264,6 +269,7 @@
   async function init() {
     await checkAuthentication();
     loadBatchesLocal();
+    loadWMSLocal();
     setupEventListeners();
     renderApp();
 
@@ -345,6 +351,29 @@
     localStorage.setItem(MASTER_STORAGE_KEY, JSON.stringify(batches));
     if (triggerCloudUpload) {
       pushToCloud(true); // Force push immediately for user actions
+    }
+  }
+
+  function loadWMSLocal() {
+    const savedLots = localStorage.getItem(WMS_STOCK_LOTS_KEY);
+    if (savedLots) {
+      try {
+        stockLots = JSON.parse(savedLots);
+      } catch (e) {}
+    }
+    const savedTx = localStorage.getItem(WMS_TRANSACTIONS_KEY);
+    if (savedTx) {
+      try {
+        wmsTransactions = JSON.parse(savedTx);
+      } catch (e) {}
+    }
+  }
+
+  function saveWMS(triggerCloudUpload = true) {
+    localStorage.setItem(WMS_STOCK_LOTS_KEY, JSON.stringify(stockLots));
+    localStorage.setItem(WMS_TRANSACTIONS_KEY, JSON.stringify(wmsTransactions));
+    if (triggerCloudUpload) {
+      pushToCloud(true);
     }
   }
 
@@ -450,6 +479,39 @@
     return Array.from(mergedMap.values());
   }
 
+  function mergeStockLots(localLots, cloudLots) {
+    const mergedMap = new Map();
+    cloudLots.forEach(lot => {
+      if (lot && lot.Lot_ID) {
+        mergedMap.set(String(lot.Lot_ID), lot);
+      }
+    });
+    localLots.forEach(lot => {
+      if (lot && lot.Lot_ID) {
+        const existing = mergedMap.get(String(lot.Lot_ID));
+        if (!existing || (lot.updatedAt || 0) > (existing.updatedAt || 0)) {
+          mergedMap.set(String(lot.Lot_ID), lot);
+        }
+      }
+    });
+    return Array.from(mergedMap.values());
+  }
+
+  function mergeTransactions(localTx, cloudTx) {
+    const mergedMap = new Map();
+    cloudTx.forEach(tx => {
+      if (tx && tx.Tx_ID) {
+        mergedMap.set(String(tx.Tx_ID), tx);
+      }
+    });
+    localTx.forEach(tx => {
+      if (tx && tx.Tx_ID) {
+        mergedMap.set(String(tx.Tx_ID), tx);
+      }
+    });
+    return Array.from(mergedMap.values()).sort((a, b) => (a.Timestamp || 0) - (b.Timestamp || 0));
+  }
+
   /**
    * Realtime Synchronization Engine with API Cache-Busting
    */
@@ -470,103 +532,130 @@
             syncText.textContent = 'متصل بالسحابة 🟢 (قاعدة البيانات فارغة أو رابط السيرفر غير دقيق)';
             syncText.style.color = '#f59e0b';
           }
-        } else if (Array.isArray(cloudData)) {
-          const mergedList = mergeBatches(batches, cloudData);
-          sanitizeBatchesCoatingName(mergedList);
-          const currentLocalHash = JSON.stringify(batches);
-          const currentCloudHash = JSON.stringify(cloudData);
-          const mergedHash = JSON.stringify(mergedList);
+        } else {
+          let cloudBatches = [];
+          let cloudLots = [];
+          let cloudTx = [];
 
-          if (currentLocalHash !== mergedHash) {
-            // Find what changed to show notification toast messages
-            const oldBatchesMap = new Map();
-            batches.forEach(b => {
-              if (b && b.id) oldBatchesMap.set(String(b.id), b);
-            });
-
-            const notificationsToShow = [];
-
-            mergedList.forEach(nb => {
-              if (!nb || nb.deleted === true) return;
-              const ob = oldBatchesMap.get(String(nb.id));
-              if (!ob) {
-                // New batch added
-                notificationsToShow.push(`🆕 تم إضافة تشغيلة جديدة: ${nb.productName} (رقم ${nb.batchNo})`);
-              } else if ((nb.version || 0) > (ob.version || 0)) {
-                // Batch updated. Let's look at new logs
-                const newLogsCount = (nb.logs || []).length - (ob.logs || []).length;
-                if (newLogsCount > 0) {
-                  for (let i = 0; i < newLogsCount; i++) {
-                    const log = nb.logs[i];
-                    if (log && log.text) {
-                      notificationsToShow.push(`🔔 ${log.text}`);
-                    }
-                  }
-                } else {
-                  // General update
-                  notificationsToShow.push(`🔄 تم تحديث بيانات التشغيلة: ${nb.productName} (رقم ${nb.batchNo})`);
-                }
-              }
-            });
-
-            // Check for deleted batches
-            batches.forEach(ob => {
-              if (!ob || ob.deleted === true) return;
-              const nb = mergedList.find(b => b && String(b.id) === String(ob.id));
-              if (!nb || nb.deleted === true) {
-                notificationsToShow.push(`🗑️ تم حذف/إلغاء التشغيلة: ${ob.productName} (رقم ${ob.batchNo})`);
-              }
-            });
-
-            batches = mergedList;
-            localStorage.setItem(MASTER_STORAGE_KEY, JSON.stringify(batches));
-            renderApp();
-
-            if (activeBatchId) {
-              const activeBatch = batches.find(b => b && String(b.id) === String(activeBatchId));
-              if (activeBatch) {
-                renderWorkflowTimeline(activeBatch);
-                renderStageLogger(activeBatch);
-                renderHistoryList(activeBatch);
-              } else {
-                closeBatchDetailModal();
-              }
-            }
-
-            // Show toast notifications
-            let soundPlayed = false;
-            notificationsToShow.reverse().forEach(msg => {
-              // Push to history
-              notificationsHistory.unshift({
-                text: msg,
-                timestamp: new Date().toLocaleTimeString('ar-EG'),
-                unread: true
-              });
-
-              if (window.showToast) {
-                window.showToast(msg, 'info', 6000);
-              }
-              
-              if (!soundPlayed) {
-                playNotificationSound();
-                soundPlayed = true; // only play sound once per sync cycle to avoid noise
-              }
-            });
-
-            if (notificationsToShow.length > 0) {
-              localStorage.setItem('notifications_history', JSON.stringify(notificationsHistory));
-              updateNotificationsBadge();
-              if (drawerNotifications && !drawerNotifications.classList.contains('hidden')) {
-                renderNotificationsDrawer();
-              }
-            }
+          if (Array.isArray(cloudData)) {
+            cloudBatches = cloudData;
+          } else if (cloudData && typeof cloudData === 'object') {
+            cloudBatches = cloudData.batches || [];
+            cloudLots = cloudData.stock_lots || [];
+            cloudTx = cloudData.transactions || [];
           }
 
-          // No auto-push on background sync to prevent HTTP 429 Rate Limits.
-          // Pushes only happen when the user performs a local action (add, edit, delete, restore).
+          if (Array.isArray(cloudBatches)) {
+            const mergedList = mergeBatches(batches, cloudBatches);
+            sanitizeBatchesCoatingName(mergedList);
 
-          lastSyncHash = mergedHash;
-          updateSyncStatusLabel(true);
+            const mergedLots = mergeStockLots(stockLots, cloudLots);
+            const mergedTx = mergeTransactions(wmsTransactions, cloudTx);
+
+            const currentLocalHash = JSON.stringify({ batches, stockLots, wmsTransactions });
+            const mergedHash = JSON.stringify({ batches: mergedList, stock_lots: mergedLots, transactions: mergedTx });
+
+            if (currentLocalHash !== mergedHash) {
+              // Find what changed to show notification toast messages
+              const oldBatchesMap = new Map();
+              batches.forEach(b => {
+                if (b && b.id) oldBatchesMap.set(String(b.id), b);
+              });
+
+              const notificationsToShow = [];
+
+              mergedList.forEach(nb => {
+                if (!nb || nb.deleted === true) return;
+                const ob = oldBatchesMap.get(String(nb.id));
+                if (!ob) {
+                  // New batch added
+                  notificationsToShow.push(`🆕 تم إضافة تشغيلة جديدة: ${nb.productName} (رقم ${nb.batchNo})`);
+                } else if ((nb.version || 0) > (ob.version || 0)) {
+                  // Batch updated. Let's look at new logs
+                  const newLogsCount = (nb.logs || []).length - (ob.logs || []).length;
+                  if (newLogsCount > 0) {
+                    for (let i = 0; i < newLogsCount; i++) {
+                      const log = nb.logs[i];
+                      if (log && log.text) {
+                        notificationsToShow.push(`🔔 ${log.text}`);
+                      }
+                    }
+                  } else {
+                    // General update
+                    notificationsToShow.push(`🔄 تم تحديث بيانات التشغيلة: ${nb.productName} (رقم ${nb.batchNo})`);
+                  }
+                }
+              });
+
+              // Check for deleted batches
+              batches.forEach(ob => {
+                if (!ob || ob.deleted === true) return;
+                const nb = mergedList.find(b => b && String(b.id) === String(ob.id));
+                if (!nb || nb.deleted === true) {
+                  notificationsToShow.push(`🗑️ تم حذف/إلغاء التشغيلة: ${ob.productName} (رقم ${ob.batchNo})`);
+                }
+              });
+
+              batches = mergedList;
+              stockLots = mergedLots;
+              wmsTransactions = mergedTx;
+
+              localStorage.setItem(MASTER_STORAGE_KEY, JSON.stringify(batches));
+              localStorage.setItem(WMS_STOCK_LOTS_KEY, JSON.stringify(stockLots));
+              localStorage.setItem(WMS_TRANSACTIONS_KEY, JSON.stringify(wmsTransactions));
+
+              renderApp();
+
+              if (typeof renderWMSViews === 'function') {
+                renderWMSViews();
+              }
+
+              if (activeBatchId) {
+                const activeBatch = batches.find(b => b && String(b.id) === String(activeBatchId));
+                if (activeBatch) {
+                  renderWorkflowTimeline(activeBatch);
+                  renderStageLogger(activeBatch);
+                  renderHistoryList(activeBatch);
+                } else {
+                  closeBatchDetailModal();
+                }
+              }
+
+              // Show toast notifications
+              let soundPlayed = false;
+              notificationsToShow.reverse().forEach(msg => {
+                // Push to history
+                notificationsHistory.unshift({
+                  text: msg,
+                  timestamp: new Date().toLocaleTimeString('ar-EG'),
+                  unread: true
+                });
+
+                if (window.showToast) {
+                  window.showToast(msg, 'info', 6000);
+                }
+                
+                if (!soundPlayed) {
+                  playNotificationSound();
+                  soundPlayed = true; // only play sound once per sync cycle to avoid noise
+                }
+              });
+
+              if (notificationsToShow.length > 0) {
+                localStorage.setItem('notifications_history', JSON.stringify(notificationsHistory));
+                updateNotificationsBadge();
+                if (drawerNotifications && !drawerNotifications.classList.contains('hidden')) {
+                  renderNotificationsDrawer();
+                }
+              }
+            }
+
+            // No auto-push on background sync to prevent HTTP 429 Rate Limits.
+            // Pushes only happen when the user performs a local action (add, edit, delete, restore).
+
+            lastSyncHash = mergedHash;
+            updateSyncStatusLabel(true);
+          }
         }
       } else if (response.status === 429) {
         updateSyncStatusLabel(true);
@@ -590,7 +679,8 @@
     }
 
     isSavingToCloud = true;
-    lastSyncHash = JSON.stringify(batches);
+    const payload = { batches: batches, stock_lots: stockLots, transactions: wmsTransactions };
+    lastSyncHash = JSON.stringify({ batches: batches, stock_lots: stockLots, transactions: wmsTransactions });
     if (syncText) syncText.textContent = 'جاري رفع وتكامل البيانات سحابياً... 🔄';
 
     try {
@@ -601,7 +691,7 @@
           'Content-Type': 'application/json',
           'Accept': 'application/json'
         },
-        body: JSON.stringify(batches)
+        body: JSON.stringify(payload)
       });
 
       if (response.ok) {
@@ -1005,20 +1095,36 @@
 
     if (viewTabProduction) {
       viewTabProduction.addEventListener('click', () => {
-        viewTabProduction.classList.add('active');
-        if (viewTabQuarantine) viewTabQuarantine.classList.remove('active');
+        viewTabProduction.style.background = 'var(--primary)';
+        viewTabProduction.style.borderColor = 'var(--primary)';
+        viewTabProduction.style.color = '#fff';
+        if (viewTabWarehouse) {
+          viewTabWarehouse.style.background = 'transparent';
+          viewTabWarehouse.style.borderColor = 'rgba(255,255,255,0.15)';
+          viewTabWarehouse.style.color = 'var(--text-dim)';
+        }
         if (viewProductionContainer) viewProductionContainer.classList.remove('hidden');
-        if (viewQuarantineContainer) viewQuarantineContainer.classList.add('hidden');
+        if (viewWarehouseContainer) viewWarehouseContainer.classList.add('hidden');
+        const prodStats = document.querySelector('.stats-grid');
+        if (prodStats) prodStats.classList.remove('hidden');
       });
     }
 
-    if (viewTabQuarantine) {
-      viewTabQuarantine.addEventListener('click', () => {
-        viewTabQuarantine.classList.add('active');
-        if (viewTabProduction) viewTabProduction.classList.remove('active');
-        if (viewQuarantineContainer) viewQuarantineContainer.classList.remove('hidden');
+    if (viewTabWarehouse) {
+      viewTabWarehouse.addEventListener('click', () => {
+        viewTabWarehouse.style.background = 'var(--primary)';
+        viewTabWarehouse.style.borderColor = 'var(--primary)';
+        viewTabWarehouse.style.color = '#fff';
+        if (viewTabProduction) {
+          viewTabProduction.style.background = 'transparent';
+          viewTabProduction.style.borderColor = 'rgba(255,255,255,0.15)';
+          viewTabProduction.style.color = 'var(--text-dim)';
+        }
+        if (viewWarehouseContainer) viewWarehouseContainer.classList.remove('hidden');
         if (viewProductionContainer) viewProductionContainer.classList.add('hidden');
-        renderQuarantineView();
+        const prodStats = document.querySelector('.stats-grid');
+        if (prodStats) prodStats.classList.add('hidden');
+        renderWMSViews();
       });
     }
 
@@ -1257,6 +1363,8 @@
         }
       });
     }
+
+    setupWMSEventListeners();
   }
 
   function handleResetCache() {
@@ -1675,6 +1783,34 @@
         if (inputLogRejectedKg) { inputLogRejectedKg.value = '0'; inputLogRejectedKg.placeholder = 'مثال: 2 kg مرفوض'; }
         if (logConversionHint) logConversionHint.textContent = 'يتم إدخال الوزن بالكيلوغرام وتقوم المنظومة بتحويلها تلقائياً إلى أعداد ظروف/تيوبات ولوتات وتحديث كافة أجهزة المعمل.';
       }
+
+      // Weighing Formulation Dynamic View toggle
+      if (activeStageIndex === 0) {
+        if (elWeighingFormulationContainer) elWeighingFormulationContainer.classList.remove('hidden');
+        if (inputLogAcceptedKg) {
+          inputLogAcceptedKg.readOnly = true;
+          inputLogAcceptedKg.style.background = 'rgba(255,255,255,0.05)';
+          inputLogAcceptedKg.style.cursor = 'not-allowed';
+        }
+        if (elWeighingFormulationTbody) {
+          elWeighingFormulationTbody.innerHTML = '';
+          if (stage.formulation && stage.formulation.length > 0) {
+            stage.formulation.forEach(row => {
+              addWeighingFormulationRow(row.Lot_ID, row.Quantity);
+            });
+          } else {
+            addWeighingFormulationRow('', 0);
+          }
+        }
+        updateWeighingFormulationTotal();
+      } else {
+        if (elWeighingFormulationContainer) elWeighingFormulationContainer.classList.add('hidden');
+        if (inputLogAcceptedKg) {
+          inputLogAcceptedKg.readOnly = false;
+          inputLogAcceptedKg.style.background = '';
+          inputLogAcceptedKg.style.cursor = '';
+        }
+      }
     }
 
     let maxAllowedTotal = batch.totalWeightKg;
@@ -1818,6 +1954,41 @@
     if (currentUserRole === 'qc') {
       alert('عذراً، لا تملك صلاحيات إدارة الإنتاج لتسجيل الإنجاز.');
       return;
+    }
+
+    let formulationRows = [];
+    if (activeStageIndex === 0 && !isEditCorrectionMode) {
+      const rows = elWeighingFormulationTbody.querySelectorAll('tr');
+      let isValid = true;
+      for (let i = 0; i < rows.length; i++) {
+        const select = rows[i].querySelector('.wms-lot-select');
+        const input = rows[i].querySelector('.wms-qty-input');
+        const lotId = select.value;
+        const qty = parseFloat(input.value) || 0;
+
+        if (!lotId || qty <= 0) {
+          alert('يرجى اختيار لوط صالح وتحديد الكمية الموزونة لجميع أسطر المواد الخام!');
+          isValid = false;
+          break;
+        }
+
+        const lot = stockLots.find(l => l && String(l.Lot_ID) === String(lotId));
+        if (!lot) {
+          alert('اللوط المحدد غير موجود بالمستودع!');
+          isValid = false;
+          break;
+        }
+
+        if (qty > lot.Current_Qty) {
+          alert(`الكمية المطلوبة للمادة [${lot.Material_Name}] (${qty}) أكبر من الرصيد المتوفر باللوط [${lot.Lot_Number}] (${lot.Current_Qty} ${lot.Unit})!`);
+          isValid = false;
+          break;
+        }
+
+        formulationRows.push({ lotId, qty, lotName: lot.Material_Name, lotNumber: lot.Lot_Number, unit: lot.Unit });
+      }
+
+      if (!isValid) return;
     }
 
     // QC Gate Validation Checks
@@ -2060,6 +2231,30 @@
     stage.acceptedKg = (stage.acceptedKg || 0) + finalAddAcceptedKg;
     stage.rejectedKg = (stage.rejectedKg || 0) + addRejectedKg;
 
+    // If Weighing stage, execute WMS stock deductions
+    if (activeStageIndex === 0) {
+      stage.formulation = formulationRows.map(r => ({ Lot_ID: r.lotId, Quantity: r.qty }));
+      formulationRows.forEach(row => {
+        const lot = stockLots.find(l => l && String(l.Lot_ID) === String(row.lotId));
+        if (lot) {
+          lot.Current_Qty = parseFloat((lot.Current_Qty - row.qty).toFixed(3));
+          lot.updatedAt = Date.now();
+        }
+
+        // Log transaction in WMS history
+        wmsTransactions.unshift({
+          Tx_ID: 'tx-' + Date.now() + '-' + Math.random().toString(36).substr(2, 4),
+          Lot_ID: row.lotId,
+          Tx_Type: 'Dispense_Production',
+          Quantity: -row.qty,
+          Reference_ID: `صرف لإنتاج تشغيلة ${batch.productName} (#${batch.batchNo})`,
+          Performed_By: currentUserRole,
+          Timestamp: Date.now()
+        });
+      });
+      saveWMS(false);
+    }
+
     if (stage.doneKg >= (stageLimit - 0.05)) {
       stage.status = 'completed';
     } else {
@@ -2078,6 +2273,9 @@
       } else {
         logMsg = `تسجيل إنجاز بالبليستر والتغليف: (${addAcceptedBlisters} ${term.packName} مقبول = ${addAcceptedKg} kg) و (${addRejectedBlisters} ${term.packName} مرفوض = ${addRejectedKg} kg)`;
       }
+    } else if (activeStageIndex === 0) {
+      const detailsStr = formulationRows.map(r => `${r.lotName} (لوط: ${r.lotNumber}) بوزن ${r.qty} ${r.unit}`).join('، ');
+      logMsg = `تسجيل إنجاز بالوزن الميداني للمواد الخام: إجمالي مقبول ${addAcceptedKg} kg. تفاصيل المواد الموزونة المصروفة: [ ${detailsStr} ]`;
     } else {
       logMsg = `تسجيل إنجاز بمرحلة [${stage.name}]: (${addAcceptedKg} kg مقبول = ${PharmaMath.formatNumber(addAcceptedBlisters)} ${uLabel}) و (${addRejectedKg} kg مرفوض = ${PharmaMath.formatNumber(addRejectedBlisters)} ${uLabel})`;
     }
@@ -3331,6 +3529,653 @@
     } catch (err) {
       console.warn("Web Audio playback failed:", err);
     }
+  }
+
+  // =========================================================================
+  // WMS (Warehouse Management System) Logic and Views
+  // =========================================================================
+  let currentWMSTab = 'stock';
+  let wmsExcelImportTemp = [];
+
+  function setupWMSEventListeners() {
+    // WMS Tab switching
+    const tabs = document.querySelectorAll('#wms-sub-tabs .filter-tab');
+    tabs.forEach(tab => {
+      tab.addEventListener('click', (e) => {
+        currentWMSTab = e.target.getAttribute('data-wms-tab');
+        renderWMSViews();
+      });
+    });
+
+    // Excel import
+    const excelFile = document.getElementById('wms-excel-file');
+    if (excelFile) excelFile.addEventListener('change', handleExcelImportChange);
+
+    const btnCancelImport = document.getElementById('wms-btn-cancel-import');
+    if (btnCancelImport) {
+      btnCancelImport.addEventListener('click', () => {
+        wmsExcelImportTemp = [];
+        const preview = document.getElementById('wms-excel-preview-container');
+        if (preview) preview.classList.add('hidden');
+        if (excelFile) excelFile.value = '';
+      });
+    }
+
+    const btnConfirmImport = document.getElementById('wms-btn-confirm-import');
+    if (btnConfirmImport) btnConfirmImport.addEventListener('click', confirmExcelImport);
+
+    // Inbound Purchase Form
+    const formInbound = document.getElementById('wms-form-inbound');
+    if (formInbound) formInbound.addEventListener('submit', handleInboundSubmit);
+
+    // Sales/FEFO Form
+    const salesProduct = document.getElementById('wms-sales-product');
+    if (salesProduct) salesProduct.addEventListener('change', updateFEFORecommendation);
+
+    const salesQty = document.getElementById('wms-sales-qty');
+    if (salesQty) salesQty.addEventListener('input', updateFEFORecommendation);
+
+    const formSales = document.getElementById('wms-form-sales');
+    if (formSales) formSales.addEventListener('submit', handleSalesSubmit);
+
+    // Stock Search
+    const stockSearch = document.getElementById('wms-stock-search');
+    if (stockSearch) stockSearch.addEventListener('input', renderStockLots);
+
+    // Formulation dynamically adding rows
+    if (btnAddFormulationRow) {
+      btnAddFormulationRow.addEventListener('click', () => {
+        addWeighingFormulationRow('', 0);
+      });
+    }
+  }
+
+  function renderWMSViews() {
+    updateWMSStats();
+    
+    // Toggle active sub-tab buttons
+    const tabs = document.querySelectorAll('#wms-sub-tabs .filter-tab');
+    tabs.forEach(tab => {
+      if (tab.getAttribute('data-wms-tab') === currentWMSTab) {
+        tab.classList.add('active');
+        tab.style.background = 'var(--primary)';
+        tab.style.borderColor = 'var(--primary)';
+        tab.style.color = '#fff';
+      } else {
+        tab.classList.remove('active');
+        tab.style.background = 'transparent';
+        tab.style.borderColor = 'rgba(255,255,255,0.15)';
+        tab.style.color = 'var(--text-dim)';
+      }
+    });
+
+    // Toggle sub-views
+    const subViews = document.querySelectorAll('.wms-sub-view');
+    subViews.forEach(view => {
+      if (view.id === `wms-view-${currentWMSTab}`) {
+        view.classList.remove('hidden');
+      } else {
+        view.classList.add('hidden');
+      }
+    });
+
+    // Render corresponding sub-view data
+    if (currentWMSTab === 'stock') {
+      renderStockLots();
+    } else if (currentWMSTab === 'history') {
+      renderTransactionsLog();
+    } else if (currentWMSTab === 'sales') {
+      populateSalesProductsDropdown();
+    }
+  }
+
+  function updateWMSStats() {
+    let relCount = 0, relWeight = 0;
+    let quaCount = 0, quaWeight = 0;
+    let rejCount = 0, rejWeight = 0;
+
+    stockLots.forEach(lot => {
+      if (!lot) return;
+      const qty = parseFloat(lot.Current_Qty) || 0;
+      if (lot.Status === 'Released') {
+        relCount++;
+        relWeight += qty;
+      } else if (lot.Status === 'Quarantine') {
+        quaCount++;
+        quaWeight += qty;
+      } else if (lot.Status === 'Rejected') {
+        rejCount++;
+        rejWeight += qty;
+      }
+    });
+
+    const elRelCount = document.getElementById('wms-stat-released-count');
+    const elRelWeight = document.getElementById('wms-stat-released-weight');
+    const elQuaCount = document.getElementById('wms-stat-quarantine-count');
+    const elQuaWeight = document.getElementById('wms-stat-quarantine-weight');
+    const elRejCount = document.getElementById('wms-stat-rejected-count');
+    const elRejWeight = document.getElementById('wms-stat-rejected-weight');
+    const elTxCount = document.getElementById('wms-stat-tx-count');
+
+    if (elRelCount) elRelCount.textContent = relCount;
+    if (elRelWeight) elRelWeight.textContent = `${relWeight.toFixed(3)} ${stockLots[0]?.Unit || 'kg'}`;
+    if (elQuaCount) elQuaCount.textContent = quaCount;
+    if (elQuaWeight) elQuaWeight.textContent = `${quaWeight.toFixed(3)} ${stockLots[0]?.Unit || 'kg'}`;
+    if (elRejCount) elRejCount.textContent = rejCount;
+    if (elRejWeight) elRejWeight.textContent = `${rejWeight.toFixed(3)} ${stockLots[0]?.Unit || 'kg'}`;
+    if (elTxCount) elTxCount.textContent = wmsTransactions.length;
+  }
+
+  function renderStockLots() {
+    const tbody = document.getElementById('wms-stock-tbody');
+    if (!tbody) return;
+    tbody.innerHTML = '';
+
+    const searchInput = document.getElementById('wms-stock-search');
+    const query = searchInput ? searchInput.value.toLowerCase().trim() : '';
+
+    const filtered = stockLots.filter(lot => {
+      if (!lot) return false;
+      return lot.Material_Code.toLowerCase().includes(query) ||
+             lot.Material_Name.toLowerCase().includes(query) ||
+             lot.Lot_Number.toLowerCase().includes(query);
+    });
+
+    if (filtered.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="8" style="text-align: center; color: var(--text-dim); padding: 20px;">لا توجد مواد تطابق البحث أو المخزون فارغ.</td></tr>`;
+      return;
+    }
+
+    filtered.forEach(lot => {
+      const tr = document.createElement('tr');
+      tr.style.borderBottom = '1px solid rgba(255, 255, 255, 0.05)';
+
+      const statusMap = {
+        Released: '<span class="wms-badge released"><i data-lucide="check-circle-2" style="width:12px;height:12px;"></i> مقبول ومفرج عنه</span>',
+        Quarantine: '<span class="wms-badge quarantine"><i data-lucide="shield-alert" style="width:12px;height:12px;"></i> محجور (تحت الفحص)</span>',
+        Rejected: '<span class="wms-badge rejected"><i data-lucide="x-circle" style="width:12px;height:12px;"></i> مرفوض معزول</span>'
+      };
+
+      // QC Actions HTML
+      let actionsHtml = '-';
+      if (currentUserRole === 'admin' || currentUserRole === 'qc') {
+        const btnClass = 'btn btn-secondary btn-sm';
+        const style = 'padding: 2px 6px; font-size: 0.72rem; margin: 0 2px;';
+        if (lot.Status === 'Quarantine') {
+          actionsHtml = `
+            <button class="${btnClass}" style="${style} border-color: var(--emerald); color: var(--emerald);" onclick="changeLotStatus('${lot.Lot_ID}', 'Released')">إفراج ✅</button>
+            <button class="${btnClass}" style="${style} border-color: var(--rose); color: var(--rose);" onclick="changeLotStatus('${lot.Lot_ID}', 'Rejected')">رفض ❌</button>
+          `;
+        } else if (lot.Status === 'Released') {
+          actionsHtml = `
+            <button class="${btnClass}" style="${style} border-color: var(--amber); color: var(--amber);" onclick="changeLotStatus('${lot.Lot_ID}', 'Quarantine')">حجر 🔒</button>
+            <button class="${btnClass}" style="${style} border-color: var(--rose); color: var(--rose);" onclick="changeLotStatus('${lot.Lot_ID}', 'Rejected')">رفض ❌</button>
+          `;
+        } else if (lot.Status === 'Rejected') {
+          actionsHtml = `
+            <button class="${btnClass}" style="${style} border-color: var(--amber); color: var(--amber);" onclick="changeLotStatus('${lot.Lot_ID}', 'Quarantine')">حجر 🔒</button>
+            <button class="${btnClass}" style="${style} border-color: var(--emerald); color: var(--emerald);" onclick="changeLotStatus('${lot.Lot_ID}', 'Released')">إفراج ✅</button>
+          `;
+        }
+      }
+
+      tr.innerHTML = `
+        <td style="padding: 12px; font-weight: bold; color: var(--cyan);">${lot.Material_Code}</td>
+        <td style="padding: 12px; color: #fff;">${lot.Material_Name}</td>
+        <td style="padding: 12px;"><strong style="color: var(--amber); font-family: monospace;">${lot.Lot_Number}</strong></td>
+        <td style="padding: 12px; font-weight: bold; color: var(--emerald);">${lot.Current_Qty} ${lot.Unit}</td>
+        <td style="padding: 12px; color: var(--rose);">${lot.Expiry_Date}</td>
+        <td style="padding: 12px; color: var(--text-dim);">${lot.Storage_Location || '-'}</td>
+        <td style="padding: 12px;">${statusMap[lot.Status] || lot.Status}</td>
+        <td style="padding: 12px; text-align: center;">${actionsHtml}</td>
+      `;
+      tbody.appendChild(tr);
+    });
+
+    if (window.lucide) window.lucide.createIcons();
+  }
+
+  window.changeLotStatus = function(lotId, newStatus) {
+    const lot = stockLots.find(l => l && String(l.Lot_ID) === String(lotId));
+    if (!lot) return;
+
+    const oldStatus = lot.Status;
+    lot.Status = newStatus;
+    lot.updatedAt = Date.now();
+
+    // Log transaction
+    const tx = {
+      Tx_ID: 'tx-' + Date.now() + '-' + Math.random().toString(36).substr(2, 4),
+      Lot_ID: lotId,
+      Tx_Type: 'QC_Status_Change',
+      Quantity: 0,
+      Reference_ID: `تغيير حالة من ${oldStatus} إلى ${newStatus}`,
+      Performed_By: currentUserRole,
+      Timestamp: Date.now()
+    };
+    wmsTransactions.unshift(tx);
+
+    saveWMS(true);
+    renderWMSViews();
+
+    if (window.showToast) {
+      window.showToast(`تم تغيير حالة اللوط [${lot.Lot_Number}] للمادة [${lot.Material_Name}] إلى ${newStatus} بنجاح 🧪`, 'success');
+    }
+  };
+
+  function renderTransactionsLog() {
+    const tbody = document.getElementById('wms-history-tbody');
+    if (!tbody) return;
+    tbody.innerHTML = '';
+
+    if (wmsTransactions.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="9" style="text-align: center; color: var(--text-dim); padding: 20px;">سجل الحركات فارغ حالياً.</td></tr>`;
+      return;
+    }
+
+    wmsTransactions.forEach(tx => {
+      const lot = stockLots.find(l => l && String(l.Lot_ID) === String(tx.Lot_ID));
+      const materialName = lot ? lot.Material_Name : 'مادة محذوفة';
+      const lotNumber = lot ? lot.Lot_Number : '-';
+      const unit = lot ? lot.Unit : '';
+
+      const tr = document.createElement('tr');
+      tr.style.borderBottom = '1px solid rgba(255, 255, 255, 0.05)';
+
+      const typeMap = {
+        Initial_Balance: '<span style="color: var(--cyan); font-weight: bold;">رصيد افتتاحي 📥</span>',
+        Inbound_Purchase: '<span style="color: var(--amber); font-weight: bold;">وارد جديد للمستودع ➕</span>',
+        Dispense_Production: '<span style="color: var(--primary); font-weight: bold;">صرف لأوامر الإنتاج ⚙️</span>',
+        FG_Receipt: '<span style="color: var(--emerald); font-weight: bold;">وارد منتج تام 📦</span>',
+        Sales_Dispatch: '<span style="color: var(--rose); font-weight: bold;">شحن مبيعات وعملاء 🚚</span>',
+        QC_Status_Change: '<span style="color: #c084fc; font-weight: bold;">قرار جودة جودي 🧪</span>'
+      };
+
+      const dateStr = new Date(tx.Timestamp).toLocaleString('ar-EG');
+
+      tr.innerHTML = `
+        <td style="padding: 10px; font-family: monospace; font-size: 0.75rem; color: var(--text-dim);">${tx.Tx_ID}</td>
+        <td style="padding: 10px;">${typeMap[tx.Tx_Type] || tx.Tx_Type}</td>
+        <td style="padding: 10px; font-weight: bold; color: #fff;">${materialName}</td>
+        <td style="padding: 10px;"><strong style="color: var(--amber); font-family: monospace;">${lotNumber}</strong></td>
+        <td style="padding: 10px; font-weight: bold; color: ${tx.Quantity < 0 ? 'var(--rose)' : 'var(--emerald)'};">${tx.Quantity > 0 ? '+' : ''}${tx.Quantity}</td>
+        <td style="padding: 10px; color: var(--text-dim);">${unit}</td>
+        <td style="padding: 10px; font-size: 0.8rem;">${tx.Reference_ID || '-'}</td>
+        <td style="padding: 10px; color: var(--text-dim);">${tx.Performed_By}</td>
+        <td style="padding: 10px; font-size: 0.8rem; color: var(--text-dim);">${dateStr}</td>
+      `;
+      tbody.appendChild(tr);
+    });
+  }
+
+  function handleExcelImportChange(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = function(evt) {
+      try {
+        const data = new Uint8Array(evt.target.result);
+        const workbook = XLSX.read(data, { type: 'array' });
+        const sheetName = workbook.SheetNames[0];
+        const sheet = workbook.Sheets[sheetName];
+        const rawJson = XLSX.utils.sheet_to_json(sheet);
+
+        if (!Array.isArray(rawJson) || rawJson.length === 0) {
+          alert('ملف الأكسل فارغ أو غير متوافق!');
+          return;
+        }
+
+        wmsExcelImportTemp = [];
+        rawJson.forEach(row => {
+          const code = row['رمز المادة'] || row['Material_Code'] || '';
+          const name = row['اسم المادة'] || row['Material_Name'] || '';
+          const unit = row['الوحدة'] || row['Unit'] || 'kg';
+          const qty = parseFloat(row['الكمية']) || parseFloat(row['Quantity']) || 0;
+          const lotNum = row['الفئة'] || row['Lot_Number'] || row['Lot'] || '';
+          const expDate = row['تاريخ انتهاء الصلاحية'] || row['Expiry_Date'] || '';
+
+          if (code && name && lotNum) {
+            wmsExcelImportTemp.push({
+              Material_Code: String(code).trim(),
+              Material_Name: String(name).trim(),
+              Unit: String(unit).trim(),
+              Quantity: qty,
+              Lot_Number: String(lotNum).trim(),
+              Expiry_Date: String(expDate).trim()
+            });
+          }
+        });
+
+        const previewTbody = document.getElementById('wms-excel-preview-tbody');
+        if (previewTbody) {
+          previewTbody.innerHTML = '';
+          wmsExcelImportTemp.forEach(row => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+              <td>${row.Material_Code}</td>
+              <td>${row.Material_Name}</td>
+              <td><strong>${row.Lot_Number}</strong></td>
+              <td style="color: var(--emerald); font-weight: bold;">${row.Quantity}</td>
+              <td>${row.Unit}</td>
+              <td style="color: var(--rose);">${row.Expiry_Date}</td>
+              <td><span class="wms-badge released">Released ✅</span></td>
+            `;
+            previewTbody.appendChild(tr);
+          });
+        }
+
+        document.getElementById('wms-excel-preview-container').classList.remove('hidden');
+
+      } catch (err) {
+        alert('حدث خطأ أثناء تحليل ملف الأكسل: ' + err.message);
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  }
+
+  function confirmExcelImport() {
+    if (wmsExcelImportTemp.length === 0) return;
+
+    wmsExcelImportTemp.forEach(row => {
+      const lotId = 'lot-init-' + Date.now() + '-' + Math.random().toString(36).substr(2, 5);
+      const newLot = {
+        Lot_ID: lotId,
+        Material_Code: row.Material_Code,
+        Material_Name: row.Material_Name,
+        Lot_Number: row.Lot_Number,
+        Current_Qty: row.Quantity,
+        Unit: row.Unit,
+        Status: 'Released',
+        Expiry_Date: row.Expiry_Date,
+        Storage_Location: 'مستورد افتتاحي',
+        updatedAt: Date.now()
+      };
+      stockLots.push(newLot);
+
+      wmsTransactions.unshift({
+        Tx_ID: 'tx-' + Date.now() + '-' + Math.random().toString(36).substr(2, 4),
+        Lot_ID: lotId,
+        Tx_Type: 'Initial_Balance',
+        Quantity: row.Quantity,
+        Reference_ID: 'استيراد رصيد افتتاحي من أكسل',
+        Performed_By: currentUserRole,
+        Timestamp: Date.now()
+      });
+    });
+
+    saveWMS(true);
+    
+    wmsExcelImportTemp = [];
+    document.getElementById('wms-excel-preview-container').classList.add('hidden');
+    document.getElementById('wms-excel-file').value = '';
+    
+    currentWMSTab = 'stock';
+    renderWMSViews();
+
+    if (window.showToast) {
+      window.showToast('تم استيراد الأرصدة الافتتاحية للمواد الخام بنجاح كـ Released 📥', 'success');
+    }
+  }
+
+  function handleInboundSubmit(e) {
+    e.preventDefault();
+    const code = document.getElementById('wms-in-code').value.trim();
+    const name = document.getElementById('wms-in-name').value.trim();
+    const lotNum = document.getElementById('wms-in-lot').value.trim();
+    const qty = parseFloat(document.getElementById('wms-in-qty').value) || 0;
+    const unit = document.getElementById('wms-in-unit').value;
+    const expiry = document.getElementById('wms-in-expiry').value;
+    const location = document.getElementById('wms-in-location').value.trim();
+
+    const lotId = 'lot-in-' + Date.now() + '-' + Math.random().toString(36).substr(2, 5);
+    const newLot = {
+      Lot_ID: lotId,
+      Material_Code: code,
+      Material_Name: name,
+      Lot_Number: lotNum,
+      Current_Qty: qty,
+      Unit: unit,
+      Status: 'Quarantine',
+      Expiry_Date: expiry,
+      Storage_Location: location,
+      updatedAt: Date.now()
+    };
+
+    stockLots.push(newLot);
+
+    wmsTransactions.unshift({
+      Tx_ID: 'tx-' + Date.now() + '-' + Math.random().toString(36).substr(2, 4),
+      Lot_ID: lotId,
+      Tx_Type: 'Inbound_Purchase',
+      Quantity: qty,
+      Reference_ID: 'استلام مادة أولية جديدة للمستودع',
+      Performed_By: currentUserRole,
+      Timestamp: Date.now()
+    });
+
+    saveWMS(true);
+    
+    document.getElementById('wms-form-inbound').reset();
+    currentWMSTab = 'stock';
+    renderWMSViews();
+
+    if (window.showToast) {
+      window.showToast('تم استلام الوارد بنجاح وحفظه في الحجر الصحي (Quarantine) 🔒', 'success');
+    }
+  }
+
+  function populateSalesProductsDropdown() {
+    const select = document.getElementById('wms-sales-product');
+    if (!select) return;
+    select.innerHTML = '<option value="">-- اختر المنتج التام --</option>';
+
+    const releasedProductsMap = new Map();
+    stockLots.forEach(lot => {
+      if (lot && lot.Status === 'Released' && lot.Current_Qty > 0) {
+        releasedProductsMap.set(lot.Material_Name, lot.Unit);
+      }
+    });
+
+    releasedProductsMap.forEach((unit, name) => {
+      const option = document.createElement('option');
+      option.value = name;
+      option.textContent = `${name} (${unit})`;
+      select.appendChild(option);
+    });
+  }
+
+  function updateFEFORecommendation() {
+    const select = document.getElementById('wms-sales-product');
+    const inputQty = document.getElementById('wms-sales-qty');
+    const container = document.getElementById('wms-fefo-recommendation');
+    const details = document.getElementById('wms-fefo-details');
+
+    if (!select || !inputQty || !container || !details) return;
+
+    const productName = select.value;
+    const requiredQty = parseFloat(inputQty.value) || 0;
+
+    if (!productName || requiredQty <= 0) {
+      container.classList.add('hidden');
+      return;
+    }
+
+    const lots = stockLots
+      .filter(l => l && l.Material_Name === productName && l.Status === 'Released' && l.Current_Qty > 0)
+      .sort((a, b) => new Date(a.Expiry_Date) - new Date(b.Expiry_Date));
+
+    let remaining = requiredQty;
+    let recommendationHtml = '<ul style="margin: 0; padding-right: 20px;">';
+    let availableTotal = 0;
+
+    lots.forEach(lot => {
+      availableTotal += lot.Current_Qty;
+      if (remaining <= 0) return;
+
+      const take = Math.min(remaining, lot.Current_Qty);
+      remaining -= take;
+
+      recommendationHtml += `
+        <li style="margin-bottom: 4px;">
+          صرف <strong style="color: var(--emerald);">${take.toFixed(3)} ${lot.Unit}</strong> 
+          من اللوط <strong style="color: var(--amber);">${lot.Lot_Number}</strong> 
+          (تاريخ الانتهاء: <span style="color: var(--rose); font-weight: bold;">${lot.Expiry_Date}</span>، المتوفر: ${lot.Current_Qty} ${lot.Unit})
+        </li>
+      `;
+    });
+
+    recommendationHtml += '</ul>';
+
+    if (requiredQty > availableTotal) {
+      recommendationHtml += `
+        <div style="color: var(--rose); font-weight: bold; margin-top: 8px; display: flex; align-items: center; gap: 4px;">
+          <i data-lucide="alert-circle" style="width:16px;height:16px;"></i>
+          عذراً، الرصيد المتاح من هذا المنتج (${availableTotal.toFixed(3)}) غير كافٍ لتلبية الطلب!
+        </div>
+      `;
+    }
+
+    details.innerHTML = recommendationHtml;
+    container.classList.remove('hidden');
+
+    if (window.lucide) window.lucide.createIcons();
+  }
+
+  function handleSalesSubmit(e) {
+    e.preventDefault();
+    const productName = document.getElementById('wms-sales-product').value;
+    const requiredQty = parseFloat(document.getElementById('wms-sales-qty').value) || 0;
+    const ref = document.getElementById('wms-sales-ref').value.trim() || 'فاتورة شحن مبيعات';
+
+    if (!productName || requiredQty <= 0) return;
+
+    const lots = stockLots
+      .filter(l => l && l.Material_Name === productName && l.Status === 'Released' && l.Current_Qty > 0)
+      .sort((a, b) => new Date(a.Expiry_Date) - new Date(b.Expiry_Date));
+
+    let availableTotal = 0;
+    lots.forEach(l => availableTotal += l.Current_Qty);
+
+    if (requiredQty > availableTotal) {
+      alert(`الرصيد المفرج عنه غير كافٍ! المتوفر: ${availableTotal}، المطلوب: ${requiredQty}`);
+      return;
+    }
+
+    let remaining = requiredQty;
+    lots.forEach(lot => {
+      if (remaining <= 0) return;
+
+      const take = Math.min(remaining, lot.Current_Qty);
+      lot.Current_Qty = parseFloat((lot.Current_Qty - take).toFixed(3));
+      lot.updatedAt = Date.now();
+      remaining -= take;
+
+      wmsTransactions.unshift({
+        Tx_ID: 'tx-' + Date.now() + '-' + Math.random().toString(36).substr(2, 4),
+        Lot_ID: lot.Lot_ID,
+        Tx_Type: 'Sales_Dispatch',
+        Quantity: -take,
+        Reference_ID: `شحن مبيعات للعملاء (${ref})`,
+        Performed_By: currentUserRole,
+        Timestamp: Date.now()
+      });
+    });
+
+    saveWMS(true);
+    
+    document.getElementById('wms-form-sales').reset();
+    document.getElementById('wms-fefo-recommendation').classList.add('hidden');
+    currentWMSTab = 'stock';
+    renderWMSViews();
+
+    if (window.showToast) {
+      window.showToast(`تم شحن وصرف كمية ${requiredQty} من المنتج [${productName}] بنجاح وفق مبدأ FEFO 🚚`, 'success');
+    }
+  }
+
+  function addWeighingFormulationRow(selectedLotId = '', qty = 0) {
+    if (!elWeighingFormulationTbody) return;
+    const tr = document.createElement('tr');
+    
+    const select = document.createElement('select');
+    select.required = true;
+    select.className = 'wms-lot-select';
+    select.style.width = '100%';
+    select.style.background = '#1e293b';
+    select.style.color = '#fff';
+    select.style.border = '1px solid rgba(255,255,255,0.15)';
+    select.style.padding = '6px';
+    select.style.borderRadius = '4px';
+
+    select.innerHTML = '<option value="">-- اختر المادة واللوط المفرج عنه --</option>';
+    
+    const releasedLots = stockLots.filter(l => l && l.Status === 'Released' && l.Current_Qty > 0);
+    releasedLots.forEach(lot => {
+      const opt = document.createElement('option');
+      opt.value = lot.Lot_ID;
+      opt.textContent = `${lot.Material_Name} [Code: ${lot.Material_Code}] - Lot: ${lot.Lot_Number} (الرصيد: ${lot.Current_Qty} ${lot.Unit})`;
+      if (String(lot.Lot_ID) === String(selectedLotId)) {
+        opt.selected = true;
+      }
+      select.appendChild(opt);
+    });
+
+    const input = document.createElement('input');
+    input.type = 'number';
+    input.step = '0.001';
+    input.required = true;
+    input.value = qty > 0 ? qty : '';
+    input.placeholder = 'الكمية';
+    input.className = 'wms-qty-input';
+    input.style.width = '100%';
+    input.style.background = '#1e293b';
+    input.style.color = '#fff';
+    input.style.border = '1px solid rgba(255,255,255,0.15)';
+    input.style.padding = '6px';
+    input.style.borderRadius = '4px';
+    input.style.boxSizing = 'border-box';
+
+    input.addEventListener('input', updateWeighingFormulationTotal);
+    select.addEventListener('change', updateWeighingFormulationTotal);
+
+    const btnDel = document.createElement('button');
+    btnDel.type = 'button';
+    btnDel.className = 'btn btn-secondary btn-sm';
+    btnDel.style.borderColor = 'var(--rose)';
+    btnDel.style.color = 'var(--rose)';
+    btnDel.style.padding = '4px';
+    btnDel.innerHTML = '&times;';
+    btnDel.addEventListener('click', () => {
+      tr.remove();
+      updateWeighingFormulationTotal();
+    });
+
+    const tdSelect = document.createElement('td');
+    tdSelect.appendChild(select);
+    const tdInput = document.createElement('td');
+    tdInput.appendChild(input);
+    const tdAction = document.createElement('td');
+    tdAction.style.textAlign = 'center';
+    tdAction.appendChild(btnDel);
+
+    tr.appendChild(tdSelect);
+    tr.appendChild(tdInput);
+    tr.appendChild(tdAction);
+
+    elWeighingFormulationTbody.appendChild(tr);
+  }
+
+  function updateWeighingFormulationTotal() {
+    if (!elWeighingFormulationTbody || !inputLogAcceptedKg) return;
+    let total = 0;
+    const rows = elWeighingFormulationTbody.querySelectorAll('tr');
+    rows.forEach(row => {
+      const input = row.querySelector('.wms-qty-input');
+      const val = parseFloat(input?.value) || 0;
+      total += val;
+    });
+    inputLogAcceptedKg.value = total.toFixed(3);
   }
 
   document.addEventListener('DOMContentLoaded', init);

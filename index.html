@@ -123,6 +123,18 @@
     <!-- Main Content Container -->
     <main class="main-content">
       
+      <!-- Navigation Tabs -->
+      <div class="nav-tabs-container" style="display: flex; gap: 10px; margin-bottom: 20px; border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 10px; direction: rtl;">
+        <button id="view-tab-production" class="btn btn-secondary active" style="border-radius: 6px; padding: 10px 16px; font-weight: bold; display: flex; align-items: center; gap: 8px; cursor: pointer; background: var(--primary); border-color: var(--primary); color: #fff;">
+          <i data-lucide="activity" style="width: 18px; height: 18px;"></i>
+          <span>العملية الإنتاجية والخطوط ⚙️</span>
+        </button>
+        <button id="view-tab-warehouse" class="btn btn-secondary" style="border-radius: 6px; padding: 10px 16px; font-weight: bold; display: flex; align-items: center; gap: 8px; cursor: pointer; background: transparent; border-color: rgba(255,255,255,0.15); color: var(--text-dim);">
+          <i data-lucide="package" style="width: 18px; height: 18px;"></i>
+          <span>إدارة المستودعات والمخزون 📦</span>
+        </button>
+      </div>
+      
       <!-- Dashboard Stats in Blisters & Weights -->
       <section class="stats-grid">
         <div class="stat-card">
@@ -188,6 +200,263 @@
             <!-- Batches cards injected dynamically -->
           </div>
         </section>
+      </div>
+
+      <!-- VIEW 2: Warehouse Management System Container -->
+      <div id="view-warehouse-container" class="hidden" style="direction: rtl;">
+        
+        <!-- WMS Stats -->
+        <section class="stats-grid" style="margin-bottom: 20px;">
+          <div class="stat-card">
+            <div class="stat-icon icon-emerald">
+              <i data-lucide="package-check"></i>
+            </div>
+            <div class="stat-info">
+              <span class="stat-label">المخزون المفرج عنه (Released)</span>
+              <h2><span id="wms-stat-released-count">0</span> <small>لوط</small></h2>
+              <span class="stat-desc" id="wms-stat-released-weight">0.00 kg</span>
+            </div>
+          </div>
+
+          <div class="stat-card">
+            <div class="stat-icon icon-amber">
+              <i data-lucide="shield-alert"></i>
+            </div>
+            <div class="stat-info">
+              <span class="stat-label">المخزون المحجور (Quarantine)</span>
+              <h2><span id="wms-stat-quarantine-count">0</span> <small>لوط</small></h2>
+              <span class="stat-desc" id="wms-stat-quarantine-weight">0.00 kg</span>
+            </div>
+          </div>
+
+          <div class="stat-card">
+            <div class="stat-icon icon-rose">
+              <i data-lucide="slash"></i>
+            </div>
+            <div class="stat-info">
+              <span class="stat-label">المخزون المرفوض (Rejected)</span>
+              <h2><span id="wms-stat-rejected-count">0</span> <small>لوط</small></h2>
+              <span class="stat-desc" id="wms-stat-rejected-weight">0.00 kg</span>
+            </div>
+          </div>
+
+          <div class="stat-card">
+            <div class="stat-icon icon-cyan">
+              <i data-lucide="clipboard-list"></i>
+            </div>
+            <div class="stat-info">
+              <span class="stat-label">إجمالي العمليات الموثقة</span>
+              <h2><span id="wms-stat-tx-count">0</span></h2>
+              <span class="stat-desc">سجل حركات مستودعية</span>
+            </div>
+          </div>
+        </section>
+
+        <!-- WMS Main Sub-Tab Navigation -->
+        <section class="controls-bar" style="margin-bottom: 20px;">
+          <div class="filter-tabs" id="wms-sub-tabs" style="display: flex; gap: 8px;">
+            <button class="filter-tab active" data-wms-tab="stock">الرصيد الفعلي للمخزن 📋</button>
+            <button class="filter-tab" data-wms-tab="import">استيراد رصيد افتتاحي 📥</button>
+            <button class="filter-tab" data-wms-tab="inbound">استلام وارد جديد ➕</button>
+            <button class="filter-tab" data-wms-tab="sales">شحن ومبيعات (FEFO) 🚚</button>
+            <button class="filter-tab" data-wms-tab="history">سجل حركات المستودعات 📜</button>
+          </div>
+        </section>
+
+        <!-- Sub-View 1: Current Stock Lots -->
+        <div id="wms-view-stock" class="wms-sub-view">
+          <div class="section-header" style="margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center;">
+            <h3>الأرصدة الحالية في المستودعات</h3>
+            <div class="search-box" style="max-width: 300px; margin: 0;">
+              <i data-lucide="search" class="search-icon"></i>
+              <input type="text" id="wms-stock-search" placeholder="ابحث باسم المادة أو كود المادة أو اللوط...">
+            </div>
+          </div>
+          <div class="table-container" style="overflow-x: auto; background: var(--bg-card); border-radius: 8px; border: 1px solid rgba(255,255,255,0.08);">
+            <table class="pharma-table" style="width: 100%; border-collapse: collapse; text-align: right;">
+              <thead>
+                <tr style="background: rgba(255,255,255,0.02); border-bottom: 1px solid rgba(255,255,255,0.08);">
+                  <th style="padding: 12px; text-align: right;">رمز المادة</th>
+                  <th style="padding: 12px; text-align: right;">اسم المادة</th>
+                  <th style="padding: 12px; text-align: right;">رقم التشغيلة (الفئة/اللوط)</th>
+                  <th style="padding: 12px; text-align: right;">الكمية المتوفرة</th>
+                  <th style="padding: 12px; text-align: right;">تاريخ انتهاء الصلاحية</th>
+                  <th style="padding: 12px; text-align: right;">الموقع</th>
+                  <th style="padding: 12px; text-align: right;">حالة المادة جودياً</th>
+                  <th style="padding: 12px; text-align: center; width: 180px;">إجراءات الجودة (QC)</th>
+                </tr>
+              </thead>
+              <tbody id="wms-stock-tbody">
+                <!-- Stock rows injected dynamically -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Sub-View 2: Excel Import -->
+        <div id="wms-view-import" class="wms-sub-view hidden">
+          <div class="section-header" style="margin-bottom: 16px;">
+            <h3>استيراد الأرصدة الافتتاحية للمواد الخام والمستودع</h3>
+            <p style="font-size: 0.8rem; color: var(--text-dim);">استيراد لمرة واحدة فقط باستخدام شيت الأكسل الافتتاحي لمطابقة بيانات المعمل الحالية</p>
+          </div>
+          <div style="background: var(--bg-card); padding: 24px; border-radius: 8px; border: 1px dashed rgba(6, 182, 212, 0.3); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; min-height: 180px;">
+            <i data-lucide="file-spreadsheet" style="width: 48px; height: 48px; color: var(--cyan);"></i>
+            <div style="text-align: center;">
+              <p style="margin: 0 0 6px 0; font-weight: bold;">اضغط هنا لتحميل أو سحب ملف الأكسل الافتتاحي (.xlsx / .xls / .csv)</p>
+              <p style="margin: 0; font-size: 0.72rem; color: var(--text-dim);">يتم جلب الأعمدة آلياً: رمز المادة، اسم المادة، الوحدة، الكمية، الفئة (اللوط)، وتاريخ انتهاء الصلاحية</p>
+            </div>
+            <button type="button" class="btn btn-primary" onclick="document.getElementById('wms-excel-file').click()">
+              <i data-lucide="upload"></i> اختيار ملف الأكسل
+            </button>
+            <input type="file" id="wms-excel-file" accept=".xlsx, .xls, .csv" style="display: none;">
+          </div>
+          
+          <!-- Excel Preview Table -->
+          <div id="wms-excel-preview-container" class="hidden" style="margin-top: 24px;">
+            <h4 style="margin-bottom: 12px; color: var(--cyan);">معاينة البيانات قبل الحفظ والاستيراد للتأكيد:</h4>
+            <div class="table-container" style="max-height: 400px; overflow-y: auto; background: rgba(0,0,0,0.2); border-radius: 6px; border: 1px solid rgba(255,255,255,0.08);">
+              <table class="pharma-table" style="width: 100%;">
+                <thead>
+                  <tr style="background: rgba(255,255,255,0.03);">
+                    <th style="padding: 10px; text-align: right;">رمز المادة</th>
+                    <th style="padding: 10px; text-align: right;">اسم المادة</th>
+                    <th style="padding: 10px; text-align: right;">اللوط (الفئة)</th>
+                    <th style="padding: 10px; text-align: right;">الكمية</th>
+                    <th style="padding: 10px; text-align: right;">الوحدة</th>
+                    <th style="padding: 10px; text-align: right;">تاريخ الصلاحية</th>
+                    <th style="padding: 10px; text-align: right;">الحالة المبدئية</th>
+                  </tr>
+                </thead>
+                <tbody id="wms-excel-preview-tbody"></tbody>
+              </table>
+            </div>
+            <div style="margin-top: 16px; display: flex; justify-content: flex-end; gap: 12px;">
+              <button type="button" class="btn btn-secondary" id="wms-btn-cancel-import">إلغاء وتصفير</button>
+              <button type="button" class="btn btn-primary" id="wms-btn-confirm-import">
+                <i data-lucide="check"></i> تأكيد استيراد وحفظ الأرصدة الافتتاحية المفرج عنها
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Sub-View 3: Inbound Receipt Form -->
+        <div id="wms-view-inbound" class="wms-sub-view hidden">
+          <div class="section-header" style="margin-bottom: 16px;">
+            <h3>تسجيل استلام وارد جديد للمستودع (Inbound Invoices)</h3>
+            <p style="font-size: 0.8rem; color: var(--text-dim);">لتسجيل المواد الأولية ومواد التعبئة الواردة الجديدة. تدخل تلقائياً في حالة الحجر الجودي (Quarantine)</p>
+          </div>
+          <form id="wms-form-inbound" style="background: var(--bg-card); padding: 20px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.08);">
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin-bottom: 20px;">
+              <div class="form-group">
+                <label>رمز المادة الخام (Material Code) *</label>
+                <input type="text" id="wms-in-code" placeholder="مثال: MC-021" required style="width: 100%; box-sizing: border-box; padding: 8px; border-radius: 4px; background: #1e293b; border: 1px solid rgba(255,255,255,0.15); color: #fff;">
+              </div>
+              <div class="form-group">
+                <label>اسم المادة الخام (Material Name) *</label>
+                <input type="text" id="wms-in-name" placeholder="مثال: Paracetamol Powder" required style="width: 100%; box-sizing: border-box; padding: 8px; border-radius: 4px; background: #1e293b; border: 1px solid rgba(255,255,255,0.15); color: #fff;">
+              </div>
+              <div class="form-group">
+                <label>رقم التشغيلة / اللوط (Lot No / الفئة) *</label>
+                <input type="text" id="wms-in-lot" placeholder="مثال: LOT-PA-901" required style="width: 100%; box-sizing: border-box; padding: 8px; border-radius: 4px; background: #1e293b; border: 1px solid rgba(255,255,255,0.15); color: #fff;">
+              </div>
+              <div class="form-group">
+                <label>الكمية المستلمة *</label>
+                <input type="number" step="0.001" id="wms-in-qty" placeholder="مثال: 500" required style="width: 100%; box-sizing: border-box; padding: 8px; border-radius: 4px; background: #1e293b; border: 1px solid rgba(255,255,255,0.15); color: #fff;">
+              </div>
+              <div class="form-group">
+                <label>الوحدة *</label>
+                <select id="wms-in-unit" style="width: 100%; box-sizing: border-box; padding: 8px; border-radius: 4px; background: #1e293b; border: 1px solid rgba(255,255,255,0.15); color: #fff;">
+                  <option value="kg">kg (كيلوغرام)</option>
+                  <option value="g">g (غرام)</option>
+                  <option value="units">Units (وحدات)</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label>تاريخ انتهاء صلاحية المادة *</label>
+                <input type="date" id="wms-in-expiry" required style="width: 100%; box-sizing: border-box; padding: 8px; border-radius: 4px; background: #1e293b; border: 1px solid rgba(255,255,255,0.15); color: #fff;">
+              </div>
+              <div class="form-group">
+                <label>موقع التخزين المقترح</label>
+                <input type="text" id="wms-in-location" placeholder="مثال: مستودع المواد الخام 1" style="width: 100%; box-sizing: border-box; padding: 8px; border-radius: 4px; background: #1e293b; border: 1px solid rgba(255,255,255,0.15); color: #fff;">
+              </div>
+            </div>
+            <div style="display: flex; justify-content: flex-end;">
+              <button type="submit" class="btn btn-primary">
+                <i data-lucide="plus"></i> تسجيل استلام الوارد في الحجر (Quarantine)
+              </button>
+            </div>
+          </form>
+        </div>
+
+        <!-- Sub-View 4: Sales Dispatch & FEFO -->
+        <div id="wms-view-sales" class="wms-sub-view hidden">
+          <div class="section-header" style="margin-bottom: 16px;">
+            <h3>صرف الشحن والمبيعات للمنتجات التامة (Sales Dispatch FEFO)</h3>
+            <p style="font-size: 0.8rem; color: var(--text-dim);">يقوم النظام باقتراح وصرف المنتجات المفرج عنها (Released) ذات تاريخ الانتهاء الأقرب أولاً</p>
+          </div>
+          <form id="wms-form-sales" style="background: var(--bg-card); padding: 20px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.08);">
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin-bottom: 20px;">
+              <div class="form-group">
+                <label>اختر المنتج التام للصرف *</label>
+                <select id="wms-sales-product" required style="width: 100%; box-sizing: border-box; padding: 8px; border-radius: 4px; background: #1e293b; border: 1px solid rgba(255,255,255,0.15); color: #fff;">
+                  <!-- Dynamically populated with finished goods in stock lots -->
+                </select>
+              </div>
+              <div class="form-group">
+                <label>الكمية المطلوبة للشحن *</label>
+                <input type="number" step="0.01" id="wms-sales-qty" placeholder="الكمية المطلوبة" required style="width: 100%; box-sizing: border-box; padding: 8px; border-radius: 4px; background: #1e293b; border: 1px solid rgba(255,255,255,0.15); color: #fff;">
+              </div>
+              <div class="form-group">
+                <label>الجهة المستلمة / رقم العميل</label>
+                <input type="text" id="wms-sales-ref" placeholder="مثال: فاتورة بيع رقم 10292" style="width: 100%; box-sizing: border-box; padding: 8px; border-radius: 4px; background: #1e293b; border: 1px solid rgba(255,255,255,0.15); color: #fff;">
+              </div>
+            </div>
+            
+            <div id="wms-fefo-recommendation" class="hidden" style="background: rgba(6, 182, 212, 0.05); border: 1px solid rgba(6, 182, 212, 0.2); border-radius: 6px; padding: 12px 16px; margin-bottom: 20px; font-size: 0.85rem;">
+              <h5 style="color: var(--cyan); margin: 0 0 6px 0; display: flex; align-items: center; gap: 6px;">
+                <i data-lucide="sparkles" style="width: 16px; height: 16px;"></i> توصية الصرف الذكية (FEFO):
+              </h5>
+              <div id="wms-fefo-details" style="color: #e2e8f0; line-height: 1.4;">
+                <!-- Recommedations injected here -->
+              </div>
+            </div>
+
+            <div style="display: flex; justify-content: flex-end;">
+              <button type="submit" class="btn btn-primary" id="wms-btn-sales-submit">
+                <i data-lucide="truck"></i> تأكيد صرف وشحن الشحنة (FEFO)
+              </button>
+            </div>
+          </form>
+        </div>
+
+        <!-- Sub-View 5: Transactions History Audit Trail -->
+        <div id="wms-view-history" class="wms-sub-view hidden">
+          <div class="section-header" style="margin-bottom: 12px;">
+            <h3>سجل حركات المخزن وتاريخ التوزين (Audit Trail Log)</h3>
+            <p style="font-size: 0.8rem; color: var(--text-dim);">سجل الحركة دائم وغير قابل للتعديل أو الإلغاء لضمان شروط التصنيع الجيد (GMP)</p>
+          </div>
+          <div class="table-container" style="overflow-x: auto; background: var(--bg-card); border-radius: 8px; border: 1px solid rgba(255,255,255,0.08);">
+            <table class="pharma-table" style="width: 100%; border-collapse: collapse; text-align: right;">
+              <thead>
+                <tr style="background: rgba(255,255,255,0.02); border-bottom: 1px solid rgba(255,255,255,0.08);">
+                  <th style="padding: 12px; text-align: right;">معرف الحركة</th>
+                  <th style="padding: 12px; text-align: right;">نوع الحركة</th>
+                  <th style="padding: 12px; text-align: right;">اسم المادة</th>
+                  <th style="padding: 12px; text-align: right;">رقم اللوط</th>
+                  <th style="padding: 12px; text-align: right;">الكمية المتأثرة</th>
+                  <th style="padding: 12px; text-align: right;">الوحدة</th>
+                  <th style="padding: 12px; text-align: right;">كود مرجعي</th>
+                  <th style="padding: 12px; text-align: right;">بواسطة</th>
+                  <th style="padding: 12px; text-align: right;">تاريخ ووقت الحركة</th>
+                </tr>
+              </thead>
+              <tbody id="wms-history-tbody">
+                <!-- Transactions injected here -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
       </div>
 
     </main>
@@ -412,6 +681,28 @@
                 </div>
               </div>
 
+              <!-- Dynamic formulation weight block (only visible during Weighing stage) -->
+              <div id="weighing-formulation-container" class="hidden" style="margin-top: 1rem; border-top: 1px dashed rgba(255,255,255,0.1); padding-top: 1.25rem;">
+                <h5 style="color: var(--cyan); margin: 0 0 10px 0; display: flex; align-items: center; gap: 6px;">
+                  <i data-lucide="scale" style="width: 16px; height: 16px;"></i> تسجيل تفاصيل وزنات المواد الخام وصرف اللوطات المفرج عنها:
+                </h5>
+                <table class="weighing-formulation-table">
+                  <thead>
+                    <tr>
+                      <th style="text-align: right; padding: 8px;">المادة الخام المفرج عنها (Released Lot) *</th>
+                      <th style="text-align: right; padding: 8px; width: 150px;">الكمية الموزونة (كغ) *</th>
+                      <th style="text-align: center; padding: 8px; width: 70px;">إجراء</th>
+                    </tr>
+                  </thead>
+                  <tbody id="weighing-formulation-tbody">
+                    <!-- Dynamic material rows here -->
+                  </tbody>
+                </table>
+                <button type="button" class="btn btn-secondary btn-sm" id="btn-add-formulation-row" style="margin-top: 10px; border-color: var(--cyan); color: var(--cyan); padding: 4px 8px; font-size: 0.78rem;">
+                  <i data-lucide="plus-circle" style="width: 14px; height: 14px; display: inline-block; vertical-align: middle;"></i> + إضافة مادة خام للوزن
+                </button>
+              </div>
+
               <!-- Carry-over Stage Progress Checkbox Container -->
               <div id="stage-carry-over-progress-container" style="margin-top: 1rem;"></div>
 
@@ -614,9 +905,10 @@
   </div>
 
   <!-- Scripts with cache-busting timestamp -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <script src="pharmaMath.js?v=15.1"></script>
   <script src="mockData.js?v=15.0"></script>
-  <script src="app_v11.js?v=7.1"></script>
+  <script src="app_v11.js?v=8.0"></script>
   <script>
     lucide.createIcons();
   </script>
