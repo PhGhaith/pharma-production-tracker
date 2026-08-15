@@ -1947,8 +1947,8 @@
     if (logStageRejectedBlisters) logStageRejectedBlisters.textContent = `(${PharmaMath.formatNumber(rejMath.totalBlisters)} ${unitLabel} مرفوض/إعادة تشغيل)`;
 
     // Role Authorization for Production Logger
-    const isQC = currentUserRole === 'qc';
-    if (isQC) {
+    const isQCOrWMS = currentUserRole === 'qc' || currentUserRole === 'wms';
+    if (isQCOrWMS) {
       if (inputLogAcceptedKg) inputLogAcceptedKg.disabled = true;
       if (inputLogRejectedKg) inputLogRejectedKg.disabled = true;
       if (btnSubmitStageLog) {
@@ -1978,6 +1978,30 @@
         btnToggleEditMode.title = '';
       }
     }
+
+    // Render QC Lab notification triggers in the logger box based on active stage
+    const notifyContainer = document.getElementById('stage-qc-notification-container');
+    if (notifyContainer) {
+      if (activeStageIndex === 1) { // Preparation (التحضير)
+        notifyContainer.style.display = 'block';
+        notifyContainer.innerHTML = `
+          <button type="button" class="btn btn-secondary btn-sm" style="width: 100%; border-color: var(--cyan); color: var(--cyan); background: rgba(6, 182, 212, 0.05); font-weight: bold; display: flex; align-items: center; justify-content: center; gap: 6px; padding: 8px 12px; font-size: 0.82rem;" onclick="window.notifyQCAssay('${batch.id}')">
+            <i data-lucide="beaker" style="width: 14px; height: 14px;"></i> 🧪 إرسال إشعار للمخبر لتحليل مادة (التحضير Assay)
+          </button>
+        `;
+      } else if (activeStageIndex === 2) { // Compression/Filling (الضغط / التعبئة)
+        notifyContainer.style.display = 'block';
+        notifyContainer.innerHTML = `
+          <button type="button" class="btn btn-secondary btn-sm" style="width: 100%; border-color: var(--cyan); color: var(--cyan); background: rgba(6, 182, 212, 0.05); font-weight: bold; display: flex; align-items: center; justify-content: center; gap: 6px; padding: 8px 12px; font-size: 0.82rem;" onclick="window.notifyQCDissUnif('${batch.id}')">
+            <i data-lucide="beaker" style="width: 14px; height: 14px;"></i> 🧪 إرسال إشعار للمخبر لتحليل الانحلالية وتجانس المحتوى (Dissolution & Uniformity)
+          </button>
+        `;
+      } else {
+        notifyContainer.style.display = 'none';
+        notifyContainer.innerHTML = '';
+      }
+      if (window.lucide) window.lucide.createIcons();
+    }
   }
 
   function handleUpdateStageSubmit(e) {
@@ -1990,7 +2014,7 @@
     const isBlisterStage = activeStageIndex === batch.stages.length - 1;
     const term = getTerminology(batch.pharmaForm);
 
-    if (currentUserRole === 'qc') {
+    if (currentUserRole === 'qc' || currentUserRole === 'wms') {
       alert('عذراً، لا تملك صلاحيات إدارة الإنتاج لتسجيل الإنجاز.');
       return;
     }
@@ -3429,7 +3453,8 @@
     const rolePinMap = {
       admin: '9999',
       production: '1234',
-      qc: '5555'
+      qc: '5555',
+      wms: '8888'
     };
     
     if (rolePinMap[selectedRole] && pin !== rolePinMap[selectedRole]) {
@@ -3471,10 +3496,80 @@
     const roleNames = {
       admin: 'الصلاحية: مشرف 👑',
       production: 'الصلاحية: الإنتاج ⚙️',
-      qc: 'الصلاحية: الجودة 🧪'
+      qc: 'الصلاحية: الجودة 🧪',
+      wms: 'الصلاحية: المستودع 📦'
     };
     roleSwitcherText.textContent = roleNames[currentUserRole] || 'الصلاحية: مشرف 👑';
   }
+
+  window.notifyQCAssay = function(batchId) {
+    if (currentUserRole !== 'production' && currentUserRole !== 'admin') {
+      alert('عذراً، هذا الإجراء خاص بإدارة الإنتاج أو مشرف النظام.');
+      return;
+    }
+    const batch = batches.find(b => String(b.id) === String(batchId));
+    if (!batch) return;
+
+    const msg = `طلب فحص ومعايرة كيميائية (Assay) 🧪 للتشغيلة [${batch.productName}] (رقم الباتش: ${batch.batchNo}) - يرجى سحب العينات وتحليل مادة التحضير.`;
+    notificationsHistory.unshift({
+      text: msg,
+      timestamp: new Date().toLocaleTimeString('en-US'),
+      unread: true
+    });
+    localStorage.setItem('notifications_history', JSON.stringify(notificationsHistory));
+    updateNotificationsBadge();
+    playNotificationSound();
+
+    if (window.showToast) {
+      window.showToast(`تم إرسال إشعار للمخبر بنجاح لتحليل التحضير (Assay) للباتش [${batch.batchNo}]! 🟢`, 'success');
+    }
+  };
+
+  window.notifyQCDissUnif = function(batchId) {
+    if (currentUserRole !== 'production' && currentUserRole !== 'admin') {
+      alert('عذراً، هذا الإجراء خاص بإدارة الإنتاج أو مشرف النظام.');
+      return;
+    }
+    const batch = batches.find(b => String(b.id) === String(batchId));
+    if (!batch) return;
+
+    const msg = `طلب تحليل الانحلالية وتجانس المحتوى 🧪 للتشغيلة [${batch.productName}] (رقم الباتش: ${batch.batchNo}) - يرجى سحب عينات الضغط والتعبئة.`;
+    notificationsHistory.unshift({
+      text: msg,
+      timestamp: new Date().toLocaleTimeString('en-US'),
+      unread: true
+    });
+    localStorage.setItem('notifications_history', JSON.stringify(notificationsHistory));
+    updateNotificationsBadge();
+    playNotificationSound();
+
+    if (window.showToast) {
+      window.showToast(`تم إرسال إشعار للمخبر بنجاح لتحليل الانحلالية والتجانس للباتش [${batch.batchNo}]! 🟢`, 'success');
+    }
+  };
+
+  window.notifyQCToReleaseLot = function(lotId) {
+    if (currentUserRole !== 'wms' && currentUserRole !== 'admin') {
+      alert('عذراً، هذا الإجراء خاص بقسم المستودعات أو مشرف النظام.');
+      return;
+    }
+    const lot = stockLots.find(l => String(l.Lot_ID) === String(lotId));
+    if (!lot) return;
+
+    const msg = `طلب تحليل وإفراج 🔒: قسم المستودعات يطلب من المختبر تحليل وإفراج المادة [${lot.Material_Name}] (اللوت: ${lot.Lot_Number}) واردة حديثاً.`;
+    notificationsHistory.unshift({
+      text: msg,
+      timestamp: new Date().toLocaleTimeString('en-US'),
+      unread: true
+    });
+    localStorage.setItem('notifications_history', JSON.stringify(notificationsHistory));
+    updateNotificationsBadge();
+    playNotificationSound();
+
+    if (window.showToast) {
+      window.showToast(`تم إرسال إشعار للمخبر بنجاح لتحليل وإفراج اللوت [${lot.Lot_Number}]! 🟢`, 'success');
+    }
+  };
 
   window.showToast = function(message, type = 'info', duration = 5000) {
     const container = document.getElementById('toast-container');
@@ -3855,11 +3950,11 @@
 
       // QC Actions HTML
       let actionsHtml = '-';
-      if (currentUserRole === 'admin' || currentUserRole === 'qc') {
+      if (currentUserRole === 'admin' || currentUserRole === 'qc' || currentUserRole === 'wms') {
         const btnClass = 'btn btn-secondary btn-sm';
         const style = 'padding: 2px 6px; font-size: 0.72rem; margin: 0 2px;';
         let deleteBtnHtml = '';
-        if (currentUserRole === 'admin') {
+        if (currentUserRole === 'admin' || currentUserRole === 'wms') {
           deleteBtnHtml = `
             <button class="${btnClass}" style="${style} border-color: var(--rose); color: var(--rose);" onclick="deleteStockLot('${lot.Lot_ID}')" title="حذف اللوت نهائياً">
               <i data-lucide="trash-2" style="width: 12px; height: 12px; display: inline-block; vertical-align: middle;"></i>
@@ -3868,9 +3963,14 @@
         }
         
         if (lot.Status === 'Quarantine') {
+          let requestBtnHtml = '';
+          if (currentUserRole === 'wms' || currentUserRole === 'admin') {
+            requestBtnHtml = `<button class="${btnClass}" style="${style} border-color: var(--cyan); color: var(--cyan);" onclick="notifyQCToReleaseLot('${lot.Lot_ID}')" title="طلب تحليل وإفراج من المختبر">طلب تحليل 🧪</button>`;
+          }
           actionsHtml = `
             <button class="${btnClass}" style="${style} border-color: var(--emerald); color: var(--emerald);" onclick="changeLotStatus('${lot.Lot_ID}', 'Released')">إفراج ✅</button>
             <button class="${btnClass}" style="${style} border-color: var(--rose); color: var(--rose);" onclick="changeLotStatus('${lot.Lot_ID}', 'Rejected')">رفض ❌</button>
+            ${requestBtnHtml}
             ${deleteBtnHtml}
           `;
         } else if (lot.Status === 'Released') {

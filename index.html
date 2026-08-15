@@ -738,6 +738,9 @@
                 <button type="button" class="btn btn-secondary hidden" id="btn-cancel-edit-mode">إلغاء التعديل</button>
               </div>
               <small class="help-text" id="log-conversion-hint">ستقوم المنظومة بالتحويل الرياضي التلقائي وتحديث كافة أجهزة المعمل.</small>
+              
+              <!-- Container for QC Lab notification requests -->
+              <div id="stage-qc-notification-container" style="margin-top: 12px; border-top: 1px dashed rgba(255,255,255,0.1); padding-top: 12px; display: none;"></div>
             </form>
           </div>
 
@@ -882,6 +885,7 @@
               <option value="admin" style="background: #1e293b; color: #ffffff;">مشرف النظام (Admin) - كامل الصلاحيات 👑</option>
               <option value="production" style="background: #1e293b; color: #ffffff;">إدارة الإنتاج (Production Operator) - تسجيل إنجازات ومراحل الإنتاج ⚙️</option>
               <option value="qc" style="background: #1e293b; color: #ffffff;">قسم الجودة (QC Lab Analyst) - إدخال الفحوصات المخبرية وتخليص اللوتات 🧪</option>
+              <option value="wms" style="background: #1e293b; color: #ffffff;">قسم المستودعات (WMS Operator) - إدارة الأرصدة والمخزون وحركات الصرف 📦</option>
             </select>
           </div>
 
