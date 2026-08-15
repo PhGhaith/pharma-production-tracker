@@ -284,6 +284,37 @@
     window.addEventListener('focus', () => {
       syncFromCloud();
     });
+
+    startQCUnreleasedNotifier();
+  }
+
+  function startQCUnreleasedNotifier() {
+    function checkAndNotify() {
+      if (currentUserRole !== 'qc' && currentUserRole !== 'admin') return;
+      if (!Array.isArray(stockLots)) return;
+
+      const unreleased = stockLots.filter(l => l && l.Status === 'Quarantine');
+      if (unreleased.length === 0) return;
+
+      unreleased.forEach(lot => {
+        const msg = `تنبيه الجودة (QC) 🔒: لوت المواد الخام [${lot.Lot_Number}] للمادة [${lot.Material_Name}] غير مفرج عنه (محجور) وبانتظار التخليص!`;
+        
+        notificationsHistory.unshift({
+          text: msg,
+          timestamp: new Date().toLocaleTimeString('en-US'),
+          unread: true
+        });
+
+        if (window.showToast) {
+          window.showToast(msg, 'warning', 10000);
+        }
+      });
+
+      playNotificationSound();
+    }
+
+    setTimeout(checkAndNotify, 4000);
+    setInterval(checkAndNotify, 15 * 60 * 1000);
   }
 
   function sanitizeBatchesCoatingName(batchesList) {
@@ -1904,7 +1935,7 @@
       } else if (batch.carryOverKg > 0 && (stage.carryOverAdded || chkChecked)) {
         logStageTotalBlisters.innerHTML = `(${totalMath.equivalentLots.toFixed(2)} Lot | ${PharmaMath.formatNumber(totalMath.totalBlisters)} ${unitLabel}) <span style="color: var(--emerald); font-weight: bold;">(شامل المنقولة 🟢)</span>`;
       } else {
-        logStageTotalBlisters.textContent = `(${totalMath.equivalentLots.toFixed(2)} Lot | ${PharmaMath.formatNumber(totalMath.totalBlisters)} ${unitLabel})`;
+        logStageTotalBlisters.textContent = `(${totalMath.equivalentLots.toFixed(2)} Lot | ${PharmaMath.formatNumber(totalMath.totalBlisters)} ${unitLabel})`;;
       }
     }
 
@@ -1964,7 +1995,7 @@
     }
 
     let formulationRows = [];
-    if (activeStageIndex === 0 && !isEditCorrectionMode) {
+    if (activeStageIndex === 0) {
       const rows = elWeighingFormulationTbody.querySelectorAll('tr');
       let isValid = true;
       for (let i = 0; i < rows.length; i++) {
@@ -1986,8 +2017,22 @@
           break;
         }
 
-        if (qty > lot.Current_Qty) {
-          alert(`الكمية المطلوبة للمادة [${lot.Material_Name}] (${qty}) أكبر من الرصيد المتوفر باللوط [${lot.Lot_Number}] (${lot.Current_Qty} ${lot.Unit})!`);
+        if (lot.Status !== 'Released') {
+          alert(`لا يمكن وزن أو استخدام اللوت [${lot.Lot_Number}] للمادة [${lot.Material_Name}] لأنه غير مفرج عنه (الحالة الحالية: ${lot.Status})! يجب أن تكون حالة المادة "مقبول ومفرج عنه (Released)" قبل وزنها.`);
+          isValid = false;
+          break;
+        }
+
+        let oldQtyForLot = 0;
+        if (isEditCorrectionMode && Array.isArray(stage.formulation)) {
+          const oldRow = stage.formulation.find(or => String(or.Lot_ID || or.lotId) === String(lotId));
+          if (oldRow) {
+            oldQtyForLot = oldRow.Quantity || oldRow.qty || 0;
+          }
+        }
+
+        if (qty > (lot.Current_Qty + oldQtyForLot)) {
+          alert(`الكمية المطلوبة للمادة [${lot.Material_Name}] (${qty}) أكبر من الرصيد المتوفر باللوت [${lot.Lot_Number}] مضافاً إليه الكمية المصروفة سابقاً (${(lot.Current_Qty + oldQtyForLot).toFixed(3)} ${lot.Unit})!`);
           isValid = false;
           break;
         }
@@ -2107,6 +2152,53 @@
 
         newAccKg = PharmaMath.blistersToKg(newAccBlisters, batch.isCoated, batch.preCoatingMg, batch.postCoatingMg, batch.unitsPerBlister);
         newRejKg = PharmaMath.blistersToKg(newRejBlisters, batch.isCoated, batch.preCoatingMg, batch.postCoatingMg, batch.unitsPerBlister);
+      } else if (activeStageIndex === 0) {
+        // Weighing stage edit mode: calculate sum of formulationRows
+        newAccKg = formulationRows.reduce((sum, r) => sum + r.qty, 0);
+        newRejKg = 0;
+        
+        const accMath = PharmaMath.kgToBlistersAndLots(newAccKg, batch.isCoated, batch.preCoatingMg, batch.postCoatingMg, batch.unitsPerBlister, batch.totalWeightKg, batch.lotsCount);
+        newAccBlisters = accMath.totalBlisters;
+        newRejBlisters = 0;
+
+        // WMS Revert & Apply logic for Weighing Correction
+        // 1. Revert old stock deductions
+        if (stage.formulation && stage.formulation.length > 0) {
+          stage.formulation.forEach(oldRow => {
+            const lotId = oldRow.Lot_ID || oldRow.lotId;
+            const qty = oldRow.Quantity || oldRow.qty;
+            const lot = stockLots.find(l => l && String(l.Lot_ID) === String(lotId));
+            if (lot) {
+              lot.Current_Qty = parseFloat((lot.Current_Qty + qty).toFixed(3));
+              lot.updatedAt = Date.now();
+            }
+          });
+        }
+        // 2. Delete previous WMS transactions for this batch
+        wmsTransactions = wmsTransactions.filter(tx => tx && !(tx.Tx_Type === 'Dispense_Production' && tx.Reference_ID === `صرف لإنتاج تشغيلة ${batch.productName} (#${batch.batchNo})`));
+
+        // 3. Save new formulation array
+        stage.formulation = formulationRows.map(r => ({ Lot_ID: r.lotId, Quantity: r.qty }));
+        
+        // 4. Deduct new quantities and log transactions
+        formulationRows.forEach(row => {
+          const lot = stockLots.find(l => l && String(l.Lot_ID) === String(row.lotId));
+          if (lot) {
+            lot.Current_Qty = parseFloat((lot.Current_Qty - row.qty).toFixed(3));
+            lot.updatedAt = Date.now();
+          }
+
+          wmsTransactions.unshift({
+            Tx_ID: 'tx-' + Date.now() + '-' + Math.random().toString(36).substr(2, 4),
+            Lot_ID: row.lotId,
+            Tx_Type: 'Dispense_Production',
+            Quantity: -row.qty,
+            Reference_ID: `صرف لإنتاج تشغيلة ${batch.productName} (#${batch.batchNo})`,
+            Performed_By: currentUserRole,
+            Timestamp: Date.now()
+          });
+        });
+        saveWMS(false);
       } else {
         newAccKg = parseFloat(inputLogAcceptedKg.value) || 0;
         newRejKg = parseFloat(inputLogRejectedKg.value) || 0;
@@ -3802,7 +3894,6 @@
         <td style="padding: 12px;"><strong style="color: var(--amber); font-family: monospace;">${lot.Lot_Number}</strong></td>
         <td style="padding: 12px; font-weight: bold; color: var(--emerald);">${lot.Current_Qty} ${lot.Unit}</td>
         <td style="padding: 12px; color: var(--rose);">${lot.Expiry_Date}</td>
-        <td style="padding: 12px; color: var(--text-dim);">${lot.Storage_Location || '-'}</td>
         <td style="padding: 12px;">${statusMap[lot.Status] || lot.Status}</td>
         <td style="padding: 12px; text-align: center;">${actionsHtml}</td>
       `;
@@ -4322,7 +4413,7 @@
 
     // Set initial value if selectedLotId is provided
     if (selectedLotId) {
-      const initialLot = releasedLots.find(l => String(l.Lot_ID) === String(selectedLotId));
+      const initialLot = stockLots.find(l => String(l.Lot_ID) === String(selectedLotId));
       if (initialLot) {
         inputSearch.value = `${initialLot.Material_Name} [Code: ${initialLot.Material_Code}] - L: ${initialLot.Lot_Number} (الرصيد: ${initialLot.Current_Qty} ${initialLot.Unit})`;
       } else {
