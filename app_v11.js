@@ -5,6 +5,8 @@
 
 (function () {
   const MASTER_STORAGE_KEY = 'pharma_production_batches_master_v2';
+  const WMS_STOCK_LOTS_KEY = 'pharma_wms_stock_lots_v1';
+  const WMS_TRANSACTIONS_KEY = 'pharma_wms_transactions_v1';
   
   // Previous keys for automatic user data recovery
   const PREVIOUS_STORAGE_KEYS = [
@@ -20,7 +22,7 @@
     'pharma_production_batches_v1'
   ];
 
-  const DEFAULT_CLOUD_API = 'https://jsonblob.com/api/jsonBlob/019fc699-099e-70ee-9ccd-d6048b84646a';
+  const DEFAULT_CLOUD_API = 'https://idm-production-c5174-default-rtdb.firebaseio.com/batches.json';
   let CLOUD_API_BASE = localStorage.getItem('pharma_production_server_url') || DEFAULT_CLOUD_API;
 
   // Helper to generate cache-busting cloud URL
@@ -32,6 +34,8 @@
 
   // Application State
   let batches = [];
+  let stockLots = [];
+  let wmsTransactions = [];
   let currentFormFilter = 'all';
   let searchQuery = '';
   let activeBatchId = null;

@@ -1,6 +1,25 @@
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
+  <script>
+    window.onerror = function(message, source, lineno, colno, error) {
+      const errDiv = document.createElement('div');
+      errDiv.style.position = 'fixed';
+      errDiv.style.top = '0';
+      errDiv.style.left = '0';
+      errDiv.style.width = '100%';
+      errDiv.style.background = '#ef4444';
+      errDiv.style.color = '#fff';
+      errDiv.style.padding = '15px';
+      errDiv.style.zIndex = '999999';
+      errDiv.style.textAlign = 'center';
+      errDiv.style.fontFamily = 'monospace';
+      errDiv.style.direction = 'ltr';
+      errDiv.innerHTML = '<strong>JS Error:</strong> ' + message + ' <br><strong>Source:</strong> ' + source + ' <br><strong>Line:</strong> ' + lineno;
+      document.body.appendChild(errDiv);
+      return false;
+    };
+  </script>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>نظام تتبع العملية الإنتاجية والحجر - معمل الأدوية</title>
@@ -908,7 +927,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <script src="pharmaMath.js?v=15.1"></script>
   <script src="mockData.js?v=15.0"></script>
-  <script src="app_v11.js?v=8.0"></script>
+  <script src="app_v11.js?v=8.1"></script>
   <script>
     lucide.createIcons();
   </script>
