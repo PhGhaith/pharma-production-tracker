@@ -420,11 +420,11 @@
           </div>
           <form id="wms-form-sales" style="background: var(--bg-card); padding: 20px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.08);">
             <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin-bottom: 20px;">
-              <div class="form-group">
+              <div class="form-group" style="position: relative;">
                 <label>اختر المنتج التام للصرف *</label>
-                <select id="wms-sales-product" required style="width: 100%; box-sizing: border-box; padding: 8px; border-radius: 4px; background: #1e293b; border: 1px solid rgba(255,255,255,0.15); color: #fff;">
-                  <!-- Dynamically populated with finished goods in stock lots -->
-                </select>
+                <input type="text" id="wms-sales-product-search" placeholder="🔍 اكتب للبحث عن منتج تام..." required style="width: 100%; box-sizing: border-box; padding: 8px; border-radius: 4px; background: #1e293b; border: 1px solid rgba(255,255,255,0.15); color: #fff;">
+                <input type="hidden" id="wms-sales-product" required>
+                <div id="wms-sales-product-dropdown" class="hidden" style="position: absolute; left: 0; right: 0; background: #0b0f19; border: 1px solid rgba(6, 182, 212, 0.3); border-radius: 4px; max-height: 180px; overflow-y: auto; z-index: 9999; box-shadow: 0 10px 25px rgba(0,0,0,0.8); margin-top: 2px;"></div>
               </div>
               <div class="form-group">
                 <label>الكمية المطلوبة للشحن *</label>

@@ -3668,8 +3668,7 @@
     if (formInbound) formInbound.addEventListener('submit', handleInboundSubmit);
 
     // Sales/FEFO Form
-    const salesProduct = document.getElementById('wms-sales-product');
-    if (salesProduct) salesProduct.addEventListener('change', updateFEFORecommendation);
+    setupSalesAutocomplete();
 
     const salesQty = document.getElementById('wms-sales-qty');
     if (salesQty) salesQty.addEventListener('input', updateFEFORecommendation);
@@ -4237,22 +4236,92 @@
   }
 
   function populateSalesProductsDropdown() {
-    const select = document.getElementById('wms-sales-product');
-    if (!select) return;
-    select.innerHTML = '<option value="">-- اختر المنتج التام --</option>';
+    const searchInput = document.getElementById('wms-sales-product-search');
+    const hiddenProduct = document.getElementById('wms-sales-product');
+    if (searchInput) searchInput.value = '';
+    if (hiddenProduct) hiddenProduct.value = '';
+    updateFEFORecommendation();
+  }
 
-    const releasedProductsMap = new Map();
-    stockLots.forEach(lot => {
-      if (lot && lot.Status === 'Released' && lot.Current_Qty > 0) {
-        releasedProductsMap.set(lot.Material_Name, lot.Unit);
+  function setupSalesAutocomplete() {
+    const inputSearch = document.getElementById('wms-sales-product-search');
+    const hiddenProduct = document.getElementById('wms-sales-product');
+    const dropdown = document.getElementById('wms-sales-product-dropdown');
+
+    if (!inputSearch || !hiddenProduct || !dropdown) return;
+
+    function getReleasedProducts() {
+      const releasedProductsMap = new Map();
+      stockLots.forEach(lot => {
+        if (lot && lot.Status === 'Released' && lot.Current_Qty > 0) {
+          releasedProductsMap.set(lot.Material_Name, lot.Unit);
+        }
+      });
+      return Array.from(releasedProductsMap.entries()).map(([name, unit]) => ({ name, unit }));
+    }
+
+    function populateDropdown(query = '') {
+      dropdown.innerHTML = '';
+      const products = getReleasedProducts();
+      const filtered = products.filter(p => p.name.toLowerCase().includes(query.toLowerCase()));
+
+      if (filtered.length === 0) {
+        dropdown.innerHTML = '<div style="padding: 8px; color: var(--text-dim); text-align: center; font-size: 0.85rem;">لا توجد منتجات مطابقة</div>';
+        dropdown.classList.remove('hidden');
+        return;
       }
+
+      filtered.forEach(p => {
+        const item = document.createElement('div');
+        item.style.padding = '8px 12px';
+        item.style.cursor = 'pointer';
+        item.style.fontSize = '0.88rem';
+        item.style.borderBottom = '1px solid rgba(255,255,255,0.03)';
+        item.style.transition = 'background 0.2s';
+        item.textContent = `${p.name} (${p.unit})`;
+
+        item.addEventListener('mouseenter', () => {
+          item.style.background = 'rgba(6, 182, 212, 0.15)';
+        });
+        item.addEventListener('mouseleave', () => {
+          item.style.background = 'transparent';
+        });
+
+        item.addEventListener('mousedown', (e) => {
+          e.preventDefault();
+          inputSearch.value = p.name;
+          hiddenProduct.value = p.name;
+          dropdown.classList.add('hidden');
+          updateFEFORecommendation();
+        });
+
+        dropdown.appendChild(item);
+      });
+
+      dropdown.classList.remove('hidden');
+    }
+
+    inputSearch.addEventListener('focus', () => {
+      populateDropdown(inputSearch.value);
     });
 
-    releasedProductsMap.forEach((unit, name) => {
-      const option = document.createElement('option');
-      option.value = name;
-      option.textContent = `${name} (${unit})`;
-      select.appendChild(option);
+    inputSearch.addEventListener('input', (e) => {
+      hiddenProduct.value = '';
+      populateDropdown(e.target.value);
+      updateFEFORecommendation();
+    });
+
+    inputSearch.addEventListener('blur', () => {
+      setTimeout(() => {
+        dropdown.classList.add('hidden');
+        const products = getReleasedProducts();
+        const exists = products.some(p => p.name === inputSearch.value);
+        if (!exists) {
+          inputSearch.value = '';
+          hiddenProduct.value = '';
+          updateFEFORecommendation();
+        }
+      }, 200);
     });
   }
 
