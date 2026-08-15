@@ -3843,56 +3843,98 @@
     const file = e.target.files[0];
     if (!file) return;
 
-    function getValueByAlternativeKeys(row, keys) {
-      for (const key of keys) {
-        if (row[key] !== undefined && row[key] !== null) return row[key];
-        const cleanKey = key.toLowerCase().trim().replace(/_/g, ' ');
-        for (const rowKey in row) {
-          const cleanRowKey = rowKey.toLowerCase().trim().replace(/_/g, ' ');
-          if (cleanRowKey === cleanKey && row[rowKey] !== undefined && row[rowKey] !== null) return row[rowKey];
-        }
-      }
-      return '';
-    }
-
     const reader = new FileReader();
     reader.onload = function(evt) {
       try {
         const data = new Uint8Array(evt.target.result);
         const workbook = XLSX.read(data, { type: 'array' });
-        const sheetName = workbook.SheetNames[0];
-        const sheet = workbook.Sheets[sheetName];
-        const rawJson = XLSX.utils.sheet_to_json(sheet);
+        
+        let rows = [];
+        let headerRowIndex = -1;
+        let colIndices = { code: -1, name: -1, unit: -1, qty: -1, lot: -1, exp: -1 };
+        let activeSheet = null;
 
-        if (!Array.isArray(rawJson) || rawJson.length === 0) {
-          alert('ملف الأكسل فارغ أو غير متوافق!');
+        // Loop through all sheets to find the correct one
+        for (const sName of workbook.SheetNames) {
+          const sheet = workbook.Sheets[sName];
+          const tempRows = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+          if (!Array.isArray(tempRows) || tempRows.length === 0) continue;
+
+          for (let r = 0; r < tempRows.length; r++) {
+            const row = tempRows[r];
+            if (!Array.isArray(row)) continue;
+
+            let tempIndices = { code: -1, name: -1, unit: -1, qty: -1, lot: -1, exp: -1 };
+
+            for (let c = 0; c < row.length; c++) {
+              if (row[c] === undefined || row[c] === null) continue;
+              const val = String(row[c]).toLowerCase().trim().replace(/_/g, ' ');
+              if (!val) continue;
+
+              function isMatch(val, list) {
+                return list.some(k => val.includes(k.toLowerCase().trim().replace(/_/g, ' ')) || k.toLowerCase().trim().replace(/_/g, ' ').includes(val));
+              }
+
+              if (tempIndices.code === -1 && isMatch(val, ['رمز المادة', 'كود المادة', 'المادة', 'material code', 'material_code', 'code'])) {
+                tempIndices.code = c;
+              } else if (tempIndices.name === -1 && isMatch(val, ['اسم المادة', 'اسم المادة الخام', 'اسم المكون', 'material name', 'material_name', 'name'])) {
+                tempIndices.name = c;
+              } else if (tempIndices.lot === -1 && isMatch(val, ['الفئة', 'اللوط', 'لوط', 'رقم اللوط', 'الوجبة', 'الدفعة', 'رقم التشغيلة', 'رقم الدفعة', 'lot', 'lot number', 'lot_number', 'batch', 'batch number', 'batch_no'])) {
+                tempIndices.lot = c;
+              } else if (tempIndices.qty === -1 && isMatch(val, ['الكمية', 'الكمية المتوفرة', 'الرصيد', 'الوزن', 'quantity', 'qty', 'balance', 'weight'])) {
+                tempIndices.qty = c;
+              } else if (tempIndices.unit === -1 && isMatch(val, ['الوحدة', 'الواحدة', 'unit'])) {
+                tempIndices.unit = c;
+              } else if (tempIndices.exp === -1 && isMatch(val, ['تاريخ انتهاء الصلاحية', 'تاريخ الصلاحية', 'تاريخ الانتهاء', 'الصلاحية', 'الانتهاء', 'expiry date', 'expiry_date', 'expiry', 'exp date', 'exp_date'])) {
+                tempIndices.exp = c;
+              }
+            }
+
+            // Match if we have at least code and name, and either lot or quantity
+            if (tempIndices.code !== -1 && tempIndices.name !== -1) {
+              headerRowIndex = r;
+              colIndices = tempIndices;
+              rows = tempRows;
+              activeSheet = sName;
+              break;
+            }
+          }
+          if (headerRowIndex !== -1) break;
+        }
+
+        if (headerRowIndex === -1 || rows.length === 0) {
+          alert('تعذر التعرف التلقائي على أعمدة الجدول في ملف الأكسل! يرجى التأكد من أن الملف يحتوي على أعمدة: رمز المادة، اسم المادة، رقم اللوط، والكمية.');
+          e.target.value = '';
           return;
         }
 
         wmsExcelImportTemp = [];
-        rawJson.forEach(row => {
-          const code = getValueByAlternativeKeys(row, ['رمز المادة', 'كود المادة', 'المادة', 'material code', 'material_code', 'code']);
-          const name = getValueByAlternativeKeys(row, ['اسم المادة', 'اسم المادة الخام', 'اسم المكون', 'material name', 'material_name', 'name']);
-          const unit = getValueByAlternativeKeys(row, ['الوحدة', 'الواحدة', 'unit']) || 'kg';
-          const qtyVal = getValueByAlternativeKeys(row, ['الكمية', 'الكمية المتوفرة', 'الرصيد', 'الوزن', 'quantity', 'qty', 'balance', 'weight']);
-          const qty = parseFloat(qtyVal) || 0;
-          const lotNum = getValueByAlternativeKeys(row, ['الفئة', 'اللوط', 'لوط', 'رقم اللوط', 'الوجبة', 'الدفعة', 'رقم التشغيلة', 'رقم الدفعة', 'lot', 'lot number', 'lot_number', 'batch', 'batch number', 'batch_no']);
-          const expDate = getValueByAlternativeKeys(row, ['تاريخ انتهاء الصلاحية', 'تاريخ الصلاحية', 'تاريخ الانتهاء', 'الصلاحية', 'الانتهاء', 'expiry date', 'expiry_date', 'expiry', 'exp date', 'exp_date']);
+        for (let r = headerRowIndex + 1; r < rows.length; r++) {
+          const row = rows[r];
+          if (!Array.isArray(row) || row.length === 0) continue;
 
-          if (code && name && lotNum) {
+          const code = colIndices.code !== -1 && row[colIndices.code] !== undefined && row[colIndices.code] !== null ? String(row[colIndices.code]).trim() : '';
+          const name = colIndices.name !== -1 && row[colIndices.name] !== undefined && row[colIndices.name] !== null ? String(row[colIndices.name]).trim() : '';
+          const unit = colIndices.unit !== -1 && row[colIndices.unit] !== undefined && row[colIndices.unit] !== null ? String(row[colIndices.unit]).trim() : 'kg';
+          const qtyVal = colIndices.qty !== -1 ? row[colIndices.qty] : 0;
+          const qty = parseFloat(qtyVal) || 0;
+          const lotNum = colIndices.lot !== -1 && row[colIndices.lot] !== undefined && row[colIndices.lot] !== null ? String(row[colIndices.lot]).trim() : '';
+          const expDate = colIndices.exp !== -1 && row[colIndices.exp] !== undefined && row[colIndices.exp] !== null ? String(row[colIndices.exp]).trim() : '';
+
+          if (code && name) {
             wmsExcelImportTemp.push({
-              Material_Code: String(code).trim(),
-              Material_Name: String(name).trim(),
-              Unit: String(unit).trim(),
+              Material_Code: code,
+              Material_Name: name,
+              Unit: unit || 'kg',
               Quantity: qty,
-              Lot_Number: String(lotNum).trim(),
-              Expiry_Date: String(expDate).trim()
+              Lot_Number: lotNum || 'lot-auto',
+              Expiry_Date: expDate
             });
           }
-        });
+        }
 
         if (wmsExcelImportTemp.length === 0) {
-          alert('لم يتم العثور على أي صفوف تطابق الأعمدة المطلوبة في ملف الأكسل! يرجى التأكد من احتواء الملف على أعمدة: رمز المادة، اسم المادة، الفئة (اللوط/رقم التشغيلة)، الكمية، وتاريخ انتهاء الصلاحية.');
+          alert('لم يتم العثور على أي بيانات صالحة تحت الأعمدة المطابقة في ملف الأكسل!');
           const preview = document.getElementById('wms-excel-preview-container');
           if (preview) preview.classList.add('hidden');
           e.target.value = '';
