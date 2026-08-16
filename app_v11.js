@@ -4914,14 +4914,7 @@
     inputSearch.addEventListener('blur', () => {
       setTimeout(() => {
         dropdown.classList.add('hidden');
-        const lots = getReleasedProducts();
-        const exists = lots.some(l => `${l.name} [الباتش: ${l.lotNumber}]` === inputSearch.value);
-        if (!exists) {
-          inputSearch.value = '';
-          hiddenProduct.value = '';
-          updateFEFORecommendation();
-        }
-      }, 200);
+      }, 250);
     });
   }
 
