@@ -1762,6 +1762,25 @@
     
     if (confirm(`هل أنت متأكد من إلغاء وحذف تشغيلة المنتج [${batchName}] نهائياً من خط الإنتاج والحجر؟`)) {
       if (batch) {
+        // Revert weighed materials to Raw Materials Stock
+        const weighingStage = batch.stages[0];
+        if (weighingStage && Array.isArray(weighingStage.formulation)) {
+          weighingStage.formulation.forEach(row => {
+            const lotId = row.Lot_ID || row.lotId;
+            const qty = row.Quantity || row.qty;
+            const lot = stockLots.find(l => l && String(l.Lot_ID) === String(lotId));
+            if (lot) {
+              const isGram = lot.Unit === 'g' || lot.Unit === 'غ' || lot.Unit === 'جرام';
+              const revertQty = isGram ? (qty * 1000) : qty;
+              lot.Current_Qty = parseFloat((lot.Current_Qty + revertQty).toFixed(3));
+              lot.updatedAt = Date.now();
+            }
+          });
+          // Remove transaction logs
+          wmsTransactions = wmsTransactions.filter(tx => tx && !(tx.Tx_Type === 'Dispense_Production' && tx.Reference_ID === `صرف لإنتاج تشغيلة ${batch.productName} (#${batch.batchNo})`));
+          saveWMS();
+        }
+
         batch.deleted = true;
         batch.version = (batch.version || 0) + 1;
         batch.updatedAt = Date.now();
