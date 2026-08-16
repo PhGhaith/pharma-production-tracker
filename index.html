@@ -275,6 +275,7 @@
         <section class="controls-bar" style="margin-bottom: 20px;">
           <div class="filter-tabs" id="wms-sub-tabs" style="display: flex; gap: 8px;">
             <button class="filter-tab active" data-wms-tab="stock">رصيد المواد الأولية 📋</button>
+            <button class="filter-tab" data-wms-tab="packaging">رصيد مواد التغليف 🏷️</button>
             <button class="filter-tab" data-wms-tab="ready">الرصيد الجاهز 📦</button>
             <button class="filter-tab" data-wms-tab="inbound">استلام وارد جديد ➕</button>
             <button class="filter-tab" data-wms-tab="sales">شحن ومبيعات 🚚</button>
@@ -319,9 +320,48 @@
                 <!-- Stock rows injected dynamically -->
               </tbody>
             </table>
+        </div>
+
+        <!-- Sub-View 1.5: Packaging Materials Stock -->
+        <div id="wms-view-packaging" class="wms-sub-view hidden">
+          <div class="section-header" style="margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center;">
+            <h3>أرصدة مواد التغليف الأولية في المستودع 🏷️</h3>
+            <div style="display: flex; align-items: center; gap: 10px;">
+              <button class="btn btn-secondary btn-sm" id="btn-export-packaging-excel" style="border-color: var(--emerald); color: var(--emerald); display: inline-flex; align-items: center; gap: 4px;">
+                <i data-lucide="download" style="width: 14px; height: 14px;"></i> تصدير الرصيد إلى Excel 📤
+              </button>
+              <button class="btn btn-secondary btn-sm" id="btn-import-packaging-excel" style="border-color: var(--cyan); color: var(--cyan); display: inline-flex; align-items: center; gap: 4px;">
+                <i data-lucide="file-spreadsheet" style="width: 14px; height: 14px;"></i> استيراد رصيد افتتاحي (أكسل)
+              </button>
+              <button class="btn btn-secondary btn-sm" id="wms-btn-clear-packaging" style="border-color: var(--rose); color: var(--rose); display: inline-flex; align-items: center; gap: 4px;">
+                <i data-lucide="trash-2" style="width: 14px; height: 14px;"></i> تصفير مستودع التغليف ⚠️
+              </button>
+              <div class="search-box" style="max-width: 300px; margin: 0;">
+                <i data-lucide="search" class="search-icon"></i>
+                <input type="text" id="wms-packaging-search" placeholder="ابحث باسم المادة أو الكود أو اللوت...">
+              </div>
+            </div>
+          </div>
+          <div class="table-container" style="overflow-x: auto; background: var(--bg-card); border-radius: 8px; border: 1px solid rgba(255,255,255,0.08);">
+            <table class="pharma-table" style="width: 100%; border-collapse: collapse; text-align: right;">
+              <thead>
+                <tr style="background: rgba(255,255,255,0.02); border-bottom: 1px solid rgba(255,255,255,0.08);">
+                  <th style="padding: 12px; text-align: right;">كود المادة</th>
+                  <th style="padding: 12px; text-align: right;">اسم المادة</th>
+                  <th style="padding: 12px; text-align: right;">رقم اللوت (الباتش)</th>
+                  <th style="padding: 12px; text-align: right;">الكمية المتوفرة</th>
+                  <th style="padding: 12px; text-align: right;">تاريخ انتهاء الصلاحية</th>
+                  <th style="padding: 12px; text-align: right;">حالة المادة</th>
+                  <th style="padding: 12px; text-align: center; width: 220px;">إجراءات الجودة والتحكم</th>
+                </tr>
+              </thead>
+              <tbody id="wms-packaging-tbody">
+                <!-- Packaging stock rows injected dynamically -->
+              </tbody>
+            </table>
           </div>
         </div>
- 
+
         <!-- Sub-View 6: Ready Finished Products Stock -->
         <div id="wms-view-ready" class="wms-sub-view hidden">
           <div class="section-header" style="margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center;">
@@ -373,11 +413,18 @@
           <form id="wms-form-inbound" style="background: var(--bg-card); padding: 20px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.08);">
             <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin-bottom: 20px;">
               <div class="form-group">
-                <label>رمز المادة الخام (Material Code) *</label>
+                <label>نوع المادة الواردة *</label>
+                <select id="wms-in-type" required style="width: 100%; box-sizing: border-box; padding: 8px; border-radius: 4px; background: #1e293b; border: 1px solid rgba(255,255,255,0.15); color: #fff; height: 38px;">
+                  <option value="raw">مادة أولية خام 🧪</option>
+                  <option value="packaging">مادة تعبئة وتغليف 🏷️</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label>رمز المادة الخام / التغليف (Material Code) *</label>
                 <input type="text" id="wms-in-code" placeholder="مثال: MC-021" required style="width: 100%; box-sizing: border-box; padding: 8px; border-radius: 4px; background: #1e293b; border: 1px solid rgba(255,255,255,0.15); color: #fff;">
               </div>
               <div class="form-group">
-                <label>اسم المادة الخام (Material Name) *</label>
+                <label>اسم المادة (Material Name) *</label>
                 <input type="text" id="wms-in-name" placeholder="مثال: Paracetamol Powder" required style="width: 100%; box-sizing: border-box; padding: 8px; border-radius: 4px; background: #1e293b; border: 1px solid rgba(255,255,255,0.15); color: #fff;">
               </div>
               <div class="form-group">
@@ -390,10 +437,14 @@
               </div>
               <div class="form-group">
                 <label>الوحدة *</label>
-                <select id="wms-in-unit" style="width: 100%; box-sizing: border-box; padding: 8px; border-radius: 4px; background: #1e293b; border: 1px solid rgba(255,255,255,0.15); color: #fff;">
+                <select id="wms-in-unit" style="width: 100%; box-sizing: border-box; padding: 8px; border-radius: 4px; background: #1e293b; border: 1px solid rgba(255,255,255,0.15); color: #fff; height: 38px;">
                   <option value="kg">kg (كيلوغرام)</option>
                   <option value="g">g (غرام)</option>
+                  <option value="L">L (لتر)</option>
                   <option value="units">Units (وحدات)</option>
+                  <option value="piece">قطعة (Piece)</option>
+                  <option value="roll">رول (Roll)</option>
+                  <option value="box">كرتونة / علبة</option>
                 </select>
               </div>
               <div class="form-group">
@@ -487,6 +538,12 @@
           <div class="section-header" style="margin-bottom: 12px;">
             <h3>سجل حركات المخزن وتاريخ التوزين (Audit Trail Log)</h3>
             <p style="font-size: 0.8rem; color: var(--text-dim);">سجل الحركة دائم وغير قابل للتعديل أو الإلغاء لضمان شروط التصنيع الجيد (GMP)</p>
+          </div>
+          <div style="display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap;" id="wms-history-filters">
+            <button class="filter-tab active" data-history-filter="all">كل الحركات 📋</button>
+            <button class="filter-tab" data-history-filter="raw">المواد الأولية 🧪</button>
+            <button class="filter-tab" data-history-filter="packaging">مواد التغليف 🏷️</button>
+            <button class="filter-tab" data-history-filter="ready">المنتجات الجاهزة 📦</button>
           </div>
           <div class="table-container" style="overflow-x: auto; background: var(--bg-card); border-radius: 8px; border: 1px solid rgba(255,255,255,0.08);">
             <table class="pharma-table" style="width: 100%; border-collapse: collapse; text-align: right;">
@@ -1034,7 +1091,7 @@
   <script src="xlsx.full.min.js"></script>
   <script src="pharmaMath.js?v=15.1"></script>
   <script src="mockData.js?v=15.0"></script>
-  <script src="app_v11.js?v=10.0"></script>
+  <script src="app_v11.js?v=10.1"></script>
   <script>
     lucide.createIcons();
   </script>

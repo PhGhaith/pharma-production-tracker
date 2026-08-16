@@ -3826,6 +3826,7 @@
   // WMS (Warehouse Management System) Logic and Views
   // =========================================================================
   let currentWMSTab = 'stock';
+  let currentHistoryFilter = 'all';
   let wmsExcelImportTemp = [];
 
   function setupWMSEventListeners() {
@@ -3880,6 +3881,19 @@
       });
     }
 
+    const btnImportPackaging = document.getElementById('btn-import-packaging-excel');
+    if (btnImportPackaging) {
+      btnImportPackaging.addEventListener('click', () => {
+        window.excelImportTargetType = 'packaging';
+        const title = document.getElementById('wms-excel-import-title');
+        const desc = document.getElementById('wms-excel-import-desc');
+        if (title) title.innerHTML = 'استيراد الأرصدة الافتتاحية لمواد التغليف (Excel) 📥';
+        if (desc) desc.textContent = 'استيراد لمرة واحدة لمطابقة أرصدة مواد التعبئة والتغليف الحالية بالمعمل كـ Released.';
+        if (modalExcelImport) modalExcelImport.classList.remove('hidden');
+        if (window.lucide) window.lucide.createIcons();
+      });
+    }
+
     if (closeExcelImportModal) {
       closeExcelImportModal.addEventListener('click', () => {
         if (modalExcelImport) modalExcelImport.classList.add('hidden');
@@ -3898,20 +3912,234 @@
     const btnCancelImport = document.getElementById('wms-btn-cancel-import');
     if (btnCancelImport) {
       btnCancelImport.addEventListener('click', () => {
+        if (modalExcelImport) modalExcelImport.classList.add('hidden');
         wmsExcelImportTemp = [];
         const preview = document.getElementById('wms-excel-preview-container');
         if (preview) preview.classList.add('hidden');
+        const excelFile = document.getElementById('wms-excel-file');
         if (excelFile) excelFile.value = '';
-        if (modalExcelImport) modalExcelImport.classList.add('hidden');
       });
     }
 
     const btnConfirmImport = document.getElementById('wms-btn-confirm-import');
     if (btnConfirmImport) btnConfirmImport.addEventListener('click', confirmExcelImport);
 
-    // Inbound Purchase Form
     const formInbound = document.getElementById('wms-form-inbound');
     if (formInbound) formInbound.addEventListener('submit', handleInboundSubmit);
+
+    const formSales = document.getElementById('wms-form-sales');
+    if (formSales) formSales.addEventListener('submit', handleSalesSubmit);
+
+    // Stock Search
+    const stockSearch = document.getElementById('wms-stock-search');
+    if (stockSearch) stockSearch.addEventListener('input', renderStockLots);
+
+    const packagingSearch = document.getElementById('wms-packaging-search');
+    if (packagingSearch) packagingSearch.addEventListener('input', renderPackagingLots);
+
+    const readySearch = document.getElementById('wms-ready-search');
+    if (readySearch) readySearch.addEventListener('input', renderReadyProducts);
+
+    // Excel Export listeners
+    const btnExportRawExcel = document.getElementById('btn-export-raw-excel');
+    if (btnExportRawExcel) {
+      btnExportRawExcel.addEventListener('click', () => exportStockToExcel('raw'));
+    }
+
+    const btnExportPackagingExcel = document.getElementById('btn-export-packaging-excel');
+    if (btnExportPackagingExcel) {
+      btnExportPackagingExcel.addEventListener('click', () => exportStockToExcel('packaging'));
+    }
+
+    const btnExportReadyExcel = document.getElementById('btn-export-ready-excel');
+    if (btnExportReadyExcel) {
+      btnExportReadyExcel.addEventListener('click', () => exportStockToExcel('ready'));
+    }
+
+    // Clear Raw Materials Stock
+    const btnClearAll = document.getElementById('wms-btn-clear-all');
+    if (btnClearAll) {
+      btnClearAll.addEventListener('click', () => {
+        if (!confirm('⚠️ تحذير حرج: هل أنت متأكد من تفريغ وتصفير كامل رصيد المواد الأولية بالمستودع؟\nلا يمكن التراجع عن هذا الإجراء!')) {
+          return;
+        }
+        
+        const pin = prompt('الرجاء إدخال رمز تأكيد الحذف (الـ PIN code لمدير النظام):');
+        if (pin !== '9999') {
+          alert('رمز التأكيد غير صحيح! تم إلغاء العملية.');
+          return;
+        }
+        
+        const isRawMaterial = lot => {
+          if (!lot || !lot.Unit) return false;
+          const u = lot.Unit.toLowerCase();
+          return u === 'kg' || u === 'g' || u === 'l' || u === 'كغ' || u === 'غ' || u === 'جرام' || u === 'لتر';
+        };
+
+        // Remove only raw materials
+        const lotsToClear = stockLots.filter(lot => {
+          if (!lot) return false;
+          const type = lot.Material_Type || (isRawMaterial(lot) ? 'raw' : 'ready');
+          return type === 'raw';
+        });
+
+        stockLots = stockLots.filter(lot => !lotsToClear.includes(lot));
+
+        // Purge cleared raw materials from all batches' formulation lists
+        lotsToClear.forEach(lot => {
+          removeLotFromBatches(lot.Lot_ID);
+        });
+
+        // Add WMS transaction log
+        wmsTransactions.unshift({
+          Tx_ID: 'tx-' + Date.now() + '-' + Math.random().toString(36).substr(2, 4),
+          Lot_ID: 'system',
+          Tx_Type: 'Clear_Inventory',
+          Quantity: 0,
+          Material_Type: 'raw',
+          Reference_ID: 'تصفير كامل مستودع المواد الأولية',
+          Performed_By: currentUserRole,
+          Timestamp: Date.now()
+        });
+
+        saveWMS(true);
+        renderWMSViews();
+        
+        if (window.showToast) {
+          window.showToast('تم تصفير مستودع المواد الأولية بالكامل 🗑️', 'success');
+        }
+      });
+    }
+
+    // Clear Packaging Materials Stock
+    const btnClearPackaging = document.getElementById('wms-btn-clear-packaging');
+    if (btnClearPackaging) {
+      btnClearPackaging.addEventListener('click', () => {
+        if (!confirm('⚠️ تحذير حرج: هل أنت متأكد من تفريغ وتصفير كامل رصيد مواد التغليف بالمستودع؟\nلا يمكن التراجع عن هذا الإجراء!')) {
+          return;
+        }
+        
+        const pin = prompt('الرجاء إدخال رمز تأكيد الحذف (الـ PIN code لمدير النظام):');
+        if (pin !== '9999') {
+          alert('رمز التأكيد غير صحيح! تم إلغاء العملية.');
+          return;
+        }
+        
+        const isRawMaterial = lot => {
+          if (!lot || !lot.Unit) return false;
+          const u = lot.Unit.toLowerCase();
+          return u === 'kg' || u === 'g' || u === 'l' || u === 'كغ' || u === 'غ' || u === 'جرام' || u === 'لتر';
+        };
+
+        const lotsToClear = stockLots.filter(lot => {
+          if (!lot) return false;
+          const type = lot.Material_Type || (isRawMaterial(lot) ? 'raw' : 'ready');
+          return type === 'packaging';
+        });
+
+        stockLots = stockLots.filter(lot => !lotsToClear.includes(lot));
+
+        // Add WMS transaction log
+        wmsTransactions.unshift({
+          Tx_ID: 'tx-' + Date.now() + '-' + Math.random().toString(36).substr(2, 4),
+          Lot_ID: 'system',
+          Tx_Type: 'Clear_Inventory',
+          Quantity: 0,
+          Material_Type: 'packaging',
+          Reference_ID: 'تصفير كامل مستودع مواد التغليف',
+          Performed_By: currentUserRole,
+          Timestamp: Date.now()
+        });
+
+        saveWMS(true);
+        renderWMSViews();
+        
+        if (window.showToast) {
+          window.showToast('تم تصفير مستودع مواد التغليف بالكامل 🗑️', 'success');
+        }
+      });
+    }
+
+    // Clear Finished Products Stock
+    const btnClearReady = document.getElementById('wms-btn-clear-ready');
+    if (btnClearReady) {
+      btnClearReady.addEventListener('click', () => {
+        if (!confirm('⚠️ تحذير حرج: هل أنت متأكد من تفريغ وتصفير كامل الرصيد الجاهز للمنتجات التامة؟\nلا يمكن التراجع عن هذا الإجراء!')) {
+          return;
+        }
+        
+        const pin = prompt('الرجاء إدخال رمز تأكيد الحذف (الـ PIN code لمدير النظام):');
+        if (pin !== '9999') {
+          alert('رمز التأكيد غير صحيح! تم إلغاء العملية.');
+          return;
+        }
+        
+        const isRawMaterial = lot => {
+          if (!lot || !lot.Unit) return false;
+          const u = lot.Unit.toLowerCase();
+          return u === 'kg' || u === 'g' || u === 'l' || u === 'كغ' || u === 'غ' || u === 'جرام' || u === 'لتر';
+        };
+
+        // Remove only ready finished products
+        stockLots = stockLots.filter(lot => {
+          if (!lot) return false;
+          const type = lot.Material_Type || (isRawMaterial(lot) ? 'raw' : 'ready');
+          return type !== 'ready';
+        });
+
+        // Add WMS transaction log
+        wmsTransactions.unshift({
+          Tx_ID: 'tx-' + Date.now() + '-' + Math.random().toString(36).substr(2, 4),
+          Lot_ID: 'system',
+          Tx_Type: 'Clear_Inventory',
+          Quantity: 0,
+          Material_Type: 'ready',
+          Reference_ID: 'تصفير كامل رصيد المنتجات التامة (الرصيد الجاهز)',
+          Performed_By: currentUserRole,
+          Timestamp: Date.now()
+        });
+
+        saveWMS(true);
+        renderWMSViews();
+        
+        if (window.showToast) {
+          window.showToast('تم تصفير الرصيد الجاهز بالكامل 🗑️', 'success');
+        }
+      });
+    }
+
+    // History Filters event listeners
+    const historyFilters = document.querySelectorAll('#wms-history-filters .filter-tab');
+    historyFilters.forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        currentHistoryFilter = e.target.getAttribute('data-history-filter');
+        
+        historyFilters.forEach(b => {
+          if (b.getAttribute('data-history-filter') === currentHistoryFilter) {
+            b.classList.add('active');
+            b.style.background = 'var(--primary)';
+            b.style.borderColor = 'var(--primary)';
+            b.style.color = '#fff';
+          } else {
+            b.classList.remove('active');
+            b.style.background = 'transparent';
+            b.style.borderColor = 'rgba(255,255,255,0.15)';
+            b.style.color = 'var(--text-dim)';
+          }
+        });
+
+        renderTransactionsLog();
+      });
+    });
+
+    // Formulation dynamically adding rows
+    if (btnAddFormulationRow) {
+      btnAddFormulationRow.addEventListener('click', () => {
+        addWeighingFormulationRow('', 0);
+      });
+    }
+
+
 
     // Sales/FEFO Form
     setupSalesAutocomplete();
@@ -3975,143 +4203,6 @@
         renderSalesInvoiceTable();
       });
     }
-
-    const formSales = document.getElementById('wms-form-sales');
-    if (formSales) formSales.addEventListener('submit', handleSalesSubmit);
-
-    // Stock Search
-    const stockSearch = document.getElementById('wms-stock-search');
-    if (stockSearch) stockSearch.addEventListener('input', renderStockLots);
-
-    const readySearch = document.getElementById('wms-ready-search');
-    if (readySearch) readySearch.addEventListener('input', renderReadyProducts);
-
-    // Excel Export listeners
-    const btnExportRawExcel = document.getElementById('btn-export-raw-excel');
-    if (btnExportRawExcel) {
-      btnExportRawExcel.addEventListener('click', () => exportStockToExcel('raw'));
-    }
-
-    const btnExportReadyExcel = document.getElementById('btn-export-ready-excel');
-    if (btnExportReadyExcel) {
-      btnExportReadyExcel.addEventListener('click', () => exportStockToExcel('ready'));
-    }
-
-    // Clear Raw Materials Stock
-    const btnClearAll = document.getElementById('wms-btn-clear-all');
-    if (btnClearAll) {
-      btnClearAll.addEventListener('click', () => {
-        if (!confirm('⚠️ تحذير حرج: هل أنت متأكد من تفريغ وتصفير كامل رصيد المواد الأولية بالمستودع؟\nلا يمكن التراجع عن هذا الإجراء!')) {
-          return;
-        }
-        
-        const pin = prompt('الرجاء إدخال رمز تأكيد الحذف (الـ PIN code لمدير النظام):');
-        if (pin !== '9999') {
-          alert('رمز التأكيد غير صحيح! تم إلغاء العملية.');
-          return;
-        }
-        
-        // Remove only raw materials
-        stockLots = stockLots.filter(lot => {
-          if (!lot) return false;
-          const isRaw = lot.Unit === 'kg' || lot.Unit === 'g' || lot.Unit === 'L' || lot.Unit === 'كغ' || lot.Unit === 'غ' || lot.Unit === 'جرام' || lot.Unit === 'لتر';
-          return !isRaw;
-        });
-
-        // Add WMS transaction log
-        wmsTransactions.unshift({
-          Tx_ID: 'tx-' + Date.now() + '-' + Math.random().toString(36).substr(2, 4),
-          Lot_ID: 'system',
-          Tx_Type: 'Clear_Inventory',
-          Quantity: 0,
-          Reference_ID: 'تصفير كامل مستودع المواد الأولية',
-          Performed_By: currentUserRole,
-          Timestamp: Date.now()
-        });
-
-        saveWMS(true);
-        renderWMSViews();
-        
-        if (window.showToast) {
-          window.showToast('تم تصفير مستودع المواد الأولية بالكامل 🗑️', 'success');
-        }
-      });
-    }
-
-    // Clear Finished Products Stock
-    const btnClearReady = document.getElementById('wms-btn-clear-ready');
-    if (btnClearReady) {
-      btnClearReady.addEventListener('click', () => {
-        if (!confirm('⚠️ تحذير حرج: هل أنت متأكد من تفريغ وتصفير كامل الرصيد الجاهز للمنتجات التامة؟\nلا يمكن التراجع عن هذا الإجراء!')) {
-          return;
-        }
-        
-        const pin = prompt('الرجاء إدخال رمز تأكيد الحذف (الـ PIN code لمدير النظام):');
-        if (pin !== '9999') {
-          alert('رمز التأكيد غير صحيح! تم إلغاء العملية.');
-          return;
-        }
-        
-        // Remove only ready finished products
-        stockLots = stockLots.filter(lot => {
-          if (!lot) return false;
-          const isRaw = lot.Unit === 'kg' || lot.Unit === 'g' || lot.Unit === 'L' || lot.Unit === 'كغ' || lot.Unit === 'غ' || lot.Unit === 'جرام' || lot.Unit === 'لتر';
-          return isRaw;
-        });
-
-        // Add WMS transaction log
-        wmsTransactions.unshift({
-          Tx_ID: 'tx-' + Date.now() + '-' + Math.random().toString(36).substr(2, 4),
-          Lot_ID: 'system',
-          Tx_Type: 'Clear_Inventory',
-          Quantity: 0,
-          Reference_ID: 'تصفير كامل رصيد المنتجات التامة (الرصيد الجاهز)',
-          Performed_By: currentUserRole,
-          Timestamp: Date.now()
-        });
-
-        saveWMS(true);
-        renderWMSViews();
-        
-        if (window.showToast) {
-          window.showToast('تم تصفير الرصيد الجاهز بالكامل 🗑️', 'success');
-        }
-      });
-    }
-
-    // Formulation dynamically adding rows
-    if (btnAddFormulationRow) {
-      btnAddFormulationRow.addEventListener('click', () => {
-        addWeighingFormulationRow('', 0);
-      });
-    }
-
-    // Download WMS template
-    const btnDownloadTemplate = document.getElementById('wms-btn-download-template');
-    if (btnDownloadTemplate) {
-      btnDownloadTemplate.addEventListener('click', () => {
-        const headers = ['رمز المادة', 'اسم المادة', 'الفئة (رقم التشغيلة)', 'الكمية', 'الوحدة', 'تاريخ انتهاء الصلاحية'];
-        const sampleRows = [
-          ['MC-021', 'Lactose Monohydrate', 'LOT-LAC-09', '1250', 'kg', '2029-08-30'],
-          ['MC-033', 'Microcrystalline Cellulose (MCC)', 'LOT-MCC-24', '800', 'kg', '2029-05-15'],
-          ['MC-104', 'Paracetamol Powder', 'LOT-PARA-88', '5000', 'kg', '2028-11-20']
-        ];
-        
-        let csvContent = '\uFEFF'; // UTF-8 BOM for proper Arabic encoding in Excel
-        csvContent += headers.join(',') + '\n';
-        sampleRows.forEach(r => {
-          csvContent += r.join(',') + '\n';
-        });
-        
-        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-        const link = document.createElement('a');
-        link.href = URL.createObjectURL(blob);
-        link.setAttribute('download', 'pharma_wms_opening_balance_template.csv');
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-      });
-    }
   }
 
   function renderWMSViews() {
@@ -4148,6 +4239,8 @@
     // Render corresponding sub-view data
     if (currentWMSTab === 'stock') {
       renderStockLots();
+    } else if (currentWMSTab === 'packaging') {
+      renderPackagingLots();
     } else if (currentWMSTab === 'ready') {
       renderReadyProducts();
     } else if (currentWMSTab === 'history') {
@@ -4202,11 +4295,17 @@
     const searchInput = document.getElementById('wms-stock-search');
     const query = searchInput ? searchInput.value.toLowerCase().trim() : '';
 
+    const isRawMaterial = lot => {
+      if (!lot || !lot.Unit) return false;
+      const u = lot.Unit.toLowerCase();
+      return u === 'kg' || u === 'g' || u === 'l' || u === 'كغ' || u === 'غ' || u === 'جرام' || u === 'لتر';
+    };
+
     const filtered = stockLots.filter(lot => {
       if (!lot) return false;
       
-      const isRawMaterial = lot.Unit === 'kg' || lot.Unit === 'g' || lot.Unit === 'L' || lot.Unit === 'كغ' || lot.Unit === 'غ' || lot.Unit === 'جرام' || lot.Unit === 'لتر';
-      if (!isRawMaterial) return false;
+      const type = lot.Material_Type || (isRawMaterial(lot) ? 'raw' : 'ready');
+      if (type !== 'raw') return false;
 
       return lot.Material_Code.toLowerCase().includes(query) ||
              lot.Material_Name.toLowerCase().includes(query) ||
@@ -4283,6 +4382,96 @@
     if (window.lucide) window.lucide.createIcons();
   }
 
+  function renderPackagingLots() {
+    const tbody = document.getElementById('wms-packaging-tbody');
+    if (!tbody) return;
+    tbody.innerHTML = '';
+
+    const searchInput = document.getElementById('wms-packaging-search');
+    const query = searchInput ? searchInput.value.toLowerCase().trim() : '';
+
+    const isRawMaterial = lot => {
+      if (!lot || !lot.Unit) return false;
+      const u = lot.Unit.toLowerCase();
+      return u === 'kg' || u === 'g' || u === 'l' || u === 'كغ' || u === 'غ' || u === 'جرام' || u === 'لتر';
+    };
+
+    const filtered = stockLots.filter(lot => {
+      if (!lot) return false;
+      
+      const type = lot.Material_Type || (isRawMaterial(lot) ? 'raw' : 'ready');
+      if (type !== 'packaging') return false;
+
+      return lot.Material_Code.toLowerCase().includes(query) ||
+             lot.Material_Name.toLowerCase().includes(query) ||
+             lot.Lot_Number.toLowerCase().includes(query);
+    });
+
+    if (filtered.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="8" style="text-align: center; color: var(--text-dim); padding: 20px;">لا توجد مواد تغليف تطابق البحث أو مستودع التغليف فارغ.</td></tr>`;
+      return;
+    }
+
+    filtered.forEach(lot => {
+      const tr = document.createElement('tr');
+      tr.style.borderBottom = '1px solid rgba(255, 255, 255, 0.05)';
+
+      const statusMap = {
+        Released: '<span class="wms-badge released"><i data-lucide="check-circle-2" style="width:12px;height:12px;"></i> مقبول ومفرج عنه</span>',
+        Quarantine: '<span class="wms-badge quarantine"><i data-lucide="shield-alert" style="width:12px;height:12px;"></i> محجور (تحت الفحص)</span>',
+        Rejected: '<span class="wms-badge rejected"><i data-lucide="x-circle" style="width:12px;height:12px;"></i> مرفوض معزول</span>'
+      };
+
+      // QC Actions HTML
+      let actionsHtml = '-';
+      if (currentUserRole === 'admin' || currentUserRole === 'qc' || currentUserRole === 'wms') {
+        const btnClass = 'btn btn-secondary btn-sm';
+        const style = 'padding: 2px 6px; font-size: 0.72rem; margin: 0 2px;';
+        let deleteBtnHtml = '';
+        if (currentUserRole === 'admin' || currentUserRole === 'wms') {
+          deleteBtnHtml = `
+            <button class="${btnClass}" style="${style} border-color: var(--rose); color: var(--rose);" onclick="deleteStockLot('${lot.Lot_ID}')" title="حذف اللوت نهائياً">
+              <i data-lucide="trash-2" style="width: 12px; height: 12px; display: inline-block; vertical-align: middle;"></i>
+            </button>
+          `;
+        }
+
+        if (lot.Status === 'Quarantine') {
+          actionsHtml = `
+            <button class="${btnClass}" style="${style} border-color: var(--emerald); color: var(--emerald);" onclick="changeLotStatus('${lot.Lot_ID}', 'Released')">إفراج ✅</button>
+            <button class="${btnClass}" style="${style} border-color: var(--rose); color: var(--rose);" onclick="changeLotStatus('${lot.Lot_ID}', 'Rejected')">رفض ❌</button>
+            ${deleteBtnHtml}
+          `;
+        } else if (lot.Status === 'Released') {
+          actionsHtml = `
+            <button class="${btnClass}" style="${style} border-color: var(--amber); color: var(--amber);" onclick="changeLotStatus('${lot.Lot_ID}', 'Quarantine')">حجر 🔒</button>
+            <button class="${btnClass}" style="${style} border-color: var(--rose); color: var(--rose);" onclick="changeLotStatus('${lot.Lot_ID}', 'Rejected')">رفض ❌</button>
+            ${deleteBtnHtml}
+          `;
+        } else if (lot.Status === 'Rejected') {
+          actionsHtml = `
+            <button class="${btnClass}" style="${style} border-color: var(--amber); color: var(--amber);" onclick="changeLotStatus('${lot.Lot_ID}', 'Quarantine')">حجر 🔒</button>
+            <button class="${btnClass}" style="${style} border-color: var(--emerald); color: var(--emerald);" onclick="changeLotStatus('${lot.Lot_ID}', 'Released')">إفراج ✅</button>
+            ${deleteBtnHtml}
+          `;
+        }
+      }
+
+      tr.innerHTML = `
+        <td style="padding: 12px; font-weight: bold; color: var(--cyan);">${lot.Material_Code}</td>
+        <td style="padding: 12px; color: #fff;">${lot.Material_Name}</td>
+        <td style="padding: 12px;"><strong style="color: var(--amber); font-family: monospace;">${lot.Lot_Number}</strong></td>
+        <td style="padding: 12px; font-weight: bold; color: var(--emerald);">${lot.Current_Qty} ${lot.Unit}</td>
+        <td style="padding: 12px; color: var(--rose);">${lot.Expiry_Date}</td>
+        <td style="padding: 12px;">${statusMap[lot.Status] || lot.Status}</td>
+        <td style="padding: 12px; text-align: center;">${actionsHtml}</td>
+      `;
+      tbody.appendChild(tr);
+    });
+
+    if (window.lucide) window.lucide.createIcons();
+  }
+
   function renderReadyProducts() {
     const tbody = document.getElementById('wms-ready-tbody');
     if (!tbody) return;
@@ -4291,11 +4480,17 @@
     const searchInput = document.getElementById('wms-ready-search');
     const query = searchInput ? searchInput.value.toLowerCase().trim() : '';
 
+    const isRawMaterial = lot => {
+      if (!lot || !lot.Unit) return false;
+      const u = lot.Unit.toLowerCase();
+      return u === 'kg' || u === 'g' || u === 'l' || u === 'كغ' || u === 'غ' || u === 'جرام' || u === 'لتر';
+    };
+
     const filtered = stockLots.filter(lot => {
       if (!lot) return false;
 
-      const isRawMaterial = lot.Unit === 'kg' || lot.Unit === 'g' || lot.Unit === 'L' || lot.Unit === 'كغ' || lot.Unit === 'غ' || lot.Unit === 'جرام' || lot.Unit === 'لتر';
-      if (isRawMaterial) return false;
+      const type = lot.Material_Type || (isRawMaterial(lot) ? 'raw' : 'ready');
+      if (type !== 'ready') return false;
 
       return lot.Material_Code.toLowerCase().includes(query) ||
              lot.Material_Name.toLowerCase().includes(query) ||
@@ -4400,6 +4595,46 @@
     }
   };
 
+  function removeLotFromBatches(lotId) {
+    let batchModified = false;
+    batches.forEach(b => {
+      if (b && Array.isArray(b.stages)) {
+        let singleBatchModified = false;
+        b.stages.forEach(stage => {
+          if (stage && Array.isArray(stage.formulation)) {
+            const originalLength = stage.formulation.length;
+            stage.formulation = stage.formulation.filter(row => {
+              const id = row.Lot_ID || row.lotId;
+              return String(id) !== String(lotId);
+            });
+            if (stage.formulation.length !== originalLength) {
+              singleBatchModified = true;
+              
+              // Recalculate total accepted weight for the weighing stage if it was modified
+              let newTotal = 0;
+              stage.formulation.forEach(row => {
+                const qtyVal = row.Quantity || row.qty || 0;
+                newTotal += parseFloat(qtyVal) || 0;
+              });
+              stage.acceptedKg = parseFloat(newTotal.toFixed(3));
+              stage.version = (stage.version || 0) + 1;
+            }
+          }
+        });
+        if (singleBatchModified) {
+          batchModified = true;
+          b.version = (b.version || 0) + 1;
+          b.updatedAt = Date.now();
+        }
+      }
+    });
+
+    if (batchModified) {
+      localStorage.setItem(MASTER_STORAGE_KEY, JSON.stringify(batches));
+      if (typeof renderApp === 'function') renderApp();
+    }
+  }
+
   window.deleteStockLot = function(lotId) {
     const lot = stockLots.find(l => l && String(l.Lot_ID) === String(lotId));
     if (!lot) return;
@@ -4413,11 +4648,14 @@
     // Remove related transactions
     wmsTransactions = wmsTransactions.filter(tx => tx && String(tx.Lot_ID) !== String(lotId));
 
+    // Remove from all batches' formulation lists!
+    removeLotFromBatches(lotId);
+
     saveWMS(true);
     renderWMSViews();
 
     if (window.showToast) {
-      window.showToast('تم حذف اللوت والعمليات المرتبطة به نهائياً 🗑️', 'success');
+      window.showToast('تم حذف اللوت وتطهير سجلات أوزان التشغيلات بنجاح 🗑️', 'success');
     }
   };
 
@@ -4426,12 +4664,41 @@
     if (!tbody) return;
     tbody.innerHTML = '';
 
-    if (wmsTransactions.length === 0) {
-      tbody.innerHTML = `<tr><td colspan="9" style="text-align: center; color: var(--text-dim); padding: 20px;">سجل الحركات فارغ حالياً.</td></tr>`;
+    const isRawMaterial = lot => {
+      if (!lot || !lot.Unit) return false;
+      const u = lot.Unit.toLowerCase();
+      return u === 'kg' || u === 'g' || u === 'l' || u === 'كغ' || u === 'غ' || u === 'جرام' || u === 'لتر';
+    };
+
+    const filteredTx = wmsTransactions.filter(tx => {
+      if (!tx) return false;
+      if (currentHistoryFilter === 'all') return true;
+
+      // Find lot to check category
+      const lot = stockLots.find(l => l && String(l.Lot_ID) === String(tx.Lot_ID));
+      let type = tx.Material_Type;
+      if (!type) {
+        if (lot) {
+          type = lot.Material_Type || (isRawMaterial(lot) ? 'raw' : 'ready');
+        } else {
+          // Fallback if deleted
+          if (tx.Tx_Type === 'Sales_Dispatch' || tx.Tx_Type === 'FG_Receipt') {
+            type = 'ready';
+          } else {
+            type = 'raw';
+          }
+        }
+      }
+
+      return type === currentHistoryFilter;
+    });
+
+    if (filteredTx.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="9" style="text-align: center; color: var(--text-dim); padding: 20px;">لا توجد حركات تطابق الفلتر المحدد حالياً.</td></tr>`;
       return;
     }
 
-    wmsTransactions.forEach(tx => {
+    filteredTx.forEach(tx => {
       const lot = stockLots.find(l => l && String(l.Lot_ID) === String(tx.Lot_ID));
       const materialName = lot ? lot.Material_Name : 'مادة محذوفة';
       const lotNumber = lot ? lot.Lot_Number : '-';
@@ -4446,7 +4713,8 @@
         Dispense_Production: '<span style="color: var(--primary); font-weight: bold;">صرف لأوامر الإنتاج ⚙️</span>',
         FG_Receipt: '<span style="color: var(--emerald); font-weight: bold;">وارد منتج تام 📦</span>',
         Sales_Dispatch: '<span style="color: var(--rose); font-weight: bold;">شحن مبيعات وعملاء 🚚</span>',
-        QC_Status_Change: '<span style="color: #c084fc; font-weight: bold;">قرار جودة جودي 🧪</span>'
+        QC_Status_Change: '<span style="color: #c084fc; font-weight: bold;">قرار جودة جودي 🧪</span>',
+        Clear_Inventory: '<span style="color: var(--rose); font-weight: bold;">تصفير مستودع 🗑️</span>'
       };
 
       const dateStr = new Date(tx.Timestamp).toLocaleString('en-US');
@@ -4456,7 +4724,7 @@
         <td style="padding: 10px;">${typeMap[tx.Tx_Type] || tx.Tx_Type}</td>
         <td style="padding: 10px; font-weight: bold; color: #fff;">${materialName}</td>
         <td style="padding: 10px;"><strong style="color: var(--amber); font-family: monospace;">${lotNumber}</strong></td>
-        <td style="padding: 10px; font-weight: bold; color: ${tx.Quantity < 0 ? 'var(--rose)' : 'var(--emerald)'};">${tx.Quantity > 0 ? '+' : ''}${tx.Quantity}</td>
+        <td style="padding: 10px; font-weight: bold; color: ${tx.Quantity < 0 ? 'var(--rose)' : (tx.Quantity === 0 ? 'var(--text-dim)' : 'var(--emerald)')};">${tx.Quantity > 0 ? '+' : ''}${tx.Quantity}</td>
         <td style="padding: 10px; color: var(--text-dim);">${unit}</td>
         <td style="padding: 10px; font-size: 0.8rem;">${tx.Reference_ID || '-'}</td>
         <td style="padding: 10px; color: var(--text-dim);">${tx.Performed_By}</td>
@@ -4624,14 +4892,13 @@
         if (!l) return false;
         if (l.Storage_Location !== 'مستورد افتتاحي') return true;
         
-        const isRaw = l.Unit === 'kg' || l.Unit === 'g' || l.Unit === 'L' || l.Unit === 'كغ' || l.Unit === 'غ' || l.Unit === 'جرام' || l.Unit === 'لتر';
-        if (targetType === 'raw') {
-          // Keep ready products, delete raw initial ones
-          return !isRaw;
-        } else {
-          // Keep raw materials, delete ready initial ones
-          return isRaw;
-        }
+        const isRawMaterial = lot => {
+          if (!lot || !lot.Unit) return false;
+          const u = lot.Unit.toLowerCase();
+          return u === 'kg' || u === 'g' || u === 'l' || u === 'كغ' || u === 'غ' || u === 'جرام' || u === 'لتر';
+        };
+        const type = l.Material_Type || (isRawMaterial(l) ? 'raw' : 'ready');
+        return type !== targetType;
       });
     }
 
@@ -4640,9 +4907,17 @@
       
       // Enforce units based on target type if missing or incorrect
       let finalUnit = row.Unit || 'kg';
+      const isRawMaterial = lot => {
+        if (!lot || !lot.Unit) return false;
+        const u = lot.Unit.toLowerCase();
+        return u === 'kg' || u === 'g' || u === 'l' || u === 'كغ' || u === 'غ' || u === 'جرام' || u === 'لتر';
+      };
+      
       if (targetType === 'raw') {
         const isRaw = finalUnit === 'kg' || finalUnit === 'g' || finalUnit === 'L' || finalUnit === 'كغ' || finalUnit === 'غ' || finalUnit === 'جرام' || finalUnit === 'لتر';
         if (!isRaw) finalUnit = 'kg';
+      } else if (targetType === 'packaging') {
+        if (!row.Unit) finalUnit = 'units';
       } else {
         const isRaw = finalUnit === 'kg' || finalUnit === 'g' || finalUnit === 'L' || finalUnit === 'كغ' || finalUnit === 'غ' || finalUnit === 'جرام' || finalUnit === 'لتر';
         if (isRaw) finalUnit = 'blisters'; // default for ready products
@@ -4658,6 +4933,7 @@
         Status: 'Released',
         Expiry_Date: row.Expiry_Date,
         Storage_Location: 'مستورد افتتاحي',
+        Material_Type: targetType, // Explicit type!
         updatedAt: Date.now()
       };
       stockLots.push(newLot);
@@ -4667,7 +4943,8 @@
         Lot_ID: lotId,
         Tx_Type: 'Initial_Balance',
         Quantity: row.Quantity,
-        Reference_ID: `استيراد رصيد افتتاحي من أكسل (${targetType === 'raw' ? 'مواد أولية' : 'رصيد جاهز'})`,
+        Material_Type: targetType, // Explicit type!
+        Reference_ID: `استيراد رصيد افتتاحي من أكسل (${targetType === 'raw' ? 'مواد أولية' : targetType === 'packaging' ? 'مواد تغليف' : 'رصيد جاهز'})`,
         Performed_By: currentUserRole,
         Timestamp: Date.now()
       });
@@ -4683,11 +4960,11 @@
     const modalExcelImport = document.getElementById('modal-wms-excel-import');
     if (modalExcelImport) modalExcelImport.classList.add('hidden');
 
-    currentWMSTab = targetType === 'raw' ? 'stock' : 'ready';
+    currentWMSTab = targetType === 'raw' ? 'stock' : (targetType === 'packaging' ? 'packaging' : 'ready');
     renderWMSViews();
 
     if (window.showToast) {
-      window.showToast(`تم استيراد الأرصدة الافتتاحية لـ ${targetType === 'raw' ? 'المواد الخام' : 'الرصيد الجاهز'} بنجاح 📥`, 'success');
+      window.showToast(`تم استيراد الأرصدة الافتتاحية لـ ${targetType === 'raw' ? 'المواد الخام' : targetType === 'packaging' ? 'مواد التغليف' : 'الرصيد الجاهز'} بنجاح 📥`, 'success');
     }
   }
 
@@ -4705,7 +4982,8 @@
     
     const filtered = stockLots.filter(lot => {
       if (!lot) return false;
-      return type === 'raw' ? isRawMaterial(lot) : !isRawMaterial(lot);
+      const t = lot.Material_Type || (isRawMaterial(lot) ? 'raw' : 'ready');
+      return t === type;
     });
 
     if (filtered.length === 0) {
@@ -4725,9 +5003,11 @@
 
     const worksheet = XLSX.utils.json_to_sheet(rows);
     const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, type === 'raw' ? 'رصيد المواد الأولية' : 'الرصيد الجاهز');
+    const sheetName = type === 'raw' ? 'رصيد المواد الأولية' : (type === 'packaging' ? 'رصيد مواد التغليف' : 'الرصيد الجاهز');
+    XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
     
-    XLSX.writeFile(workbook, type === 'raw' ? 'raw_materials_stock.xlsx' : 'ready_products_stock.xlsx');
+    const filename = type === 'raw' ? 'raw_materials_stock.xlsx' : (type === 'packaging' ? 'packaging_materials_stock.xlsx' : 'ready_products_stock.xlsx');
+    XLSX.writeFile(workbook, filename);
     
     if (window.showToast) {
       window.showToast('تم تصدير ملف الأكسل بنجاح 📤', 'success');
@@ -4736,6 +5016,7 @@
 
   function handleInboundSubmit(e) {
     e.preventDefault();
+    const type = document.getElementById('wms-in-type').value;
     const code = document.getElementById('wms-in-code').value.trim();
     const name = document.getElementById('wms-in-name').value.trim();
     const lotNum = document.getElementById('wms-in-lot').value.trim();
@@ -4755,6 +5036,7 @@
       Status: 'Quarantine',
       Expiry_Date: expiry,
       Storage_Location: location,
+      Material_Type: type, // Explicit type!
       updatedAt: Date.now()
     };
 
@@ -4765,7 +5047,8 @@
       Lot_ID: lotId,
       Tx_Type: 'Inbound_Purchase',
       Quantity: qty,
-      Reference_ID: 'استلام مادة أولية جديدة للمستودع',
+      Material_Type: type, // Explicit type!
+      Reference_ID: type === 'packaging' ? 'استلام مادة تعبئة وتغليف جديدة' : 'استلام مادة أولية جديدة للمستودع',
       Performed_By: currentUserRole,
       Timestamp: Date.now()
     });
@@ -4773,7 +5056,7 @@
     saveWMS(true);
     
     document.getElementById('wms-form-inbound').reset();
-    currentWMSTab = 'stock';
+    currentWMSTab = type === 'raw' ? 'stock' : (type === 'packaging' ? 'packaging' : 'ready');
     renderWMSViews();
 
     if (window.showToast) {
