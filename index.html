@@ -134,7 +134,7 @@
 
         <button id="btn-new-batch" class="btn btn-primary">
           <i data-lucide="plus-circle"></i>
-          <span>إضافة تشغيلة جديدة (Batch)</span>
+          <span>إصدار إضبارة جديدة 📄</span>
         </button>
       </div>
     </header>
@@ -151,6 +151,14 @@
         <button id="view-tab-warehouse" class="btn btn-secondary" style="border-radius: 6px; padding: 10px 16px; font-weight: bold; display: flex; align-items: center; gap: 8px; cursor: pointer; background: transparent; border-color: rgba(255,255,255,0.15); color: var(--text-dim);">
           <i data-lucide="package" style="width: 18px; height: 18px;"></i>
           <span>إدارة المستودعات والمخزون 📦</span>
+        </button>
+        <button id="view-tab-qc" class="btn btn-secondary" style="border-radius: 6px; padding: 10px 16px; font-weight: bold; display: flex; align-items: center; gap: 8px; cursor: pointer; background: transparent; border-color: rgba(255,255,255,0.15); color: var(--text-dim);">
+          <i data-lucide="shield-check" style="width: 18px; height: 18px;"></i>
+          <span>قسم الرقابة النوعية QC 🧪</span>
+        </button>
+        <button id="view-tab-activity" class="btn btn-secondary" style="border-radius: 6px; padding: 10px 16px; font-weight: bold; display: flex; align-items: center; gap: 8px; cursor: pointer; background: transparent; border-color: rgba(255,255,255,0.15); color: var(--text-dim);">
+          <i data-lucide="history" style="width: 18px; height: 18px;"></i>
+          <span>سجل حركة المستخدمين 📜</span>
         </button>
       </div>
       
@@ -225,26 +233,14 @@
       <div id="view-warehouse-container" class="hidden" style="direction: rtl;">
         
         <!-- WMS Stats -->
-        <section class="stats-grid" style="margin-bottom: 20px;">
-          <div class="stat-card">
-            <div class="stat-icon icon-emerald">
-              <i data-lucide="package-check"></i>
-            </div>
-            <div class="stat-info">
-              <span class="stat-label">المخزون المفرج عنه (Released)</span>
-              <h2><span id="wms-stat-released-count">0</span> <small>لوت</small></h2>
-              <span class="stat-desc" id="wms-stat-released-weight">0.00 kg</span>
-            </div>
-          </div>
-
+        <section class="stats-grid" style="margin-bottom: 20px; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));">
           <div class="stat-card">
             <div class="stat-icon icon-amber">
               <i data-lucide="shield-alert"></i>
             </div>
             <div class="stat-info">
               <span class="stat-label">المخزون المحجور (Quarantine)</span>
-              <h2><span id="wms-stat-quarantine-count">0</span> <small>لوت</small></h2>
-              <span class="stat-desc" id="wms-stat-quarantine-weight">0.00 kg</span>
+              <h2><span id="wms-stat-quarantine-count">0</span></h2>
             </div>
           </div>
 
@@ -258,17 +254,6 @@
               <span class="stat-desc" id="wms-stat-rejected-weight">0.00 kg</span>
             </div>
           </div>
-
-          <div class="stat-card">
-            <div class="stat-icon icon-cyan">
-              <i data-lucide="clipboard-list"></i>
-            </div>
-            <div class="stat-info">
-              <span class="stat-label">إجمالي العمليات الموثقة</span>
-              <h2><span id="wms-stat-tx-count">0</span></h2>
-              <span class="stat-desc">سجل حركات مستودعية</span>
-            </div>
-          </div>
         </section>
 
         <!-- WMS Main Sub-Tab Navigation -->
@@ -280,6 +265,7 @@
             <button class="filter-tab" data-wms-tab="inbound">استلام وارد جديد ➕</button>
             <button class="filter-tab" data-wms-tab="sales">شحن ومبيعات 🚚</button>
             <button class="filter-tab" data-wms-tab="history">سجل حركات المستودعات 📜</button>
+            <button class="filter-tab" data-wms-tab="trace">تتبع المواد 🔍</button>
           </div>
         </section>
 
@@ -448,9 +434,53 @@
                   <option value="box">كرتونة / علبة</option>
                 </select>
               </div>
-              <div class="form-group">
-                <label>تاريخ انتهاء صلاحية المادة *</label>
-                <input type="date" id="wms-in-expiry" required style="width: 100%; box-sizing: border-box; padding: 8px; border-radius: 4px; background: #1e293b; border: 1px solid rgba(255,255,255,0.15); color: #fff;">
+              <div class="form-group" style="grid-column: span 2; display: grid; grid-template-columns: 2fr 1fr 1.5fr; gap: 10px; align-items: end;">
+                <div class="form-group" style="margin-bottom: 0;">
+                  <label>تاريخ انتهاء صلاحية المادة *</label>
+                  <input type="date" id="wms-in-expiry" required style="width: 100%; box-sizing: border-box; padding: 8px; border-radius: 4px; background: #1e293b; border: 1px solid rgba(255,255,255,0.15); color: #fff; height: 38px;">
+                </div>
+                <div class="form-group" style="margin-bottom: 0;">
+                  <label>حساب بالصلاحية (شهر)</label>
+                  <input type="number" id="wms-in-expiry-months" placeholder="مثال: 24" style="width: 100%; box-sizing: border-box; padding: 8px; border-radius: 4px; background: #1e293b; border: 1px solid rgba(255,255,255,0.15); color: #fff; height: 38px;">
+                </div>
+                <div class="form-group" style="margin-bottom: 0;">
+                  <label>أو حدد (سنة / شهر)</label>
+                  <div style="display: flex; gap: 4px;">
+                    <select id="wms-in-expiry-mm" style="width: 45%; padding: 4px; border-radius: 4px; background: #1e293b; border: 1px solid rgba(255,255,255,0.15); color: #fff; height: 38px;">
+                      <option value="">شهر</option>
+                      <option value="01">01</option>
+                      <option value="02">02</option>
+                      <option value="03">03</option>
+                      <option value="04">04</option>
+                      <option value="05">05</option>
+                      <option value="06">06</option>
+                      <option value="07">07</option>
+                      <option value="08">08</option>
+                      <option value="09">09</option>
+                      <option value="10">10</option>
+                      <option value="11">11</option>
+                      <option value="12">12</option>
+                    </select>
+                    <select id="wms-in-expiry-yyyy" style="width: 55%; padding: 4px; border-radius: 4px; background: #1e293b; border: 1px solid rgba(255,255,255,0.15); color: #fff; height: 38px;">
+                      <option value="">سنة</option>
+                      <option value="2026">2026</option>
+                      <option value="2027">2027</option>
+                      <option value="2028">2028</option>
+                      <option value="2029">2029</option>
+                      <option value="2030">2030</option>
+                      <option value="2031">2031</option>
+                      <option value="2032">2032</option>
+                      <option value="2033">2033</option>
+                      <option value="2034">2034</option>
+                      <option value="2035">2035</option>
+                      <option value="2036">2036</option>
+                      <option value="2037">2037</option>
+                      <option value="2038">2038</option>
+                      <option value="2039">2039</option>
+                      <option value="2040">2040</option>
+                    </select>
+                  </div>
+                </div>
               </div>
               <div class="form-group">
                 <label>موقع التخزين المقترح</label>
@@ -568,6 +598,162 @@
           </div>
         </div>
 
+        <!-- Sub-View 7: Material Traceability (تتبع المواد) -->
+        <div id="wms-view-trace" class="wms-sub-view hidden">
+          <div class="section-header" style="margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center;">
+            <div>
+              <h3>تتبع المواد واستخداماتها في المنتجات النهائية 🔍</h3>
+              <p style="font-size: 0.8rem; color: var(--text-dim); margin-top: 4px;">ابحث باسم المادة الخام/التعبئة أو رقم اللوت (الباتش) لمعرفة المنتجات والإضبارات التي استخدمت فيها.</p>
+            </div>
+            <div class="search-box" style="max-width: 300px; margin: 0;">
+              <i data-lucide="search" class="search-icon"></i>
+              <input type="text" id="wms-trace-search" placeholder="ابحث باسم المادة، الكود، أو رقم اللوت...">
+            </div>
+          </div>
+          <div class="table-container" style="overflow-x: auto; background: var(--bg-card); border-radius: 8px; border: 1px solid rgba(255,255,255,0.08);">
+            <table class="pharma-table" style="width: 100%; border-collapse: collapse; text-align: right;">
+              <thead>
+                <tr style="background: rgba(255,255,255,0.02); border-bottom: 1px solid rgba(255,255,255,0.08);">
+                  <th style="padding: 12px; text-align: right;">كود المادة</th>
+                  <th style="padding: 12px; text-align: right;">اسم المادة المستعملة</th>
+                  <th style="padding: 12px; text-align: right;">رقم اللوت (الباتش) للمادة</th>
+                  <th style="padding: 12px; text-align: right;">المنتج النهائي</th>
+                  <th style="padding: 12px; text-align: right;">رقم إضبارة المنتج</th>
+                  <th style="padding: 12px; text-align: right;">مرحلة الإنتاج</th>
+                  <th style="padding: 12px; text-align: right;">الكمية المستهلكة</th>
+                </tr>
+              </thead>
+              <tbody id="wms-trace-tbody">
+                <!-- Injected dynamically -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- VIEW 3: Quality Control (QC) Container -->
+      <div id="view-qc-container" class="hidden" style="direction: rtl;">
+        <section class="controls-bar" style="margin-bottom: 20px;">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <div>
+              <h2 style="margin: 0; font-size: 1.5rem; color: #fff;">إدارة الرقابة النوعية وضمان الجودة (QC / QA) 🧪</h2>
+              <p style="margin: 4px 0 0 0; font-size: 0.85rem; color: var(--text-dim);">شاشة تحكم مخبر الرقابة النوعية للتحليل والإفراج عن لوتات المواد والمنتجات</p>
+            </div>
+            <div style="display: flex; gap: 8px;">
+              <!-- Quick Stats -->
+              <span class="wms-badge quarantine" style="padding: 6px 12px; font-size: 0.85rem;" id="qc-stat-pending">المعلقة: 0 لوت</span>
+              <span class="wms-badge released" style="padding: 6px 12px; font-size: 0.85rem;" id="qc-stat-passed">المقبولة: 0 لوت</span>
+              <span class="wms-badge rejected" style="padding: 6px 12px; font-size: 0.85rem;" id="qc-stat-failed">المرفوضة: 0 لوت</span>
+            </div>
+          </div>
+        </section>
+
+        <!-- QC Tab Navigation -->
+        <section class="controls-bar" style="margin-bottom: 20px;">
+          <div class="filter-tabs" id="qc-sub-tabs" style="display: flex; gap: 8px;">
+            <button class="filter-tab active" data-qc-tab="quarantine">بانتظار التحليل والقرار 🔒</button>
+            <button class="filter-tab" data-qc-tab="released">المواد والمنتجات المقبولة ✅</button>
+            <button class="filter-tab" data-qc-tab="rejected">المواد والمنتجات المرفوضة ❌</button>
+          </div>
+        </section>
+
+        <!-- QC Sub-view: Quarantine -->
+        <div id="qc-view-quarantine" class="qc-sub-view">
+          <div class="table-container" style="overflow-x: auto; background: var(--bg-card); border-radius: 8px; border: 1px solid rgba(255,255,255,0.08);">
+            <table class="pharma-table" style="width: 100%; border-collapse: collapse; text-align: right;">
+              <thead>
+                <tr style="background: rgba(255,255,255,0.02); border-bottom: 1px solid rgba(255,255,255,0.08);">
+                  <th style="padding: 12px; text-align: right;">كود المادة</th>
+                  <th style="padding: 12px; text-align: right;">اسم المادة / المنتج</th>
+                  <th style="padding: 12px; text-align: right;">رقم اللوت</th>
+                  <th style="padding: 12px; text-align: right;">النوع</th>
+                  <th style="padding: 12px; text-align: right;">الكمية المتوفرة</th>
+                  <th style="padding: 12px; text-align: right;">تاريخ الصلاحية</th>
+                  <th style="padding: 12px; text-align: center; width: 280px;">القرار الجودي السريع (QC Decision)</th>
+                </tr>
+              </thead>
+              <tbody id="qc-pending-tbody">
+                <!-- Injected dynamically -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- QC Sub-view: Released -->
+        <div id="qc-view-released" class="qc-sub-view hidden">
+          <div class="table-container" style="overflow-x: auto; background: var(--bg-card); border-radius: 8px; border: 1px solid rgba(255,255,255,0.08);">
+            <table class="pharma-table" style="width: 100%; border-collapse: collapse; text-align: right;">
+              <thead>
+                <tr style="background: rgba(255,255,255,0.02); border-bottom: 1px solid rgba(255,255,255,0.08);">
+                  <th style="padding: 12px; text-align: right;">كود المادة</th>
+                  <th style="padding: 12px; text-align: right;">اسم المادة / المنتج</th>
+                  <th style="padding: 12px; text-align: right;">رقم اللوت</th>
+                  <th style="padding: 12px; text-align: right;">النوع</th>
+                  <th style="padding: 12px; text-align: right;">الكمية المتوفرة</th>
+                  <th style="padding: 12px; text-align: right;">تاريخ الصلاحية</th>
+                  <th style="padding: 12px; text-align: center; width: 280px;">القرار الجودي السريع (QC Decision)</th>
+                </tr>
+              </thead>
+              <tbody id="qc-released-tbody">
+                <!-- Injected dynamically -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- QC Sub-view: Rejected -->
+        <div id="qc-view-rejected" class="qc-sub-view hidden">
+          <div class="table-container" style="overflow-x: auto; background: var(--bg-card); border-radius: 8px; border: 1px solid rgba(255,255,255,0.08);">
+            <table class="pharma-table" style="width: 100%; border-collapse: collapse; text-align: right;">
+              <thead>
+                <tr style="background: rgba(255,255,255,0.02); border-bottom: 1px solid rgba(255,255,255,0.08);">
+                  <th style="padding: 12px; text-align: right;">كود المادة</th>
+                  <th style="padding: 12px; text-align: right;">اسم المادة / المنتج</th>
+                  <th style="padding: 12px; text-align: right;">رقم اللوت</th>
+                  <th style="padding: 12px; text-align: right;">النوع</th>
+                  <th style="padding: 12px; text-align: right;">الكمية المتوفرة</th>
+                  <th style="padding: 12px; text-align: right;">تاريخ الصلاحية</th>
+                  <th style="padding: 12px; text-align: center; width: 280px;">القرار الجودي السريع (QC Decision)</th>
+                </tr>
+              </thead>
+              <tbody id="qc-rejected-tbody">
+                <!-- Injected dynamically -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- VIEW 4: User Activity Log (Audit Trail) Container -->
+      <div id="view-activity-container" class="hidden" style="direction: rtl;">
+        <section class="controls-bar" style="margin-bottom: 20px;">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <div>
+              <h2 style="margin: 0; font-size: 1.5rem; color: #fff;">سجل حركات النظام والمستخدمين (Audit Trail Log) 📜</h2>
+              <p style="margin: 4px 0 0 0; font-size: 0.85rem; color: var(--text-dim);">توثيق دائم ومحمي للعمليات والتعديلات لمطابقة معايير التصنيع الدوائي الجيد (GMP/21 CFR Part 11)</p>
+            </div>
+            <button class="btn btn-secondary btn-sm" id="btn-export-activity-excel" style="border-color: var(--emerald); color: var(--emerald); display: inline-flex; align-items: center; gap: 4px;">
+              <i data-lucide="download" style="width: 14px; height: 14px;"></i> تصدير سجل الحركة إلى Excel 📤
+            </button>
+          </div>
+        </section>
+
+        <div class="table-container" style="overflow-x: auto; background: var(--bg-card); border-radius: 8px; border: 1px solid rgba(255,255,255,0.08);">
+          <table class="pharma-table" style="width: 100%; border-collapse: collapse; text-align: right;">
+            <thead>
+              <tr style="background: rgba(255,255,255,0.02); border-bottom: 1px solid rgba(255,255,255,0.08);">
+                <th style="padding: 12px; text-align: right; width: 180px;">الوقت والتاريخ</th>
+                <th style="padding: 12px; text-align: right; width: 150px;">المستخدم / الصفة</th>
+                <th style="padding: 12px; text-align: right; width: 180px;">نوع الحركة</th>
+                <th style="padding: 12px; text-align: right;">تفاصيل التعديل / الإجراء</th>
+              </tr>
+            </thead>
+            <tbody id="user-activity-tbody">
+              <!-- Injected dynamically -->
+            </tbody>
+          </table>
+        </div>
       </div>
 
     </main>
@@ -579,7 +765,7 @@
           <div class="modal-title">
             <i data-lucide="folder-plus"></i>
             <div>
-              <h3>إدخال تشغيلة جديدة (New Batch)</h3>
+              <h3>إدخال إضبارة جديدة (New Batch Record)</h3>
               <p>مدخلات مدير الإنتاج والمستودعات للتتبع الميداني</p>
             </div>
           </div>
@@ -650,6 +836,11 @@
             <div class="form-group">
               <label for="input-units-per-blister" id="label-units-per-blister">عدد الوحدات بالظرف (البليستر) *</label>
               <input type="number" id="input-units-per-blister" placeholder="مثال: 10" required>
+            </div>
+
+            <div class="form-group">
+              <label for="input-secondary-pack-qty" id="label-secondary-pack-qty">التغليف الثانوي (عدد الظروف/البلسترات في الكرتونة) *</label>
+              <input type="number" id="input-secondary-pack-qty" placeholder="مثال: 20" required>
             </div>
 
             <div class="form-group">

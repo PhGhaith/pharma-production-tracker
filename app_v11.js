@@ -111,8 +111,12 @@
   // Navigation Tabs
   const viewTabProduction = document.getElementById('view-tab-production');
   const viewTabWarehouse = document.getElementById('view-tab-warehouse');
+  const viewTabQC = document.getElementById('view-tab-qc');
+  const viewTabActivity = document.getElementById('view-tab-activity');
   const viewProductionContainer = document.getElementById('view-production-container');
   const viewWarehouseContainer = document.getElementById('view-warehouse-container');
+  const viewQCContainer = document.getElementById('view-qc-container');
+  const viewActivityContainer = document.getElementById('view-activity-container');
 
   // Views
   const elBatchesGrid = document.getElementById('batches-grid');
@@ -142,6 +146,7 @@
   const groupPostCoatingWeight = document.getElementById('group-post-coating-weight');
   const labelPreCoatingWeight = document.getElementById('label-pre-coating-weight');
   const inputUnitsPerBlister = document.getElementById('input-units-per-blister');
+  const inputSecondaryPackQty = document.getElementById('input-secondary-pack-qty');
   const inputStartDate = document.getElementById('input-start-date');
   const inputExpDate = document.getElementById('input-exp-date');
 
@@ -301,7 +306,10 @@
     await checkAuthentication();
     loadBatchesLocal();
     loadWMSLocal();
+    userActivityLogs = JSON.parse(localStorage.getItem('pharma_user_activity_logs')) || [];
     setupEventListeners();
+    setupQCEventListeners();
+    setupTraceEventListeners();
     renderApp();
 
     // Start Throttled Sync Engine (Sync every 8 seconds to prevent rate limits)
@@ -374,6 +382,7 @@
         if (Array.isArray(parsed) && parsed.length > 0) {
           batches = parsed;
           sanitizeBatchesCoatingName(batches);
+          migrateBatchesVisualInspection();
           return;
         }
       } catch (e) {}
@@ -402,12 +411,39 @@
     if (recoveredMap.size > 0) {
       batches = Array.from(recoveredMap.values());
       sanitizeBatchesCoatingName(batches);
+      migrateBatchesVisualInspection();
       localStorage.setItem(MASTER_STORAGE_KEY, JSON.stringify(batches));
       return;
     }
 
     batches = [...window.DEFAULT_BATCHES];
     sanitizeBatchesCoatingName(batches);
+    migrateBatchesVisualInspection();
+  }
+
+  function migrateBatchesVisualInspection() {
+    let modified = false;
+    batches.forEach(batch => {
+      if (!batch || !Array.isArray(batch.stages)) return;
+      const hasVisual = batch.stages.some(s => s && s.id === 'visual_inspection');
+      if (!hasVisual) {
+        batch.stages.push({
+          id: 'visual_inspection',
+          name: 'الفحص العيني',
+          status: 'pending',
+          doneKg: 0,
+          acceptedKg: 0,
+          rejectedKg: 0,
+          acceptedBlisters: 0,
+          rejectedBlisters: 0,
+          yieldPercent: 0
+        });
+        modified = true;
+      }
+    });
+    if (modified) {
+      localStorage.setItem(MASTER_STORAGE_KEY, JSON.stringify(batches));
+    }
   }
 
   function saveBatches(triggerCloudUpload = true) {
@@ -590,6 +626,36 @@
     return Array.from(map.values());
   }
 
+  function mergeActivityLogs(localLogs, cloudLogs) {
+    if (!Array.isArray(localLogs)) localLogs = [];
+    if (!Array.isArray(cloudLogs)) cloudLogs = [];
+    const seen = new Set();
+    const merged = [];
+
+    const addLog = log => {
+      if (!log) return;
+      const key = `${log.timestamp}-${log.actionType}-${log.details}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        merged.push(log);
+      }
+    };
+
+    localLogs.forEach(addLog);
+    cloudLogs.forEach(addLog);
+
+    merged.sort((a, b) => {
+      const da = new Date(a.timestamp);
+      const db = new Date(b.timestamp);
+      if (!isNaN(da) && !isNaN(db)) {
+        return db - da;
+      }
+      return 0;
+    });
+
+    return merged.slice(0, 1000);
+  }
+
   /**
    * Realtime Synchronization Engine with API Cache-Busting
    */
@@ -615,6 +681,7 @@
           let cloudLots = [];
           let cloudTx = [];
           let cloudNotifications = [];
+          let cloudActivityLogs = [];
 
           if (Array.isArray(cloudData)) {
             cloudBatches = cloudData;
@@ -623,6 +690,7 @@
             cloudLots = cloudData.stock_lots || [];
             cloudTx = cloudData.transactions || [];
             cloudNotifications = cloudData.notifications || [];
+            cloudActivityLogs = cloudData.activity_logs || [];
           }
 
           if (Array.isArray(cloudBatches)) {
@@ -632,9 +700,10 @@
             const mergedLots = mergeStockLots(stockLots, cloudLots);
             const mergedTx = mergeTransactions(wmsTransactions, cloudTx);
             const mergedNotifications = mergeNotifications(notificationsHistory, cloudNotifications);
+            const mergedLogs = mergeActivityLogs(userActivityLogs, cloudActivityLogs);
 
-            const currentLocalHash = JSON.stringify({ batches, stockLots, wmsTransactions, notifications: notificationsHistory });
-            const mergedHash = JSON.stringify({ batches: mergedList, stock_lots: mergedLots, transactions: mergedTx, notifications: mergedNotifications });
+            const currentLocalHash = JSON.stringify({ batches, stockLots, wmsTransactions, notifications: notificationsHistory, activity_logs: userActivityLogs });
+            const mergedHash = JSON.stringify({ batches: mergedList, stock_lots: mergedLots, transactions: mergedTx, notifications: mergedNotifications, activity_logs: mergedLogs });
 
             if (currentLocalHash !== mergedHash) {
               // Find what changed to show notification toast messages
@@ -695,11 +764,13 @@
               stockLots = mergedLots;
               wmsTransactions = mergedTx;
               notificationsHistory = mergedNotifications;
+              userActivityLogs = mergedLogs;
 
               localStorage.setItem(MASTER_STORAGE_KEY, JSON.stringify(batches));
               localStorage.setItem(WMS_STOCK_LOTS_KEY, JSON.stringify(stockLots));
               localStorage.setItem(WMS_TRANSACTIONS_KEY, JSON.stringify(wmsTransactions));
               localStorage.setItem('notifications_history', JSON.stringify(notificationsHistory));
+              localStorage.setItem('pharma_user_activity_logs', JSON.stringify(userActivityLogs));
               updateNotificationsBadge();
 
               if (playNewNotifSound) {
@@ -784,8 +855,8 @@
     }
 
     isSavingToCloud = true;
-    const payload = { batches: batches, stock_lots: stockLots, transactions: wmsTransactions, notifications: notificationsHistory };
-    lastSyncHash = JSON.stringify({ batches: batches, stock_lots: stockLots, transactions: wmsTransactions, notifications: notificationsHistory });
+    const payload = { batches: batches, stock_lots: stockLots, transactions: wmsTransactions, notifications: notificationsHistory, activity_logs: userActivityLogs };
+    lastSyncHash = JSON.stringify({ batches: batches, stock_lots: stockLots, transactions: wmsTransactions, notifications: notificationsHistory, activity_logs: userActivityLogs });
     if (syncText) syncText.textContent = 'جاري رفع وتكامل البيانات سحابياً... 🔄';
 
     try {
@@ -1198,40 +1269,52 @@
     if (btnImportBackup) btnImportBackup.addEventListener('click', () => inputBackupFile.click());
     if (inputBackupFile) inputBackupFile.addEventListener('change', importBackupData);
 
-    if (viewTabProduction) {
-      viewTabProduction.addEventListener('click', () => {
-        viewTabProduction.style.background = 'var(--primary)';
-        viewTabProduction.style.borderColor = 'var(--primary)';
-        viewTabProduction.style.color = '#fff';
-        if (viewTabWarehouse) {
-          viewTabWarehouse.style.background = 'transparent';
-          viewTabWarehouse.style.borderColor = 'rgba(255,255,255,0.15)';
-          viewTabWarehouse.style.color = 'var(--text-dim)';
+    function switchViewTab(activeTabId) {
+      const tabsInfo = [
+        { id: 'view-tab-production', btn: viewTabProduction, container: viewProductionContainer },
+        { id: 'view-tab-warehouse', btn: viewTabWarehouse, container: viewWarehouseContainer },
+        { id: 'view-tab-qc', btn: viewTabQC, container: viewQCContainer },
+        { id: 'view-tab-activity', btn: viewTabActivity, container: viewActivityContainer }
+      ];
+
+      tabsInfo.forEach(t => {
+        if (!t.btn) return;
+        if (t.id === activeTabId) {
+          t.btn.style.background = 'var(--primary)';
+          t.btn.style.borderColor = 'var(--primary)';
+          t.btn.style.color = '#fff';
+          if (t.container) t.container.classList.remove('hidden');
+        } else {
+          t.btn.style.background = 'transparent';
+          t.btn.style.borderColor = 'rgba(255,255,255,0.15)';
+          t.btn.style.color = 'var(--text-dim)';
+          if (t.container) t.container.classList.add('hidden');
         }
-        if (viewProductionContainer) viewProductionContainer.classList.remove('hidden');
-        if (viewWarehouseContainer) viewWarehouseContainer.classList.add('hidden');
-        const prodStats = document.querySelector('.stats-grid');
-        if (prodStats) prodStats.classList.remove('hidden');
       });
+
+      // Show production stats cards only in production view
+      const prodStats = document.querySelector('.stats-grid');
+      if (prodStats) {
+        if (activeTabId === 'view-tab-production') {
+          prodStats.classList.remove('hidden');
+        } else {
+          prodStats.classList.add('hidden');
+        }
+      }
+
+      if (activeTabId === 'view-tab-warehouse') {
+        renderWMSViews();
+      } else if (activeTabId === 'view-tab-qc') {
+        renderQCViews();
+      } else if (activeTabId === 'view-tab-activity') {
+        renderActivityLogsView();
+      }
     }
 
-    if (viewTabWarehouse) {
-      viewTabWarehouse.addEventListener('click', () => {
-        viewTabWarehouse.style.background = 'var(--primary)';
-        viewTabWarehouse.style.borderColor = 'var(--primary)';
-        viewTabWarehouse.style.color = '#fff';
-        if (viewTabProduction) {
-          viewTabProduction.style.background = 'transparent';
-          viewTabProduction.style.borderColor = 'rgba(255,255,255,0.15)';
-          viewTabProduction.style.color = 'var(--text-dim)';
-        }
-        if (viewWarehouseContainer) viewWarehouseContainer.classList.remove('hidden');
-        if (viewProductionContainer) viewProductionContainer.classList.add('hidden');
-        const prodStats = document.querySelector('.stats-grid');
-        if (prodStats) prodStats.classList.add('hidden');
-        renderWMSViews();
-      });
-    }
+    if (viewTabProduction) viewTabProduction.addEventListener('click', () => switchViewTab('view-tab-production'));
+    if (viewTabWarehouse) viewTabWarehouse.addEventListener('click', () => switchViewTab('view-tab-warehouse'));
+    if (viewTabQC) viewTabQC.addEventListener('click', () => switchViewTab('view-tab-qc'));
+    if (viewTabActivity) viewTabActivity.addEventListener('click', () => switchViewTab('view-tab-activity'));
 
     elFilterTabs.forEach(tab => {
       tab.addEventListener('click', (e) => {
@@ -1509,6 +1592,15 @@
       labelUnitsPerBlister.textContent = term.unitsPerPackLabel;
     }
 
+    const labelSecondaryPackQty = document.getElementById('label-secondary-pack-qty');
+    if (labelSecondaryPackQty) {
+      if (form === 'cream') {
+        labelSecondaryPackQty.textContent = 'التغليف الثانوي (عدد التيوبات/العلب في الكرتونة) *';
+      } else {
+        labelSecondaryPackQty.textContent = 'التغليف الثانوي (عدد الظروف/البلسترات في الكرتونة) *';
+      }
+    }
+
     if (form === 'solid' && isCoated) {
       if (groupPostCoatingWeight) groupPostCoatingWeight.classList.remove('hidden');
       if (inputPostCoatingWeight) inputPostCoatingWeight.required = true;
@@ -1550,6 +1642,7 @@
     if (elFormNewBatch) elFormNewBatch.reset();
     if (inputIsCoated) inputIsCoated.value = 'false';
     if (inputLotsCount) inputLotsCount.value = '';
+    if (inputSecondaryPackQty) inputSecondaryPackQty.value = '20';
     toggleCoatingFields();
 
     const today = new Date().toISOString().split('T')[0];
@@ -1603,6 +1696,8 @@
       ];
     }
 
+    stagesConfig.push({ id: 'visual_inspection', name: 'الفحص العيني' });
+
     const initialStages = stagesConfig.map((s, idx) => ({
       id: s.id,
       name: s.name,
@@ -1632,6 +1727,7 @@
       preCoatingMg: preMg,
       postCoatingMg: postMg,
       unitsPerBlister: parseInt(inputUnitsPerBlister.value, 10),
+      secondaryPackQty: parseInt(inputSecondaryPackQty.value, 10) || 1,
       startDate: inputStartDate.value,
       expDate: inputExpDate.value,
       stages: initialStages,
@@ -1650,6 +1746,7 @@
 
     batches.unshift(newBatch);
     saveBatches(true);
+    logUserActivity('إصدار إضبارة جديدة', `تم إنشاء إضبارة جديدة للمنتج: ${newBatch.productName} (البատش: ${newBatch.batchNo}) بوزن إجمالي ${newBatch.totalWeightKg} kg.`);
     closeNewBatchModal();
     renderApp();
   }
@@ -1788,6 +1885,7 @@
         batch.updatedAt = Date.now();
       }
       saveBatches(true);
+      logUserActivity('حذف وإلغاء إضبارة', `تم حذف وإلغاء إضبارة المنتج [${batchName}] (الباتش: ${batch ? batch.batchNo : ''}) وإرجاع المواد الخام الموزونة للمخزن.`);
       if (String(activeBatchId) === String(batchId)) {
         closeBatchDetailModal();
       }
@@ -1861,7 +1959,8 @@
     if (!stage) return;
 
     if (logStageName) logStageName.textContent = stage.name;
-    const isBlisterStage = activeStageIndex === batch.stages.length - 1;
+    const isBlisterStage = stage.id === 'blistering' || stage.id === 'packaging' || stage.id === 'visual_inspection';
+    const isVisualInspection = stage.id === 'visual_inspection';
     const unitLabel = getUnitLabel(batch.pharmaForm);
 
     if (editModeBtnText) editModeBtnText.textContent = isEditCorrectionMode ? 'إلغاء وضع التصحيح' : 'تعديل وتصحيح الإنجاز المسجل';
@@ -1875,7 +1974,14 @@
     const rejMath = PharmaMath.kgToBlistersAndLots(stageRejKg, batch.isCoated, batch.preCoatingMg, batch.postCoatingMg, batch.unitsPerBlister, batch.totalWeightKg, batch.lotsCount);
 
     if (isEditCorrectionMode) {
-      if (isBlisterStage) {
+      if (isVisualInspection) {
+        const acceptLabel = batch.pharmaForm === 'cream' ? 'تعديل وتصحيح المقبول الكلي للفحص (عدد العلب/التيوبات PASS) *' : 'تعديل وتصحيح المقبول الكلي للفحص (عدد البلسترات PASS) *';
+        const rejectLabel = batch.pharmaForm === 'cream' ? 'تعديل وتصحيح المرفوض الكلي للفحص (عدد العلب/التيوبات REJECTED) *' : 'تعديل وتصحيح المرفوض الكلي للفحص (عدد البلسترات REJECTED) *';
+        if (labelLogAccepted) labelLogAccepted.textContent = acceptLabel;
+        if (labelLogRejected) labelLogRejected.textContent = rejectLabel;
+        if (inputLogAcceptedKg) inputLogAcceptedKg.value = stage.acceptedBlisters || accMath.totalBlisters;
+        if (inputLogRejectedKg) inputLogRejectedKg.value = stage.rejectedBlisters || rejMath.totalBlisters;
+      } else if (isBlisterStage) {
         const acceptLabel = batch.pharmaForm === 'cream' ? 'تعديل وتصحيح الكلي المقبول (عدد التيوبات PASS) *' : 'تعديل وتصحيح الكلي المقبول (عدد الظروف PASS) *';
         const rejectLabel = batch.pharmaForm === 'cream' ? 'تعديل وتصحيح الكلي المرفوض (عدد التيوبات REJECTED) *' : 'تعديل وتصحيح الكلي المرفوض (عدد الظروف REJECTED) *';
         if (labelLogAccepted) labelLogAccepted.textContent = acceptLabel;
@@ -1890,7 +1996,15 @@
       }
       if (logConversionHint) logConversionHint.textContent = 'وضع التصحيح نشط: قم بتغيير القيم وتأكيد التعديل لتحديث الحجر والمراحل مباشرة.';
     } else {
-      if (isBlisterStage) {
+      if (isVisualInspection) {
+        const acceptLabel = batch.pharmaForm === 'cream' ? 'عدد العلب/التيوبات المقبولة بالفحص العيني (PASS) *' : 'عدد الظروف/البلسترات المقبولة بالفحص العيني (PASS) *';
+        const rejectLabel = batch.pharmaForm === 'cream' ? 'عدد العلب/التيوبات المرفوضة بالفحص العيني (REJECTED) *' : 'عدد الظروف/البلسترات المرفوضة بالفحص العيني (REJECTED) *';
+        if (labelLogAccepted) labelLogAccepted.textContent = acceptLabel;
+        if (labelLogRejected) labelLogRejected.textContent = rejectLabel;
+        if (inputLogAcceptedKg) { inputLogAcceptedKg.value = ''; inputLogAcceptedKg.placeholder = 'مثال: 5000 مقبول'; }
+        if (inputLogRejectedKg) { inputLogRejectedKg.value = '0'; inputLogRejectedKg.placeholder = 'مثال: 20 مرفوض'; }
+        if (logConversionHint) logConversionHint.textContent = 'مرحلة الفحص العيني: يرجى إدخال أعداد العلب/البلسترات المقبولة والمرفوضة مباشرة لحساب مردود الإنتاج Yield % والوزن المقابل بالكيلوغرام.';
+      } else if (isBlisterStage) {
         const acceptLabel = batch.pharmaForm === 'cream' ? 'عدد التيوبات المقبولة المضافة (تيوب PASS) *' : 'عدد الظروف/البليسترات المقبولة المضافة (ظرف PASS) *';
         const rejectLabel = batch.pharmaForm === 'cream' ? 'عدد التيوبات المرفوضة/إعادة تشغيل (تيوب REJECTED) *' : 'عدد الظروف المرفوضة/إعادة تشغيل (ظرف REJECTED) *';
         if (labelLogAccepted) labelLogAccepted.textContent = acceptLabel;
@@ -2081,6 +2195,24 @@
           <button type="button" class="btn btn-secondary btn-sm" style="width: 100%; border-color: var(--cyan); color: var(--cyan); background: rgba(6, 182, 212, 0.05); font-weight: bold; display: flex; align-items: center; justify-content: center; gap: 6px; padding: 8px 12px; font-size: 0.82rem;" onclick="window.notifyQCDissUnif('${batch.id}')">
             <i data-lucide="beaker" style="width: 14px; height: 14px;"></i> 🧪 إرسال إشعار للمخبر لتحليل الانحلالية وتجانس المحتوى (Dissolution & Uniformity)
           </button>
+        `;
+      } else if (stage.id === 'visual_inspection') {
+        const yieldVal = stage.yieldPercent !== undefined ? stage.yieldPercent.toFixed(2) : '100.00';
+        const acceptedB = stage.acceptedBlisters || 0;
+        const rejectedB = stage.rejectedBlisters || 0;
+        notifyContainer.style.display = 'block';
+        notifyContainer.innerHTML = `
+          <div style="background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.25); border-radius: 6px; padding: 12px; font-size: 0.9rem; color: #fff; direction: rtl;">
+            <div style="font-weight: bold; color: var(--emerald); display: flex; align-items: center; gap: 6px; margin-bottom: 6px;">
+              <i data-lucide="percent" style="width: 18px; height: 18px;"></i>
+              <span>تقرير مردود الإنتاج الكلي (Yield %): ${yieldVal}%</span>
+            </div>
+            <div style="display: flex; gap: 15px; font-size: 0.8rem; color: var(--text-dim);">
+              <span>مقبول: <strong>${PharmaMath.formatNumber(acceptedB)}</strong> وحدة</span>
+              <span>مرفوض: <strong>${PharmaMath.formatNumber(rejectedB)}</strong> وحدة</span>
+              <span>إجمالي المفحوص: <strong>${PharmaMath.formatNumber(acceptedB + rejectedB)}</strong> وحدة</span>
+            </div>
+          </div>
         `;
       } else {
         notifyContainer.style.display = 'none';
@@ -2354,6 +2486,11 @@
       stage.acceptedKg = newAccKg;
       stage.rejectedKg = newRejKg;
       stage.doneKg = newAccKg + newRejKg;
+      if (isVisualInspection) {
+        stage.acceptedBlisters = newAccBlisters;
+        stage.rejectedBlisters = newRejBlisters;
+        stage.yieldPercent = (newAccBlisters + newRejBlisters) > 0 ? (newAccBlisters / (newAccBlisters + newRejBlisters)) * 100 : 100;
+      }
 
       if (stage.doneKg >= (stageLimit - 0.05)) {
         stage.status = 'completed';
@@ -2447,6 +2584,11 @@
     stage.doneKg += (finalAddAcceptedKg - addAcceptedKg) + addTotalKg;
     stage.acceptedKg = (stage.acceptedKg || 0) + finalAddAcceptedKg;
     stage.rejectedKg = (stage.rejectedKg || 0) + addRejectedKg;
+    if (isVisualInspection) {
+      stage.acceptedBlisters = (stage.acceptedBlisters || 0) + addAcceptedBlisters;
+      stage.rejectedBlisters = (stage.rejectedBlisters || 0) + addRejectedBlisters;
+      stage.yieldPercent = (stage.acceptedBlisters + stage.rejectedBlisters) > 0 ? (stage.acceptedBlisters / (stage.acceptedBlisters + stage.rejectedBlisters)) * 100 : 100;
+    }
 
     // If Weighing stage, execute WMS stock deductions
     if (activeStageIndex === 0) {
@@ -2512,6 +2654,7 @@
     batch.version = (batch.version || 0) + 1;
     batch.updatedAt = Date.now();
     saveBatches(true);
+    logUserActivity('تسجيل إنجاز مرحلة', `تم تسجيل إنجاز في الإضبارة (${batch.productName} باتش: ${batch.batchNo}) في مرحلة [${stage.name}]: ${logMsg}`);
     renderWorkflowTimeline(batch);
     renderStageLogger(batch);
     renderHistoryList(batch);
@@ -3929,6 +4072,56 @@
     const formInbound = document.getElementById('wms-form-inbound');
     if (formInbound) formInbound.addEventListener('submit', handleInboundSubmit);
 
+    // Expiry Date inputs sync
+    const elExpiryDate = document.getElementById('wms-in-expiry');
+    const elExpiryMonths = document.getElementById('wms-in-expiry-months');
+    const elExpiryMM = document.getElementById('wms-in-expiry-mm');
+    const elExpiryYYYY = document.getElementById('wms-in-expiry-yyyy');
+
+    if (elExpiryMonths) {
+      elExpiryMonths.addEventListener('input', () => {
+        const months = parseInt(elExpiryMonths.value, 10);
+        if (isNaN(months) || months <= 0) return;
+        const d = new Date();
+        d.setMonth(d.getMonth() + months);
+        const lastDay = new Date(d.getFullYear(), d.getMonth() + 1, 0);
+        const yyyy = lastDay.getFullYear();
+        const mm = String(lastDay.getMonth() + 1).padStart(2, '0');
+        const dd = String(lastDay.getDate()).padStart(2, '0');
+        
+        if (elExpiryDate) elExpiryDate.value = `${yyyy}-${mm}-${dd}`;
+        if (elExpiryMM) elExpiryMM.value = mm;
+        if (elExpiryYYYY) elExpiryYYYY.value = String(yyyy);
+      });
+    }
+
+    const syncMMYYYY = () => {
+      if (!elExpiryMM || !elExpiryYYYY || !elExpiryDate) return;
+      const mm = elExpiryMM.value;
+      const yyyy = elExpiryYYYY.value;
+      if (!mm || !yyyy) return;
+      const lastDay = new Date(parseInt(yyyy, 10), parseInt(mm, 10), 0);
+      const dd = String(lastDay.getDate()).padStart(2, '0');
+      elExpiryDate.value = `${yyyy}-${mm}-${dd}`;
+      if (elExpiryMonths) elExpiryMonths.value = '';
+    };
+
+    if (elExpiryMM) elExpiryMM.addEventListener('change', syncMMYYYY);
+    if (elExpiryYYYY) elExpiryYYYY.addEventListener('change', syncMMYYYY);
+
+    if (elExpiryDate) {
+      elExpiryDate.addEventListener('change', () => {
+        const val = elExpiryDate.value;
+        if (!val) return;
+        const parts = val.split('-');
+        if (parts.length === 3) {
+          if (elExpiryMM) elExpiryMM.value = parts[1];
+          if (elExpiryYYYY) elExpiryYYYY.value = parts[0];
+          if (elExpiryMonths) elExpiryMonths.value = '';
+        }
+      });
+    }
+
     const formSales = document.getElementById('wms-form-sales');
     if (formSales) formSales.addEventListener('submit', handleSalesSubmit);
 
@@ -4005,6 +4198,7 @@
         });
 
         saveWMS(true);
+        logUserActivity('تصفير المستودع', 'تم تصفير وتطهير مستودع المواد الأولية الخام بالكامل.');
         renderWMSViews();
         
         if (window.showToast) {
@@ -4054,6 +4248,7 @@
         });
 
         saveWMS(true);
+        logUserActivity('تصفير المستودع', 'تم تصفير وتطهير مستودع مواد التغليف بالكامل.');
         renderWMSViews();
         
         if (window.showToast) {
@@ -4102,6 +4297,7 @@
         });
 
         saveWMS(true);
+        logUserActivity('تصفير المستودع', 'تم تصفير وتطهير رصيد المنتجات الجاهزة (الرصيد الجاهز) بالكامل.');
         renderWMSViews();
         
         if (window.showToast) {
@@ -4249,6 +4445,8 @@
       renderTransactionsLog();
     } else if (currentWMSTab === 'sales') {
       populateSalesProductsDropdown();
+    } else if (currentWMSTab === 'trace') {
+      renderTraceabilityView();
     }
   }
 
@@ -4272,21 +4470,13 @@
       }
     });
 
-    const elRelCount = document.getElementById('wms-stat-released-count');
-    const elRelWeight = document.getElementById('wms-stat-released-weight');
     const elQuaCount = document.getElementById('wms-stat-quarantine-count');
-    const elQuaWeight = document.getElementById('wms-stat-quarantine-weight');
     const elRejCount = document.getElementById('wms-stat-rejected-count');
     const elRejWeight = document.getElementById('wms-stat-rejected-weight');
-    const elTxCount = document.getElementById('wms-stat-tx-count');
 
-    if (elRelCount) elRelCount.textContent = relCount;
-    if (elRelWeight) elRelWeight.textContent = `${relWeight.toFixed(3)} ${stockLots[0]?.Unit || 'kg'}`;
     if (elQuaCount) elQuaCount.textContent = quaCount;
-    if (elQuaWeight) elQuaWeight.textContent = `${quaWeight.toFixed(3)} ${stockLots[0]?.Unit || 'kg'}`;
     if (elRejCount) elRejCount.textContent = rejCount;
     if (elRejWeight) elRejWeight.textContent = `${rejWeight.toFixed(3)} ${stockLots[0]?.Unit || 'kg'}`;
-    if (elTxCount) elTxCount.textContent = wmsTransactions.length;
   }
 
   function renderStockLots() {
@@ -4654,6 +4844,7 @@
     removeLotFromBatches(lotId);
 
     saveWMS(true);
+    logUserActivity('حذف لوت مادة', `تم حذف اللوت ${lot.Lot_Number} للمادة ${lot.Material_Name} نهائياً وتطهير سجلات الأضابير.`);
     renderWMSViews();
 
     if (window.showToast) {
@@ -4953,6 +5144,7 @@
     });
 
     saveWMS(true);
+    logUserActivity('استيراد أكسل', `تم استيراد رصيد لوتات أكسل للنوع [${targetType}] بعدد ${wmsExcelImportTemp.length} لوت، بوضعية [${importMode}].`);
     
     wmsExcelImportTemp = [];
     document.getElementById('wms-excel-preview-container').classList.add('hidden');
@@ -5056,7 +5248,7 @@
     });
 
     saveWMS(true);
-    
+    logUserActivity('استلام وارد جديد', `تم استلام لوت وارد جديد للمادة ${name} (لوت: ${lotNum}) بكمية ${qty} ${unit} وحفظه في الحجر الصحي.`);
     document.getElementById('wms-form-inbound').reset();
     currentWMSTab = type === 'raw' ? 'stock' : (type === 'packaging' ? 'packaging' : 'ready');
     renderWMSViews();
@@ -5334,7 +5526,7 @@
     });
 
     saveWMS(true);
-    
+    logUserActivity('شحن مبيعات', `تم صرف وشحن طلبية للعميل ${ref} تشمل المنتجات: ${shippedLots.join('، ')}.`);
     window.currentSalesInvoiceItems = [];
     document.getElementById('wms-form-sales').reset();
     renderSalesInvoiceTable();
@@ -5528,6 +5720,299 @@
       total += val;
     });
     inputLogAcceptedKg.value = total.toFixed(3);
+  }
+
+  // =========================================================================
+  // USER ACTIVITY LOG ENGINE (AUDIT TRAIL)
+  // =========================================================================
+  let userActivityLogs = [];
+
+  function saveActivityLogs() {
+    localStorage.setItem('pharma_user_activity_logs', JSON.stringify(userActivityLogs));
+  }
+
+  function logUserActivity(actionType, details) {
+    const roleLabels = {
+      admin: 'مدير النظام 👑',
+      qc: 'الرقابة النوعية 🧪',
+      wms: 'أمين المستودع 📦',
+      operator: 'مشغل الإنتاج ⚙️'
+    };
+    const logEntry = {
+      timestamp: new Date().toLocaleString('en-US'),
+      user: roleLabels[currentUserRole] || currentUserRole,
+      actionType: actionType,
+      details: details
+    };
+    userActivityLogs.unshift(logEntry);
+    if (userActivityLogs.length > 1000) {
+      userActivityLogs = userActivityLogs.slice(0, 1000);
+    }
+    saveActivityLogs();
+  }
+
+  function renderActivityLogsView() {
+    const tbody = document.getElementById('user-activity-tbody');
+    if (!tbody) return;
+    tbody.innerHTML = '';
+
+    if (userActivityLogs.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="4" style="text-align: center; color: var(--text-dim); padding: 20px;">سجل حركات النظام فارغ حالياً.</td></tr>`;
+      return;
+    }
+
+    userActivityLogs.forEach(log => {
+      const tr = document.createElement('tr');
+      tr.style.borderBottom = '1px solid rgba(255, 255, 255, 0.05)';
+      tr.innerHTML = `
+        <td style="padding: 10px; color: var(--text-dim); font-size: 0.82rem;">${log.timestamp}</td>
+        <td style="padding: 10px; font-weight: bold;">${log.user}</td>
+        <td style="padding: 10px;"><span class="wms-badge" style="background: rgba(255,255,255,0.05); color: #fff; padding: 4px 8px; border-radius: 4px; font-size: 0.8rem;">${log.actionType}</span></td>
+        <td style="padding: 10px; font-size: 0.85rem;">${log.details}</td>
+      `;
+      tbody.appendChild(tr);
+    });
+  }
+
+  function exportActivityLogsToExcel() {
+    try {
+      if (userActivityLogs.length === 0) {
+        alert('سجل الحركة فارغ، لا يوجد ما يمكن تصديره.');
+        return;
+      }
+      const data = userActivityLogs.map(log => ({
+        'الوقت والتاريخ': log.timestamp,
+        'المستخدم / الصفة': log.user,
+        'نوع الحركة': log.actionType,
+        'تفاصيل التعديل / الإجراء': log.details
+      }));
+
+      const ws = XLSX.utils.json_to_sheet(data);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Audit_Trail_Log');
+      
+      const fileName = `User_Activity_Audit_Trail_${new Date().toISOString().split('T')[0]}.xlsx`;
+      XLSX.writeFile(wb, fileName);
+      logUserActivity('تصدير سجل الحركة', 'تم تصدير سجل حركات النظام إلى ملف Excel.');
+    } catch (err) {
+      alert('حدث خطأ أثناء تصدير ملف إكسل: ' + err.message);
+    }
+  }
+
+  // =========================================================================
+  // QUALITY CONTROL (QC) MANAGEMENT ENGINE
+  // =========================================================================
+  let currentQCTab = 'quarantine';
+
+  function setupQCEventListeners() {
+    const tabs = document.querySelectorAll('#qc-sub-tabs .filter-tab');
+    tabs.forEach(tab => {
+      tab.addEventListener('click', (e) => {
+        tabs.forEach(t => t.classList.remove('active'));
+        e.currentTarget.classList.add('active');
+        currentQCTab = e.currentTarget.getAttribute('data-qc-tab');
+        renderQCViews();
+      });
+    });
+
+    const btnExportActivity = document.getElementById('btn-export-activity-excel');
+    if (btnExportActivity) btnExportActivity.addEventListener('click', exportActivityLogsToExcel);
+  }
+
+  function renderQCViews() {
+    let pen = 0, pas = 0, fail = 0;
+    stockLots.forEach(lot => {
+      if (!lot) return;
+      if (lot.Status === 'Quarantine') pen++;
+      else if (lot.Status === 'Released') pas++;
+      else if (lot.Status === 'Rejected') fail++;
+    });
+
+    const elPen = document.getElementById('qc-stat-pending');
+    const elPas = document.getElementById('qc-stat-passed');
+    const elFail = document.getElementById('qc-stat-failed');
+    if (elPen) elPen.textContent = `المعلقة: ${pen} لوت`;
+    if (elPas) elPas.textContent = `المقبولة: ${pas} لوت`;
+    if (elFail) elFail.textContent = `المرفوضة: ${fail} لوت`;
+
+    const subViews = document.querySelectorAll('.qc-sub-view');
+    subViews.forEach(view => {
+      if (view.id === `qc-view-${currentQCTab}`) {
+        view.classList.remove('hidden');
+      } else {
+        view.classList.add('hidden');
+      }
+    });
+
+    let tbodyId = '';
+    let targetStatus = '';
+    if (currentQCTab === 'quarantine') {
+      tbodyId = 'qc-pending-tbody';
+      targetStatus = 'Quarantine';
+    } else if (currentQCTab === 'released') {
+      tbodyId = 'qc-released-tbody';
+      targetStatus = 'Released';
+    } else if (currentQCTab === 'rejected') {
+      tbodyId = 'qc-rejected-tbody';
+      targetStatus = 'Rejected';
+    }
+
+    const tbody = document.getElementById(tbodyId);
+    if (!tbody) return;
+    tbody.innerHTML = '';
+
+    const filtered = stockLots.filter(lot => lot && lot.Status === targetStatus);
+    if (filtered.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: var(--text-dim); padding: 20px;">لا توجد عناصر في هذا التبويب حالياً.</td></tr>`;
+      return;
+    }
+
+    const isRawMaterial = lot => {
+      if (!lot || !lot.Unit) return false;
+      const u = lot.Unit.toLowerCase();
+      return u === 'kg' || u === 'g' || u === 'l' || u === 'كغ' || u === 'غ' || u === 'جرام' || u === 'لتر';
+    };
+
+    filtered.forEach(lot => {
+      const tr = document.createElement('tr');
+      tr.style.borderBottom = '1px solid rgba(255, 255, 255, 0.05)';
+
+      const typeLabel = lot.Material_Type === 'packaging' ? 'مواد تعبئة 🏷️' : (isRawMaterial(lot) ? 'مواد أولية 🧪' : 'منتج جاهز 📦');
+      
+      let actionButtons = '';
+      if (lot.Status === 'Quarantine') {
+        actionButtons = `
+          <button class="btn btn-secondary btn-sm" style="padding: 4px 10px; font-size: 0.8rem; border-color: var(--emerald); color: var(--emerald); margin-left: 6px;" onclick="changeLotStatusFromQC('${lot.Lot_ID}', 'Released')">إفراج وقبول ✅</button>
+          <button class="btn btn-secondary btn-sm" style="padding: 4px 10px; font-size: 0.8rem; border-color: var(--rose); color: var(--rose);" onclick="changeLotStatusFromQC('${lot.Lot_ID}', 'Rejected')">رفض وعزل ❌</button>
+        `;
+      } else if (lot.Status === 'Released') {
+        actionButtons = `
+          <button class="btn btn-secondary btn-sm" style="padding: 4px 10px; font-size: 0.8rem; border-color: var(--amber); color: var(--amber); margin-left: 6px;" onclick="changeLotStatusFromQC('${lot.Lot_ID}', 'Quarantine')">إعادة حجر 🔒</button>
+          <button class="btn btn-secondary btn-sm" style="padding: 4px 10px; font-size: 0.8rem; border-color: var(--rose); color: var(--rose);" onclick="changeLotStatusFromQC('${lot.Lot_ID}', 'Rejected')">رفض وعزل ❌</button>
+        `;
+      } else if (lot.Status === 'Rejected') {
+        actionButtons = `
+          <button class="btn btn-secondary btn-sm" style="padding: 4px 10px; font-size: 0.8rem; border-color: var(--amber); color: var(--amber); margin-left: 6px;" onclick="changeLotStatusFromQC('${lot.Lot_ID}', 'Quarantine')">إعادة حجر 🔒</button>
+          <button class="btn btn-secondary btn-sm" style="padding: 4px 10px; font-size: 0.8rem; border-color: var(--emerald); color: var(--emerald);" onclick="changeLotStatusFromQC('${lot.Lot_ID}', 'Released')">إفراج وقبول ✅</button>
+        `;
+      }
+
+      tr.innerHTML = `
+        <td style="padding: 10px;">${lot.Material_Code || '-'}</td>
+        <td style="padding: 10px; font-weight: bold;">${lot.Material_Name || '-'}</td>
+        <td style="padding: 10px;"><span style="color: var(--amber); font-weight: bold;">${lot.Lot_Number || '-'}</span></td>
+        <td style="padding: 10px;">${typeLabel}</td>
+        <td style="padding: 10px;">${lot.Current_Qty} <small>${lot.Unit}</small></td>
+        <td style="padding: 10px; color: var(--text-dim);">${lot.Expiry_Date || '-'}</td>
+        <td style="padding: 10px; text-align: center;">${actionButtons}</td>
+      `;
+      tbody.appendChild(tr);
+    });
+
+    if (window.lucide) lucide.createIcons();
+  }
+
+  window.changeLotStatusFromQC = function(lotId, newStatus) {
+    const lot = stockLots.find(l => l && String(l.Lot_ID) === String(lotId));
+    if (!lot) return;
+    
+    const oldStatus = lot.Status;
+    lot.Status = newStatus;
+    lot.updatedAt = Date.now();
+
+    wmsTransactions.unshift({
+      Tx_ID: 'tx-' + Date.now() + '-' + Math.random().toString(36).substr(2, 4),
+      Lot_ID: lotId,
+      Tx_Type: newStatus === 'Released' ? 'Released_From_Quarantine' : (newStatus === 'Rejected' ? 'Rejected_From_Quarantine' : 'Re_Quarantined'),
+      Quantity: lot.Current_Qty,
+      Material_Type: lot.Material_Type || 'raw',
+      Reference_ID: `تعديل القرار الجودي من الرقابة النوعية QC`,
+      Performed_By: currentUserRole,
+      Timestamp: Date.now()
+    });
+
+    saveWMS(true);
+    
+    logUserActivity('تعديل حالة لوت (QC)', `تم تغيير حالة اللوت ${lot.Lot_Number} للمادة ${lot.Material_Name} من [${oldStatus}] إلى [${newStatus}].`);
+
+    renderQCViews();
+    if (window.showToast) {
+      window.showToast(`تم تحديث حالة اللوت بنجاح إلى [${newStatus}] 🔬`, 'success');
+    }
+  };
+
+  // =========================================================================
+  // MATERIAL TRACEABILITY ENGINE
+  // =========================================================================
+  function setupTraceEventListeners() {
+    const traceSearch = document.getElementById('wms-trace-search');
+    if (traceSearch) {
+      traceSearch.addEventListener('input', renderTraceabilityView);
+    }
+  }
+
+  function renderTraceabilityView() {
+    const tbody = document.getElementById('wms-trace-tbody');
+    if (!tbody) return;
+    tbody.innerHTML = '';
+
+    const searchInput = document.getElementById('wms-trace-search');
+    const query = searchInput ? searchInput.value.toLowerCase().trim() : '';
+
+    if (!query) {
+      tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: var(--text-dim); padding: 20px;">الرجاء كتابة اسم المادة، كود المادة، أو رقم لوت المادة للبحث...</td></tr>`;
+      return;
+    }
+
+    const matches = [];
+
+    batches.forEach(batch => {
+      if (!batch || !Array.isArray(batch.stages)) return;
+
+      batch.stages.forEach(stage => {
+        if (!stage || !Array.isArray(stage.formulation)) return;
+
+        stage.formulation.forEach(row => {
+          if (!row) return;
+          const matName = (row.Material_Name || row.name || '').toLowerCase();
+          const matCode = (row.Material_Code || row.code || '').toLowerCase();
+          const matLot = (row.Lot_Number || row.lotNum || row.lotNumber || '').toLowerCase();
+
+          if (matName.includes(query) || matCode.includes(query) || matLot.includes(query)) {
+            matches.push({
+              code: row.Material_Code || row.code || '-',
+              name: row.Material_Name || row.name || '-',
+              lotNum: row.Lot_Number || row.lotNum || row.lotNumber || '-',
+              productName: batch.productName,
+              batchNo: batch.batchNo,
+              stageName: stage.name,
+              qty: row.Quantity || row.qty || 0,
+              unit: row.Unit || 'kg'
+            });
+          }
+        });
+      });
+    });
+
+    if (matches.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: var(--text-dim); padding: 20px;">لم يتم العثور على أي نتائج تطابق البحث في المواد المستهلكة بالإنتاج.</td></tr>`;
+      return;
+    }
+
+    matches.forEach(item => {
+      const tr = document.createElement('tr');
+      tr.style.borderBottom = '1px solid rgba(255, 255, 255, 0.05)';
+      tr.innerHTML = `
+        <td style="padding: 10px;">${item.code}</td>
+        <td style="padding: 10px; font-weight: bold;">${item.name}</td>
+        <td style="padding: 10px;"><span style="color: var(--amber); font-weight: bold;">${item.lotNum}</span></td>
+        <td style="padding: 10px; font-weight: bold; color: var(--cyan);">${item.productName}</td>
+        <td style="padding: 10px;">${item.batchNo}</td>
+        <td style="padding: 10px; font-size: 0.85rem;">${item.stageName}</td>
+        <td style="padding: 10px;">${item.qty} <small>${item.unit}</small></td>
+      `;
+      tbody.appendChild(tr);
+    });
   }
 
   if (document.readyState === 'loading') {
