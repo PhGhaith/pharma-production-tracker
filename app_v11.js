@@ -4893,6 +4893,12 @@
           hiddenProduct.value = l.lotId;
           dropdown.classList.add('hidden');
           updateFEFORecommendation();
+          
+          const salesQty = document.getElementById('wms-sales-qty');
+          if (salesQty) {
+            salesQty.focus();
+            salesQty.select();
+          }
         });
 
         dropdown.appendChild(item);
@@ -4929,7 +4935,7 @@
     const lotId = select.value;
     const requiredQty = parseFloat(inputQty.value) || 0;
 
-    if (!lotId || requiredQty <= 0) {
+    if (!lotId) {
       container.classList.add('hidden');
       return;
     }
@@ -4946,15 +4952,25 @@
         صرف منتج: <strong>${lot.Material_Name}</strong>
       </li>
       <li style="margin-bottom: 4px;">
-        من الباتش: <strong style="color: var(--amber);">${lot.Lot_Number}</strong> (تاريخ الانتهاء: <span style="color: var(--rose); font-weight: bold;">${lot.Expiry_Date}</span>)
-      </li>
-      <li style="margin-bottom: 4px;">
-        الكمية المطلوبة للشحن: <strong style="color: var(--cyan);">${requiredQty.toFixed(3)} ${lot.Unit}</strong>
+        من الباتش: <strong style="color: var(--amber);">${lot.Lot_Number}</strong> (تاريخ الانتهاء: <span style="color: var(--rose); font-weight: bold;">${lot.Expiry_Date}</span>، المتوفر: ${lot.Current_Qty} ${lot.Unit})
       </li>
     `;
+    if (requiredQty > 0) {
+      recommendationHtml += `
+        <li style="margin-bottom: 4px;">
+          الكمية المطلوبة للشحن: <strong style="color: var(--cyan);">${requiredQty.toFixed(3)} ${lot.Unit}</strong>
+        </li>
+      `;
+    }
     recommendationHtml += '</ul>';
 
-    if (requiredQty > lot.Current_Qty) {
+    if (requiredQty <= 0) {
+      recommendationHtml += `
+        <div style="color: var(--text-dim); margin-top: 8px;">
+          الرجاء إدخال الكمية المطلوبة للشحن...
+        </div>
+      `;
+    } else if (requiredQty > lot.Current_Qty) {
       recommendationHtml += `
         <div style="color: var(--rose); font-weight: bold; margin-top: 8px; display: flex; align-items: center; gap: 4px;">
           <i data-lucide="alert-circle" style="width:16px;height:16px;"></i>
