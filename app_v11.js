@@ -4882,6 +4882,7 @@
     }
 
     let remaining = requiredQty;
+    let shippedLots = [];
     lots.forEach(lot => {
       if (remaining <= 0) return;
 
@@ -4889,13 +4890,14 @@
       lot.Current_Qty = parseFloat((lot.Current_Qty - take).toFixed(3));
       lot.updatedAt = Date.now();
       remaining -= take;
+      shippedLots.push(lot.Lot_Number);
 
       wmsTransactions.unshift({
         Tx_ID: 'tx-' + Date.now() + '-' + Math.random().toString(36).substr(2, 4),
         Lot_ID: lot.Lot_ID,
         Tx_Type: 'Sales_Dispatch',
         Quantity: -take,
-        Reference_ID: `شحن مبيعات للعملاء (${ref})`,
+        Reference_ID: `شحن مبيعات للعملاء (${ref}) - باتش رقم: ${lot.Lot_Number}`,
         Performed_By: currentUserRole,
         Timestamp: Date.now()
       });
@@ -4905,11 +4907,11 @@
     
     document.getElementById('wms-form-sales').reset();
     document.getElementById('wms-fefo-recommendation').classList.add('hidden');
-    currentWMSTab = 'stock';
+    currentWMSTab = 'ready';
     renderWMSViews();
 
     if (window.showToast) {
-      window.showToast(`تم شحن وصرف كمية ${requiredQty} من المنتج [${productName}] بنجاح 🚚`, 'success');
+      window.showToast(`تم شحن وصرف كمية ${requiredQty} من المنتج [${productName}] بنجاح (رقم الباتش: ${shippedLots.join('، ')}) 🚚`, 'success');
     }
   }
 
