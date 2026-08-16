@@ -3783,7 +3783,48 @@
       });
     });
 
-    // Excel import
+    // Excel Import Buttons and Modal Controls
+    const btnImportRaw = document.getElementById('btn-import-raw-excel');
+    const btnImportReady = document.getElementById('btn-import-ready-excel');
+    const modalExcelImport = document.getElementById('modal-wms-excel-import');
+    const closeExcelImportModal = document.getElementById('close-wms-excel-import-modal');
+
+    window.excelImportTargetType = 'raw'; 
+
+    if (btnImportRaw) {
+      btnImportRaw.addEventListener('click', () => {
+        window.excelImportTargetType = 'raw';
+        const title = document.getElementById('wms-excel-import-title');
+        const desc = document.getElementById('wms-excel-import-desc');
+        if (title) title.innerHTML = 'استيراد الأرصدة الافتتاحية للمواد الخام (Excel) 📥';
+        if (desc) desc.textContent = 'استيراد لمرة واحدة لمطابقة أرصدة المواد الأولية الحالية بالمعمل كـ Released.';
+        if (modalExcelImport) modalExcelImport.classList.remove('hidden');
+      });
+    }
+
+    if (btnImportReady) {
+      btnImportReady.addEventListener('click', () => {
+        window.excelImportTargetType = 'ready';
+        const title = document.getElementById('wms-excel-import-title');
+        const desc = document.getElementById('wms-excel-import-desc');
+        if (title) title.innerHTML = 'استيراد الأرصدة الافتتاحية للرصيد الجاهز (Excel) 📥';
+        if (desc) desc.textContent = 'استيراد لمرة واحدة لمطابقة أرصدة المنتجات التامة الجاهزة الحالية بالمعمل كـ Released.';
+        if (modalExcelImport) modalExcelImport.classList.remove('hidden');
+      });
+    }
+
+    if (closeExcelImportModal) {
+      closeExcelImportModal.addEventListener('click', () => {
+        if (modalExcelImport) modalExcelImport.classList.add('hidden');
+        wmsExcelImportTemp = [];
+        const preview = document.getElementById('wms-excel-preview-container');
+        if (preview) preview.classList.add('hidden');
+        const excelFile = document.getElementById('wms-excel-file');
+        if (excelFile) excelFile.value = '';
+      });
+    }
+
+    // Excel import file listener
     const excelFile = document.getElementById('wms-excel-file');
     if (excelFile) excelFile.addEventListener('change', handleExcelImportChange);
 
@@ -3794,6 +3835,7 @@
         const preview = document.getElementById('wms-excel-preview-container');
         if (preview) preview.classList.add('hidden');
         if (excelFile) excelFile.value = '';
+        if (modalExcelImport) modalExcelImport.classList.add('hidden');
       });
     }
 
@@ -4383,19 +4425,43 @@
   function confirmExcelImport() {
     if (wmsExcelImportTemp.length === 0) return;
 
-    // Filter out previous initial balance stock lots and transactions to prevent duplication
-    stockLots = stockLots.filter(l => l && l.Storage_Location !== 'مستورد افتتاحي');
-    wmsTransactions = wmsTransactions.filter(tx => tx && tx.Tx_Type !== 'Initial_Balance');
+    // Filter out previous initial balance stock lots based on target type
+    const targetType = window.excelImportTargetType || 'raw';
+    
+    stockLots = stockLots.filter(l => {
+      if (!l) return false;
+      if (l.Storage_Location !== 'مستورد افتتاحي') return true;
+      
+      const isRaw = l.Unit === 'kg' || l.Unit === 'g' || l.Unit === 'L' || l.Unit === 'كغ' || l.Unit === 'غ' || l.Unit === 'جرام' || l.Unit === 'لتر';
+      if (targetType === 'raw') {
+        // Keep ready products, delete raw initial ones
+        return !isRaw;
+      } else {
+        // Keep raw materials, delete ready initial ones
+        return isRaw;
+      }
+    });
 
     wmsExcelImportTemp.forEach(row => {
       const lotId = 'lot-init-' + Date.now() + '-' + Math.random().toString(36).substr(2, 5);
+      
+      // Enforce units based on target type if missing or incorrect
+      let finalUnit = row.Unit || 'kg';
+      if (targetType === 'raw') {
+        const isRaw = finalUnit === 'kg' || finalUnit === 'g' || finalUnit === 'L' || finalUnit === 'كغ' || finalUnit === 'غ' || finalUnit === 'جرام' || finalUnit === 'لتر';
+        if (!isRaw) finalUnit = 'kg';
+      } else {
+        const isRaw = finalUnit === 'kg' || finalUnit === 'g' || finalUnit === 'L' || finalUnit === 'كغ' || finalUnit === 'غ' || finalUnit === 'جرام' || finalUnit === 'لتر';
+        if (isRaw) finalUnit = 'blisters'; // default for ready products
+      }
+
       const newLot = {
         Lot_ID: lotId,
         Material_Code: row.Material_Code,
         Material_Name: row.Material_Name,
         Lot_Number: row.Lot_Number,
         Current_Qty: row.Quantity,
-        Unit: row.Unit,
+        Unit: finalUnit,
         Status: 'Released',
         Expiry_Date: row.Expiry_Date,
         Storage_Location: 'مستورد افتتاحي',
@@ -4408,7 +4474,7 @@
         Lot_ID: lotId,
         Tx_Type: 'Initial_Balance',
         Quantity: row.Quantity,
-        Reference_ID: 'استيراد رصيد افتتاحي من أكسل',
+        Reference_ID: `استيراد رصيد افتتاحي من أكسل (${targetType === 'raw' ? 'مواد أولية' : 'رصيد جاهز'})`,
         Performed_By: currentUserRole,
         Timestamp: Date.now()
       });
@@ -4420,11 +4486,15 @@
     document.getElementById('wms-excel-preview-container').classList.add('hidden');
     document.getElementById('wms-excel-file').value = '';
     
-    currentWMSTab = 'stock';
+    // Hide Modal
+    const modalExcelImport = document.getElementById('modal-wms-excel-import');
+    if (modalExcelImport) modalExcelImport.classList.add('hidden');
+
+    currentWMSTab = targetType === 'raw' ? 'stock' : 'ready';
     renderWMSViews();
 
     if (window.showToast) {
-      window.showToast('تم استيراد الأرصدة الافتتاحية للمواد الخام بنجاح كـ Released 📥', 'success');
+      window.showToast(`تم استيراد الأرصدة الافتتاحية لـ ${targetType === 'raw' ? 'المواد الخام' : 'الرصيد الجاهز'} بنجاح 📥`, 'success');
     }
   }
 
