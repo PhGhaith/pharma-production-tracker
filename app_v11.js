@@ -32,6 +32,33 @@
     return `${CLOUD_API_BASE}${separator}cb=${Date.now()}`;
   }
 
+  function cleanArabicNumbers(str) {
+    if (str === null || str === undefined) return '';
+    str = String(str);
+    const arabicNums = [/٠/g, /١/g, /٢/g, /٣/g, /٤/g, /٥/g, /٦/g, /٧/g, /٨/g, /٩/g];
+    for (let i = 0; i < 10; i++) {
+      str = str.replace(arabicNums[i], i);
+    }
+    str = str.replace(/،/g, '.').replace(/,/g, '.');
+    return str;
+  }
+
+  const _originalParseFloat = window.parseFloat;
+  const parseFloat = function(val) {
+    if (typeof val === 'string') {
+      val = cleanArabicNumbers(val);
+    }
+    return _originalParseFloat(val);
+  };
+
+  const _originalParseInt = window.parseInt;
+  const parseInt = function(val, radix) {
+    if (typeof val === 'string') {
+      val = cleanArabicNumbers(val);
+    }
+    return _originalParseInt(val, radix);
+  };
+
   // Application State
   let batches = [];
   let stockLots = [];
@@ -2261,7 +2288,7 @@
             Timestamp: Date.now()
           });
         });
-        saveWMS(false);
+        saveWMS();
       } else {
         newAccKg = parseFloat(inputLogAcceptedKg.value) || 0;
         newRejKg = parseFloat(inputLogRejectedKg.value) || 0;
@@ -2414,7 +2441,7 @@
           Timestamp: Date.now()
         });
       });
-      saveWMS(false);
+      saveWMS();
     }
 
     if (stage.doneKg >= (stageLimit - 0.05)) {

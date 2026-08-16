@@ -276,7 +276,6 @@
           <div class="filter-tabs" id="wms-sub-tabs" style="display: flex; gap: 8px;">
             <button class="filter-tab active" data-wms-tab="stock">رصيد المواد الأولية 📋</button>
             <button class="filter-tab" data-wms-tab="ready">الرصيد الجاهز 📦</button>
-            <button class="filter-tab" data-wms-tab="import">استيراد رصيد افتتاحي 📥</button>
             <button class="filter-tab" data-wms-tab="inbound">استلام وارد جديد ➕</button>
             <button class="filter-tab" data-wms-tab="sales">شحن ومبيعات (FEFO) 🚚</button>
             <button class="filter-tab" data-wms-tab="history">سجل حركات المستودعات 📜</button>
@@ -288,6 +287,9 @@
           <div class="section-header" style="margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center;">
             <h3>أرصدة المواد الأولية في المستودع</h3>
             <div style="display: flex; align-items: center; gap: 10px;">
+              <button class="btn btn-secondary btn-sm" id="btn-import-raw-excel" style="border-color: var(--cyan); color: var(--cyan); display: inline-flex; align-items: center; gap: 4px;">
+                <i data-lucide="file-spreadsheet" style="width: 14px; height: 14px;"></i> استيراد رصيد افتتاحي (أكسل)
+              </button>
               <button class="btn btn-secondary btn-sm" id="wms-btn-clear-all" style="border-color: var(--rose); color: var(--rose); display: none;">
                 <i data-lucide="trash-2" style="width: 14px; height: 14px; display: inline-block; vertical-align: middle;"></i> تفريغ كامل المخزن ⚠️
               </button>
@@ -322,6 +324,9 @@
           <div class="section-header" style="margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center;">
             <h3>أرصدة المنتجات التامة والجاهزة (الرصيد الجاهز)</h3>
             <div style="display: flex; align-items: center; gap: 10px;">
+              <button class="btn btn-secondary btn-sm" id="btn-import-ready-excel" style="border-color: var(--cyan); color: var(--cyan); display: inline-flex; align-items: center; gap: 4px;">
+                <i data-lucide="file-spreadsheet" style="width: 14px; height: 14px;"></i> استيراد رصيد افتتاحي (أكسل)
+              </button>
               <div class="search-box" style="max-width: 300px; margin: 0;">
                 <i data-lucide="search" class="search-icon"></i>
                 <input type="text" id="wms-ready-search" placeholder="ابحث باسم المنتج أو الكود أو اللوت...">
@@ -1024,7 +1029,7 @@
   <script src="xlsx.full.min.js"></script>
   <script src="pharmaMath.js?v=15.1"></script>
   <script src="mockData.js?v=15.0"></script>
-  <script src="app_v11.js?v=8.4"></script>
+  <script src="app_v11.js?v=8.5"></script>
   <script>
     lucide.createIcons();
   </script>
