@@ -4769,7 +4769,7 @@
     renderWMSViews();
 
     if (window.showToast) {
-      window.showToast(`تم شحن وصرف كمية ${requiredQty} من المنتج [${productName}] بنجاح وفق مبدأ FEFO 🚚`, 'success');
+      window.showToast(`تم شحن وصرف كمية ${requiredQty} من المنتج [${productName}] بنجاح 🚚`, 'success');
     }
   }
 
