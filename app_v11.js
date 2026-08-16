@@ -3919,6 +3919,17 @@
     const readySearch = document.getElementById('wms-ready-search');
     if (readySearch) readySearch.addEventListener('input', renderReadyProducts);
 
+    // Excel Export listeners
+    const btnExportRawExcel = document.getElementById('btn-export-raw-excel');
+    if (btnExportRawExcel) {
+      btnExportRawExcel.addEventListener('click', () => exportStockToExcel('raw'));
+    }
+
+    const btnExportReadyExcel = document.getElementById('btn-export-ready-excel');
+    if (btnExportReadyExcel) {
+      btnExportReadyExcel.addEventListener('click', () => exportStockToExcel('ready'));
+    }
+
     // Clear Raw Materials Stock
     const btnClearAll = document.getElementById('wms-btn-clear-all');
     if (btnClearAll) {
@@ -4535,22 +4546,27 @@
   function confirmExcelImport() {
     if (wmsExcelImportTemp.length === 0) return;
 
-    // Filter out previous initial balance stock lots based on target type
     const targetType = window.excelImportTargetType || 'raw';
     
-    stockLots = stockLots.filter(l => {
-      if (!l) return false;
-      if (l.Storage_Location !== 'مستورد افتتاحي') return true;
-      
-      const isRaw = l.Unit === 'kg' || l.Unit === 'g' || l.Unit === 'L' || l.Unit === 'كغ' || l.Unit === 'غ' || l.Unit === 'جرام' || l.Unit === 'لتر';
-      if (targetType === 'raw') {
-        // Keep ready products, delete raw initial ones
-        return !isRaw;
-      } else {
-        // Keep raw materials, delete ready initial ones
-        return isRaw;
-      }
-    });
+    // Read the import mode selected by the user
+    const modeEl = document.querySelector('input[name="wms-excel-import-mode"]:checked');
+    const importMode = modeEl ? modeEl.value : 'append';
+
+    if (importMode === 'replace') {
+      stockLots = stockLots.filter(l => {
+        if (!l) return false;
+        if (l.Storage_Location !== 'مستورد افتتاحي') return true;
+        
+        const isRaw = l.Unit === 'kg' || l.Unit === 'g' || l.Unit === 'L' || l.Unit === 'كغ' || l.Unit === 'غ' || l.Unit === 'جرام' || l.Unit === 'لتر';
+        if (targetType === 'raw') {
+          // Keep ready products, delete raw initial ones
+          return !isRaw;
+        } else {
+          // Keep raw materials, delete ready initial ones
+          return isRaw;
+        }
+      });
+    }
 
     wmsExcelImportTemp.forEach(row => {
       const lotId = 'lot-init-' + Date.now() + '-' + Math.random().toString(36).substr(2, 5);
@@ -4605,6 +4621,49 @@
 
     if (window.showToast) {
       window.showToast(`تم استيراد الأرصدة الافتتاحية لـ ${targetType === 'raw' ? 'المواد الخام' : 'الرصيد الجاهز'} بنجاح 📥`, 'success');
+    }
+  }
+
+  function exportStockToExcel(type) {
+    if (typeof XLSX === 'undefined') {
+      alert('مكتبة تصدير الأكسل غير محملة في المتصفح حالياً!');
+      return;
+    }
+
+    const isRawMaterial = lot => {
+      if (!lot || !lot.Unit) return false;
+      const u = lot.Unit.toLowerCase();
+      return u === 'kg' || u === 'g' || u === 'l' || u === 'كغ' || u === 'غ' || u === 'جرام' || u === 'لتر';
+    };
+    
+    const filtered = stockLots.filter(lot => {
+      if (!lot) return false;
+      return type === 'raw' ? isRawMaterial(lot) : !isRawMaterial(lot);
+    });
+
+    if (filtered.length === 0) {
+      alert('لا توجد بيانات لتصديرها في هذا المخزن حالياً!');
+      return;
+    }
+
+    const rows = filtered.map(lot => ({
+      'رمز المادة/المنتج': lot.Material_Code || '',
+      'اسم المادة/المنتج': lot.Material_Name || '',
+      'رقم اللوت/التشغيلة': lot.Lot_Number || '',
+      'الكمية المتوفرة': lot.Current_Qty || 0,
+      'الوحدة': lot.Unit || '',
+      'تاريخ انتهاء الصلاحية': lot.Expiry_Date || '',
+      'حالة المادة': lot.Status === 'Released' ? 'مقبول ومفرج عنه' : (lot.Status === 'Quarantine' ? 'محجور تحت الفحص' : 'مرفوض معزول')
+    }));
+
+    const worksheet = XLSX.utils.json_to_sheet(rows);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, type === 'raw' ? 'رصيد المواد الأولية' : 'الرصيد الجاهز');
+    
+    XLSX.writeFile(workbook, type === 'raw' ? 'raw_materials_stock.xlsx' : 'ready_products_stock.xlsx');
+    
+    if (window.showToast) {
+      window.showToast('تم تصدير ملف الأكسل بنجاح 📤', 'success');
     }
   }
 

@@ -287,6 +287,9 @@
           <div class="section-header" style="margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center;">
             <h3>أرصدة المواد الأولية في المستودع</h3>
             <div style="display: flex; align-items: center; gap: 10px;">
+              <button class="btn btn-secondary btn-sm" id="btn-export-raw-excel" style="border-color: var(--emerald); color: var(--emerald); display: inline-flex; align-items: center; gap: 4px;">
+                <i data-lucide="download" style="width: 14px; height: 14px;"></i> تصدير الرصيد إلى Excel 📤
+              </button>
               <button class="btn btn-secondary btn-sm" id="btn-import-raw-excel" style="border-color: var(--cyan); color: var(--cyan); display: inline-flex; align-items: center; gap: 4px;">
                 <i data-lucide="file-spreadsheet" style="width: 14px; height: 14px;"></i> استيراد رصيد افتتاحي (أكسل)
               </button>
@@ -318,12 +321,15 @@
             </table>
           </div>
         </div>
-
+ 
         <!-- Sub-View 6: Ready Finished Products Stock -->
         <div id="wms-view-ready" class="wms-sub-view hidden">
           <div class="section-header" style="margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center;">
             <h3>أرصدة المنتجات التامة والجاهزة (الرصيد الجاهز)</h3>
             <div style="display: flex; align-items: center; gap: 10px;">
+              <button class="btn btn-secondary btn-sm" id="btn-export-ready-excel" style="border-color: var(--emerald); color: var(--emerald); display: inline-flex; align-items: center; gap: 4px;">
+                <i data-lucide="download" style="width: 14px; height: 14px;"></i> تصدير الرصيد إلى Excel 📤
+              </button>
               <button class="btn btn-secondary btn-sm" id="wms-btn-clear-ready" style="border-color: var(--rose); color: var(--rose); display: inline-flex; align-items: center; gap: 4px;">
                 <i data-lucide="trash-2" style="width: 14px; height: 14px;"></i> تصفير الرصيد الجاهز ⚠️
               </button>
@@ -994,6 +1000,19 @@
               <i data-lucide="upload"></i> اختيار ملف الأكسل
             </button>
             <input type="file" id="wms-excel-file" accept=".xlsx, .xls, .csv" style="display: none;">
+            <div style="width: 100%; border-top: 1px solid rgba(255,255,255,0.08); padding-top: 16px; margin-top: 8px;">
+              <label style="font-weight: bold; margin-bottom: 8px; display: block; font-size: 0.85rem; color: #fff;">طريقة معالجة الأرصدة الافتتاحية المستوردة: *</label>
+              <div style="display: flex; flex-wrap: wrap; gap: 20px; font-size: 0.8rem; color: var(--text-dim);">
+                <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                  <input type="radio" name="wms-excel-import-mode" value="append" checked style="accent-color: var(--cyan); width: 16px; height: 16px;">
+                  <span>إضافة وتراكم البيانات (دمج مع الأرصدة الحالية)</span>
+                </label>
+                <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                  <input type="radio" name="wms-excel-import-mode" value="replace" style="accent-color: var(--cyan); width: 16px; height: 16px;">
+                  <span style="color: var(--rose);">تصفير واستبدال الأرصدة الافتتاحية السابقة للمخزن المحدد ⚠️</span>
+                </label>
+              </div>
+            </div>
           </div>
           
           <!-- Excel Preview Table -->
@@ -1032,7 +1051,7 @@
   <script src="xlsx.full.min.js"></script>
   <script src="pharmaMath.js?v=15.1"></script>
   <script src="mockData.js?v=15.0"></script>
-  <script src="app_v11.js?v=9.1"></script>
+  <script src="app_v11.js?v=9.2"></script>
   <script>
     lucide.createIcons();
   </script>
