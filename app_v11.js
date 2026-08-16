@@ -3834,6 +3834,16 @@
     tabs.forEach(tab => {
       tab.addEventListener('click', (e) => {
         currentWMSTab = e.target.getAttribute('data-wms-tab');
+        if (currentWMSTab === 'sales') {
+          const searchInput = document.getElementById('wms-sales-product-search');
+          const hiddenProduct = document.getElementById('wms-sales-product');
+          const salesQty = document.getElementById('wms-sales-qty');
+          if (searchInput) searchInput.value = '';
+          if (hiddenProduct) hiddenProduct.value = '';
+          if (salesQty) salesQty.value = '';
+          const rec = document.getElementById('wms-fefo-recommendation');
+          if (rec) rec.classList.add('hidden');
+        }
         renderWMSViews();
       });
     });
@@ -4772,13 +4782,6 @@
   }
 
   function populateSalesProductsDropdown() {
-    const searchInput = document.getElementById('wms-sales-product-search');
-    const hiddenProduct = document.getElementById('wms-sales-product');
-    const salesQty = document.getElementById('wms-sales-qty');
-    if (searchInput) searchInput.value = '';
-    if (hiddenProduct) hiddenProduct.value = '';
-    if (salesQty) salesQty.value = '';
-    
     renderSalesInvoiceTable();
     updateFEFORecommendation();
   }
