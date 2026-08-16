@@ -2121,8 +2121,11 @@
           }
         }
 
-        if (qty > (lot.Current_Qty + oldQtyForLot)) {
-          alert(`الكمية المطلوبة للمادة [${lot.Material_Name}] (${qty}) أكبر من الرصيد المتوفر باللوت [${lot.Lot_Number}] مضافاً إليه الكمية المصروفة سابقاً (${(lot.Current_Qty + oldQtyForLot).toFixed(3)} ${lot.Unit})!`);
+        const isGram = lot.Unit === 'g' || lot.Unit === 'غ' || lot.Unit === 'جرام';
+        const lotQtyInKg = isGram ? (lot.Current_Qty / 1000) : lot.Current_Qty;
+
+        if (qty > (lotQtyInKg + oldQtyForLot)) {
+          alert(`الكمية المطلوبة للمادة [${lot.Material_Name}] (${qty} kg) أكبر من الرصيد المتوفر باللوت [${lot.Lot_Number}] مضافاً إليه الكمية المصروفة سابقاً (${(lotQtyInKg + oldQtyForLot).toFixed(3)} kg)!`);
           isValid = false;
           break;
         }
@@ -2259,7 +2262,9 @@
             const qty = oldRow.Quantity || oldRow.qty;
             const lot = stockLots.find(l => l && String(l.Lot_ID) === String(lotId));
             if (lot) {
-              lot.Current_Qty = parseFloat((lot.Current_Qty + qty).toFixed(3));
+              const isGram = lot.Unit === 'g' || lot.Unit === 'غ' || lot.Unit === 'جرام';
+              const revertQty = isGram ? (qty * 1000) : qty;
+              lot.Current_Qty = parseFloat((lot.Current_Qty + revertQty).toFixed(3));
               lot.updatedAt = Date.now();
             }
           });
@@ -2274,7 +2279,9 @@
         formulationRows.forEach(row => {
           const lot = stockLots.find(l => l && String(l.Lot_ID) === String(row.lotId));
           if (lot) {
-            lot.Current_Qty = parseFloat((lot.Current_Qty - row.qty).toFixed(3));
+            const isGram = lot.Unit === 'g' || lot.Unit === 'غ' || lot.Unit === 'جرام';
+            const dispenseQty = isGram ? (row.qty * 1000) : row.qty;
+            lot.Current_Qty = parseFloat((lot.Current_Qty - dispenseQty).toFixed(3));
             lot.updatedAt = Date.now();
           }
 
@@ -2426,7 +2433,9 @@
       formulationRows.forEach(row => {
         const lot = stockLots.find(l => l && String(l.Lot_ID) === String(row.lotId));
         if (lot) {
-          lot.Current_Qty = parseFloat((lot.Current_Qty - row.qty).toFixed(3));
+          const isGram = lot.Unit === 'g' || lot.Unit === 'غ' || lot.Unit === 'جرام';
+          const dispenseQty = isGram ? (row.qty * 1000) : row.qty;
+          lot.Current_Qty = parseFloat((lot.Current_Qty - dispenseQty).toFixed(3));
           lot.updatedAt = Date.now();
         }
 
