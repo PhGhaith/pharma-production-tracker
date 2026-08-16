@@ -3834,7 +3834,7 @@
     const tabs = document.querySelectorAll('#wms-sub-tabs .filter-tab');
     tabs.forEach(tab => {
       tab.addEventListener('click', (e) => {
-        currentWMSTab = e.target.getAttribute('data-wms-tab');
+        currentWMSTab = tab.getAttribute('data-wms-tab') || e.currentTarget.getAttribute('data-wms-tab');
         if (currentWMSTab === 'sales') {
           const searchInput = document.getElementById('wms-sales-product-search');
           const hiddenProduct = document.getElementById('wms-sales-product');
@@ -4112,7 +4112,7 @@
     const historyFilters = document.querySelectorAll('#wms-history-filters .filter-tab');
     historyFilters.forEach(btn => {
       btn.addEventListener('click', (e) => {
-        currentHistoryFilter = e.target.getAttribute('data-history-filter');
+        currentHistoryFilter = btn.getAttribute('data-history-filter') || e.currentTarget.getAttribute('data-history-filter');
         
         historyFilters.forEach(b => {
           if (b.getAttribute('data-history-filter') === currentHistoryFilter) {
