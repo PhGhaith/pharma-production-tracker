@@ -4065,16 +4065,7 @@
       }
     });
 
-    // Clear button visibility based on admin/wms roles
-    const btnClearAll = document.getElementById('wms-btn-clear-all');
-    if (btnClearAll) {
-      btnClearAll.style.display = (currentUserRole === 'admin' || currentUserRole === 'wms') ? 'inline-flex' : 'none';
-    }
-
-    const btnClearReady = document.getElementById('wms-btn-clear-ready');
-    if (btnClearReady) {
-      btnClearReady.style.display = (currentUserRole === 'admin' || currentUserRole === 'wms') ? 'inline-flex' : 'none';
-    }
+    // Clear buttons display is handled directly by HTML/CSS and protected by PIN prompts.
 
     // Render corresponding sub-view data
     if (currentWMSTab === 'stock') {
