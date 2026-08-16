@@ -4065,15 +4065,15 @@
       }
     });
 
-    // Clear button visibility based on active tab and admin/wms roles
+    // Clear button visibility based on admin/wms roles
     const btnClearAll = document.getElementById('wms-btn-clear-all');
     if (btnClearAll) {
-      btnClearAll.style.display = (currentWMSTab === 'stock' && (currentUserRole === 'admin' || currentUserRole === 'wms')) ? 'inline-flex' : 'none';
+      btnClearAll.style.display = (currentUserRole === 'admin' || currentUserRole === 'wms') ? 'inline-flex' : 'none';
     }
 
     const btnClearReady = document.getElementById('wms-btn-clear-ready');
     if (btnClearReady) {
-      btnClearReady.style.display = (currentWMSTab === 'ready' && (currentUserRole === 'admin' || currentUserRole === 'wms')) ? 'inline-flex' : 'none';
+      btnClearReady.style.display = (currentUserRole === 'admin' || currentUserRole === 'wms') ? 'inline-flex' : 'none';
     }
 
     // Render corresponding sub-view data
