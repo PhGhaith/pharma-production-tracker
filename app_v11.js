@@ -4837,8 +4837,10 @@
         return u === 'kg' || u === 'g' || u === 'l' || u === 'كغ' || u === 'غ' || u === 'جرام' || u === 'لتر';
       };
       
+      const addedLotIds = (window.currentSalesInvoiceItems || []).map(item => String(item.lotId));
+      
       return stockLots
-        .filter(lot => lot && lot.Status === 'Released' && lot.Current_Qty > 0 && !isRawMaterial(lot))
+        .filter(lot => lot && lot.Status === 'Released' && lot.Current_Qty > 0 && !isRawMaterial(lot) && !addedLotIds.includes(String(lot.Lot_ID)))
         .map(lot => ({
           lotId: lot.Lot_ID,
           name: lot.Material_Name,
