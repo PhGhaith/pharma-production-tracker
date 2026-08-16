@@ -274,7 +274,8 @@
         <!-- WMS Main Sub-Tab Navigation -->
         <section class="controls-bar" style="margin-bottom: 20px;">
           <div class="filter-tabs" id="wms-sub-tabs" style="display: flex; gap: 8px;">
-            <button class="filter-tab active" data-wms-tab="stock">الرصيد الفعلي للمخزن 📋</button>
+            <button class="filter-tab active" data-wms-tab="stock">رصيد المواد الأولية 📋</button>
+            <button class="filter-tab" data-wms-tab="ready">الرصيد الجاهز 📦</button>
             <button class="filter-tab" data-wms-tab="import">استيراد رصيد افتتاحي 📥</button>
             <button class="filter-tab" data-wms-tab="inbound">استلام وارد جديد ➕</button>
             <button class="filter-tab" data-wms-tab="sales">شحن ومبيعات (FEFO) 🚚</button>
@@ -282,10 +283,10 @@
           </div>
         </section>
 
-        <!-- Sub-View 1: Current Stock Lots -->
+        <!-- Sub-View 1: Current Stock Lots (Raw Materials) -->
         <div id="wms-view-stock" class="wms-sub-view">
           <div class="section-header" style="margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center;">
-            <h3>الأرصدة الحالية في المستودعات</h3>
+            <h3>أرصدة المواد الأولية في المستودع</h3>
             <div style="display: flex; align-items: center; gap: 10px;">
               <button class="btn btn-secondary btn-sm" id="wms-btn-clear-all" style="border-color: var(--rose); color: var(--rose); display: none;">
                 <i data-lucide="trash-2" style="width: 14px; height: 14px; display: inline-block; vertical-align: middle;"></i> تفريغ كامل المخزن ⚠️
@@ -311,6 +312,37 @@
               </thead>
               <tbody id="wms-stock-tbody">
                 <!-- Stock rows injected dynamically -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Sub-View 6: Ready Finished Products Stock -->
+        <div id="wms-view-ready" class="wms-sub-view hidden">
+          <div class="section-header" style="margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center;">
+            <h3>أرصدة المنتجات التامة والجاهزة (الرصيد الجاهز)</h3>
+            <div style="display: flex; align-items: center; gap: 10px;">
+              <div class="search-box" style="max-width: 300px; margin: 0;">
+                <i data-lucide="search" class="search-icon"></i>
+                <input type="text" id="wms-ready-search" placeholder="ابحث باسم المنتج أو الكود أو اللوت...">
+              </div>
+            </div>
+          </div>
+          <div class="table-container" style="overflow-x: auto; background: var(--bg-card); border-radius: 8px; border: 1px solid rgba(255,255,255,0.08);">
+            <table class="pharma-table" style="width: 100%; border-collapse: collapse; text-align: right;">
+              <thead>
+                <tr style="background: rgba(255,255,255,0.02); border-bottom: 1px solid rgba(255,255,255,0.08);">
+                  <th style="padding: 12px; text-align: right;">رمز المنتج</th>
+                  <th style="padding: 12px; text-align: right;">اسم المنتج</th>
+                  <th style="padding: 12px; text-align: right;">رقم لوت المنتج</th>
+                  <th style="padding: 12px; text-align: right;">الكمية المتوفرة (الرصيد الجاهز)</th>
+                  <th style="padding: 12px; text-align: right;">تاريخ انتهاء الصلاحية</th>
+                  <th style="padding: 12px; text-align: right;">حالة المنتج</th>
+                  <th style="padding: 12px; text-align: center; width: 220px;">إجراءات الجودة والتحكم</th>
+                </tr>
+              </thead>
+              <tbody id="wms-ready-tbody">
+                <!-- Ready product stock rows injected dynamically -->
               </tbody>
             </table>
           </div>

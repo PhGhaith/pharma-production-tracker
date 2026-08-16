@@ -3817,6 +3817,9 @@
     const stockSearch = document.getElementById('wms-stock-search');
     if (stockSearch) stockSearch.addEventListener('input', renderStockLots);
 
+    const readySearch = document.getElementById('wms-ready-search');
+    if (readySearch) readySearch.addEventListener('input', renderReadyProducts);
+
     // Clear All WMS Stock
     const btnClearAll = document.getElementById('wms-btn-clear-all');
     if (btnClearAll) {
@@ -3915,6 +3918,8 @@
     // Render corresponding sub-view data
     if (currentWMSTab === 'stock') {
       renderStockLots();
+    } else if (currentWMSTab === 'ready') {
+      renderReadyProducts();
     } else if (currentWMSTab === 'history') {
       renderTransactionsLog();
     } else if (currentWMSTab === 'sales') {
@@ -3969,6 +3974,10 @@
 
     const filtered = stockLots.filter(lot => {
       if (!lot) return false;
+      
+      const isRawMaterial = lot.Unit === 'kg' || lot.Unit === 'g' || lot.Unit === 'L' || lot.Unit === 'كغ' || lot.Unit === 'غ' || lot.Unit === 'جرام' || lot.Unit === 'لتر';
+      if (!isRawMaterial) return false;
+
       return lot.Material_Code.toLowerCase().includes(query) ||
              lot.Material_Name.toLowerCase().includes(query) ||
              lot.Lot_Number.toLowerCase().includes(query);
@@ -3990,6 +3999,95 @@
       };
 
       // QC Actions HTML
+      let actionsHtml = '-';
+      if (currentUserRole === 'admin' || currentUserRole === 'qc' || currentUserRole === 'wms') {
+        const btnClass = 'btn btn-secondary btn-sm';
+        const style = 'padding: 2px 6px; font-size: 0.72rem; margin: 0 2px;';
+        let deleteBtnHtml = '';
+        if (currentUserRole === 'admin' || currentUserRole === 'wms') {
+          deleteBtnHtml = `
+            <button class="${btnClass}" style="${style} border-color: var(--rose); color: var(--rose);" onclick="deleteStockLot('${lot.Lot_ID}')" title="حذف اللوت نهائياً">
+              <i data-lucide="trash-2" style="width: 12px; height: 12px; display: inline-block; vertical-align: middle;"></i>
+            </button>
+          `;
+        }
+        
+        if (lot.Status === 'Quarantine') {
+          let requestBtnHtml = '';
+          if (currentUserRole === 'wms' || currentUserRole === 'admin') {
+            requestBtnHtml = `<button class="${btnClass}" style="${style} border-color: var(--cyan); color: var(--cyan);" onclick="notifyQCToReleaseLot('${lot.Lot_ID}')" title="طلب تحليل وإفراج من المختبر">طلب تحليل 🧪</button>`;
+          }
+          actionsHtml = `
+            <button class="${btnClass}" style="${style} border-color: var(--emerald); color: var(--emerald);" onclick="changeLotStatus('${lot.Lot_ID}', 'Released')">إفراج ✅</button>
+            <button class="${btnClass}" style="${style} border-color: var(--rose); color: var(--rose);" onclick="changeLotStatus('${lot.Lot_ID}', 'Rejected')">رفض ❌</button>
+            ${requestBtnHtml}
+            ${deleteBtnHtml}
+          `;
+        } else if (lot.Status === 'Released') {
+          actionsHtml = `
+            <button class="${btnClass}" style="${style} border-color: var(--amber); color: var(--amber);" onclick="changeLotStatus('${lot.Lot_ID}', 'Quarantine')">حجر 🔒</button>
+            <button class="${btnClass}" style="${style} border-color: var(--rose); color: var(--rose);" onclick="changeLotStatus('${lot.Lot_ID}', 'Rejected')">رفض ❌</button>
+            ${deleteBtnHtml}
+          `;
+        } else if (lot.Status === 'Rejected') {
+          actionsHtml = `
+            <button class="${btnClass}" style="${style} border-color: var(--amber); color: var(--amber);" onclick="changeLotStatus('${lot.Lot_ID}', 'Quarantine')">حجر 🔒</button>
+            <button class="${btnClass}" style="${style} border-color: var(--emerald); color: var(--emerald);" onclick="changeLotStatus('${lot.Lot_ID}', 'Released')">إفراج ✅</button>
+            ${deleteBtnHtml}
+          `;
+        }
+      }
+
+      tr.innerHTML = `
+        <td style="padding: 12px; font-weight: bold; color: var(--cyan);">${lot.Material_Code}</td>
+        <td style="padding: 12px; color: #fff;">${lot.Material_Name}</td>
+        <td style="padding: 12px;"><strong style="color: var(--amber); font-family: monospace;">${lot.Lot_Number}</strong></td>
+        <td style="padding: 12px; font-weight: bold; color: var(--emerald);">${lot.Current_Qty} ${lot.Unit}</td>
+        <td style="padding: 12px; color: var(--rose);">${lot.Expiry_Date}</td>
+        <td style="padding: 12px;">${statusMap[lot.Status] || lot.Status}</td>
+        <td style="padding: 12px; text-align: center;">${actionsHtml}</td>
+      `;
+      tbody.appendChild(tr);
+    });
+
+    if (window.lucide) window.lucide.createIcons();
+  }
+
+  function renderReadyProducts() {
+    const tbody = document.getElementById('wms-ready-tbody');
+    if (!tbody) return;
+    tbody.innerHTML = '';
+
+    const searchInput = document.getElementById('wms-ready-search');
+    const query = searchInput ? searchInput.value.toLowerCase().trim() : '';
+
+    const filtered = stockLots.filter(lot => {
+      if (!lot) return false;
+
+      const isRawMaterial = lot.Unit === 'kg' || lot.Unit === 'g' || lot.Unit === 'L' || lot.Unit === 'كغ' || lot.Unit === 'غ' || lot.Unit === 'جرام' || lot.Unit === 'لتر';
+      if (isRawMaterial) return false;
+
+      return lot.Material_Code.toLowerCase().includes(query) ||
+             lot.Material_Name.toLowerCase().includes(query) ||
+             lot.Lot_Number.toLowerCase().includes(query);
+    });
+
+    if (filtered.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: var(--text-dim); padding: 20px;">لا توجد منتجات جاهزة تطابق البحث أو الرصيد الجاهز فارغ.</td></tr>`;
+      return;
+    }
+
+    filtered.forEach(lot => {
+      const tr = document.createElement('tr');
+      tr.style.borderBottom = '1px solid rgba(255, 255, 255, 0.05)';
+
+      const statusMap = {
+        Released: '<span class="wms-badge released"><i data-lucide="check-circle-2" style="width:12px;height:12px;"></i> مقبول ومفرج عنه</span>',
+        Quarantine: '<span class="wms-badge quarantine"><i data-lucide="shield-alert" style="width:12px;height:12px;"></i> محجور (تحت الفحص)</span>',
+        Rejected: '<span class="wms-badge rejected"><i data-lucide="x-circle" style="width:12px;height:12px;"></i> مرفوض معزول</span>'
+      };
+
+      // Actions HTML
       let actionsHtml = '-';
       if (currentUserRole === 'admin' || currentUserRole === 'qc' || currentUserRole === 'wms') {
         const btnClass = 'btn btn-secondary btn-sm';
