@@ -3799,6 +3799,7 @@
         if (title) title.innerHTML = 'استيراد الأرصدة الافتتاحية للمواد الخام (Excel) 📥';
         if (desc) desc.textContent = 'استيراد لمرة واحدة لمطابقة أرصدة المواد الأولية الحالية بالمعمل كـ Released.';
         if (modalExcelImport) modalExcelImport.classList.remove('hidden');
+        if (window.lucide) window.lucide.createIcons();
       });
     }
 
@@ -3810,6 +3811,7 @@
         if (title) title.innerHTML = 'استيراد الأرصدة الافتتاحية للرصيد الجاهز (Excel) 📥';
         if (desc) desc.textContent = 'استيراد لمرة واحدة لمطابقة أرصدة المنتجات التامة الجاهزة الحالية بالمعمل كـ Released.';
         if (modalExcelImport) modalExcelImport.classList.remove('hidden');
+        if (window.lucide) window.lucide.createIcons();
       });
     }
 
