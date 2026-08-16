@@ -3919,11 +3919,11 @@
     const readySearch = document.getElementById('wms-ready-search');
     if (readySearch) readySearch.addEventListener('input', renderReadyProducts);
 
-    // Clear All WMS Stock
+    // Clear Raw Materials Stock
     const btnClearAll = document.getElementById('wms-btn-clear-all');
     if (btnClearAll) {
       btnClearAll.addEventListener('click', () => {
-        if (!confirm('⚠️ تحذير حرج: هل أنت متأكد من تفريغ كامل رصيد المستودع وحذف جميع المواد واللوتات وسجل الحركات نهائياً؟\nلا يمكن التراجع عن هذا الإجراء!')) {
+        if (!confirm('⚠️ تحذير حرج: هل أنت متأكد من تفريغ وتصفير كامل رصيد المواد الأولية بالمستودع؟\nلا يمكن التراجع عن هذا الإجراء!')) {
           return;
         }
         
@@ -3933,13 +3933,70 @@
           return;
         }
         
-        stockLots = [];
-        wmsTransactions = [];
+        // Remove only raw materials
+        stockLots = stockLots.filter(lot => {
+          if (!lot) return false;
+          const isRaw = lot.Unit === 'kg' || lot.Unit === 'g' || lot.Unit === 'L' || lot.Unit === 'كغ' || lot.Unit === 'غ' || lot.Unit === 'جرام' || lot.Unit === 'لتر';
+          return !isRaw;
+        });
+
+        // Add WMS transaction log
+        wmsTransactions.unshift({
+          Tx_ID: 'tx-' + Date.now() + '-' + Math.random().toString(36).substr(2, 4),
+          Lot_ID: 'system',
+          Tx_Type: 'Clear_Inventory',
+          Quantity: 0,
+          Reference_ID: 'تصفير كامل مستودع المواد الأولية',
+          Performed_By: currentUserRole,
+          Timestamp: Date.now()
+        });
+
         saveWMS(true);
         renderWMSViews();
         
         if (window.showToast) {
-          window.showToast('تم تفريغ كافة أرصدة وحركات المستودع بالكامل 🗑️', 'success');
+          window.showToast('تم تصفير مستودع المواد الأولية بالكامل 🗑️', 'success');
+        }
+      });
+    }
+
+    // Clear Finished Products Stock
+    const btnClearReady = document.getElementById('wms-btn-clear-ready');
+    if (btnClearReady) {
+      btnClearReady.addEventListener('click', () => {
+        if (!confirm('⚠️ تحذير حرج: هل أنت متأكد من تفريغ وتصفير كامل الرصيد الجاهز للمنتجات التامة؟\nلا يمكن التراجع عن هذا الإجراء!')) {
+          return;
+        }
+        
+        const pin = prompt('الرجاء إدخال رمز تأكيد الحذف (الـ PIN code لمدير النظام):');
+        if (pin !== '9999') {
+          alert('رمز التأكيد غير صحيح! تم إلغاء العملية.');
+          return;
+        }
+        
+        // Remove only ready finished products
+        stockLots = stockLots.filter(lot => {
+          if (!lot) return false;
+          const isRaw = lot.Unit === 'kg' || lot.Unit === 'g' || lot.Unit === 'L' || lot.Unit === 'كغ' || lot.Unit === 'غ' || lot.Unit === 'جرام' || lot.Unit === 'لتر';
+          return isRaw;
+        });
+
+        // Add WMS transaction log
+        wmsTransactions.unshift({
+          Tx_ID: 'tx-' + Date.now() + '-' + Math.random().toString(36).substr(2, 4),
+          Lot_ID: 'system',
+          Tx_Type: 'Clear_Inventory',
+          Quantity: 0,
+          Reference_ID: 'تصفير كامل رصيد المنتجات التامة (الرصيد الجاهز)',
+          Performed_By: currentUserRole,
+          Timestamp: Date.now()
+        });
+
+        saveWMS(true);
+        renderWMSViews();
+        
+        if (window.showToast) {
+          window.showToast('تم تصفير الرصيد الجاهز بالكامل 🗑️', 'success');
         }
       });
     }
@@ -4008,10 +4065,15 @@
       }
     });
 
-    // Clear button visibility based on active tab and admin role
+    // Clear button visibility based on active tab and admin/wms roles
     const btnClearAll = document.getElementById('wms-btn-clear-all');
     if (btnClearAll) {
-      btnClearAll.style.display = (currentWMSTab === 'stock' && currentUserRole === 'admin') ? 'inline-flex' : 'none';
+      btnClearAll.style.display = (currentWMSTab === 'stock' && (currentUserRole === 'admin' || currentUserRole === 'wms')) ? 'inline-flex' : 'none';
+    }
+
+    const btnClearReady = document.getElementById('wms-btn-clear-ready');
+    if (btnClearReady) {
+      btnClearReady.style.display = (currentWMSTab === 'ready' && (currentUserRole === 'admin' || currentUserRole === 'wms')) ? 'inline-flex' : 'none';
     }
 
     // Render corresponding sub-view data
