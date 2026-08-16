@@ -4730,34 +4730,52 @@
     if (!inputSearch || !hiddenProduct || !dropdown) return;
 
     function getReleasedProducts() {
-      const releasedProductsMap = new Map();
-      stockLots.forEach(lot => {
-        if (lot && lot.Status === 'Released' && lot.Current_Qty > 0) {
-          releasedProductsMap.set(lot.Material_Name, lot.Unit);
-        }
-      });
-      return Array.from(releasedProductsMap.entries()).map(([name, unit]) => ({ name, unit }));
+      const isRawMaterial = lot => {
+        if (!lot || !lot.Unit) return false;
+        const u = lot.Unit.toLowerCase();
+        return u === 'kg' || u === 'g' || u === 'l' || u === 'كغ' || u === 'غ' || u === 'جرام' || u === 'لتر';
+      };
+      
+      return stockLots
+        .filter(lot => lot && lot.Status === 'Released' && lot.Current_Qty > 0 && !isRawMaterial(lot))
+        .map(lot => ({
+          lotId: lot.Lot_ID,
+          name: lot.Material_Name,
+          lotNumber: lot.Lot_Number,
+          qty: lot.Current_Qty,
+          unit: lot.Unit
+        }));
     }
 
     function populateDropdown(query = '') {
       dropdown.innerHTML = '';
-      const products = getReleasedProducts();
-      const filtered = products.filter(p => p.name.toLowerCase().includes(query.toLowerCase()));
+      const lots = getReleasedProducts();
+      const filtered = lots.filter(l => 
+        l.name.toLowerCase().includes(query.toLowerCase()) || 
+        l.lotNumber.toLowerCase().includes(query.toLowerCase())
+      );
 
       if (filtered.length === 0) {
-        dropdown.innerHTML = '<div style="padding: 8px; color: var(--text-dim); text-align: center; font-size: 0.85rem;">لا توجد منتجات مطابقة</div>';
+        dropdown.innerHTML = '<div style="padding: 8px; color: var(--text-dim); text-align: center; font-size: 0.85rem;">لا توجد لوتات مطابقة</div>';
         dropdown.classList.remove('hidden');
         return;
       }
 
-      filtered.forEach(p => {
+      filtered.forEach(l => {
         const item = document.createElement('div');
         item.style.padding = '8px 12px';
         item.style.cursor = 'pointer';
         item.style.fontSize = '0.88rem';
         item.style.borderBottom = '1px solid rgba(255,255,255,0.03)';
         item.style.transition = 'background 0.2s';
-        item.textContent = `${p.name} (${p.unit})`;
+        
+        item.innerHTML = `
+          <div style="font-weight: bold; color: #fff;">${l.name}</div>
+          <div style="font-size: 0.78rem; color: var(--text-dim); margin-top: 2px; display: flex; justify-content: space-between;">
+            <span>الباتش: <strong style="color: var(--amber);">${l.lotNumber}</strong></span>
+            <span>الرصيد: <strong style="color: var(--emerald);">${l.qty} ${l.unit}</strong></span>
+          </div>
+        `;
 
         item.addEventListener('mouseenter', () => {
           item.style.background = 'rgba(6, 182, 212, 0.15)';
@@ -4768,8 +4786,8 @@
 
         item.addEventListener('mousedown', (e) => {
           e.preventDefault();
-          inputSearch.value = p.name;
-          hiddenProduct.value = p.name;
+          inputSearch.value = `${l.name} [الباتش: ${l.lotNumber}]`;
+          hiddenProduct.value = l.lotId;
           dropdown.classList.add('hidden');
           updateFEFORecommendation();
         });
@@ -4793,8 +4811,8 @@
     inputSearch.addEventListener('blur', () => {
       setTimeout(() => {
         dropdown.classList.add('hidden');
-        const products = getReleasedProducts();
-        const exists = products.some(p => p.name === inputSearch.value);
+        const lots = getReleasedProducts();
+        const exists = lots.some(l => `${l.name} [الباتش: ${l.lotNumber}]` === inputSearch.value);
         if (!exists) {
           inputSearch.value = '';
           hiddenProduct.value = '';
@@ -4812,45 +4830,46 @@
 
     if (!select || !inputQty || !container || !details) return;
 
-    const productName = select.value;
+    const lotId = select.value;
     const requiredQty = parseFloat(inputQty.value) || 0;
 
-    if (!productName || requiredQty <= 0) {
+    if (!lotId || requiredQty <= 0) {
       container.classList.add('hidden');
       return;
     }
 
-    const lots = stockLots
-      .filter(l => l && l.Material_Name === productName && l.Status === 'Released' && l.Current_Qty > 0)
-      .sort((a, b) => new Date(a.Expiry_Date) - new Date(b.Expiry_Date));
+    const lot = stockLots.find(l => l && String(l.Lot_ID) === String(lotId));
+    if (!lot) {
+      container.classList.add('hidden');
+      return;
+    }
 
-    let remaining = requiredQty;
     let recommendationHtml = '<ul style="margin: 0; padding-right: 20px;">';
-    let availableTotal = 0;
-
-    lots.forEach(lot => {
-      availableTotal += lot.Current_Qty;
-      if (remaining <= 0) return;
-
-      const take = Math.min(remaining, lot.Current_Qty);
-      remaining -= take;
-
-      recommendationHtml += `
-        <li style="margin-bottom: 4px;">
-          صرف <strong style="color: var(--emerald);">${take.toFixed(3)} ${lot.Unit}</strong> 
-          من اللوت <strong style="color: var(--amber);">${lot.Lot_Number}</strong> 
-          (تاريخ الانتهاء: <span style="color: var(--rose); font-weight: bold;">${lot.Expiry_Date}</span>، المتوفر: ${lot.Current_Qty} ${lot.Unit})
-        </li>
-      `;
-    });
-
+    recommendationHtml += `
+      <li style="margin-bottom: 4px;">
+        صرف منتج: <strong>${lot.Material_Name}</strong>
+      </li>
+      <li style="margin-bottom: 4px;">
+        من الباتش: <strong style="color: var(--amber);">${lot.Lot_Number}</strong> (تاريخ الانتهاء: <span style="color: var(--rose); font-weight: bold;">${lot.Expiry_Date}</span>)
+      </li>
+      <li style="margin-bottom: 4px;">
+        الكمية المطلوبة للشحن: <strong style="color: var(--cyan);">${requiredQty.toFixed(3)} ${lot.Unit}</strong>
+      </li>
+    `;
     recommendationHtml += '</ul>';
 
-    if (requiredQty > availableTotal) {
+    if (requiredQty > lot.Current_Qty) {
       recommendationHtml += `
         <div style="color: var(--rose); font-weight: bold; margin-top: 8px; display: flex; align-items: center; gap: 4px;">
           <i data-lucide="alert-circle" style="width:16px;height:16px;"></i>
-          عذراً، الرصيد المتاح من هذا المنتج (${availableTotal.toFixed(3)}) غير كافٍ لتلبية الطلب!
+          عذراً، الرصيد المتاح في هذا الباتش (${lot.Current_Qty} ${lot.Unit}) غير كافٍ لتلبية الطلب!
+        </div>
+      `;
+    } else {
+      recommendationHtml += `
+        <div style="color: var(--emerald); font-weight: bold; margin-top: 8px; display: flex; align-items: center; gap: 4px;">
+          <i data-lucide="check-circle" style="width:16px;height:16px;"></i>
+          الرصيد متوفر وسيصبح المتبقي في هذا الباتش: ${(lot.Current_Qty - requiredQty).toFixed(3)} ${lot.Unit}
         </div>
       `;
     }
@@ -4863,44 +4882,34 @@
 
   function handleSalesSubmit(e) {
     e.preventDefault();
-    const productName = document.getElementById('wms-sales-product').value;
+    const lotId = document.getElementById('wms-sales-product').value;
     const requiredQty = parseFloat(document.getElementById('wms-sales-qty').value) || 0;
     const ref = document.getElementById('wms-sales-ref').value.trim() || 'فاتورة شحن مبيعات';
 
-    if (!productName || requiredQty <= 0) return;
+    if (!lotId || requiredQty <= 0) return;
 
-    const lots = stockLots
-      .filter(l => l && l.Material_Name === productName && l.Status === 'Released' && l.Current_Qty > 0)
-      .sort((a, b) => new Date(a.Expiry_Date) - new Date(b.Expiry_Date));
-
-    let availableTotal = 0;
-    lots.forEach(l => availableTotal += l.Current_Qty);
-
-    if (requiredQty > availableTotal) {
-      alert(`الرصيد المفرج عنه غير كافٍ! المتوفر: ${availableTotal}، المطلوب: ${requiredQty}`);
+    const lot = stockLots.find(l => l && String(l.Lot_ID) === String(lotId));
+    if (!lot) {
+      alert('اللوت أو الباتش المحدد غير موجود في المخازن!');
       return;
     }
 
-    let remaining = requiredQty;
-    let shippedLots = [];
-    lots.forEach(lot => {
-      if (remaining <= 0) return;
+    if (requiredQty > lot.Current_Qty) {
+      alert(`الرصيد في الباتش المحدد غير كافٍ! المتوفر: ${lot.Current_Qty} ${lot.Unit}، المطلوب: ${requiredQty} ${lot.Unit}`);
+      return;
+    }
 
-      const take = Math.min(remaining, lot.Current_Qty);
-      lot.Current_Qty = parseFloat((lot.Current_Qty - take).toFixed(3));
-      lot.updatedAt = Date.now();
-      remaining -= take;
-      shippedLots.push(lot.Lot_Number);
+    lot.Current_Qty = parseFloat((lot.Current_Qty - requiredQty).toFixed(3));
+    lot.updatedAt = Date.now();
 
-      wmsTransactions.unshift({
-        Tx_ID: 'tx-' + Date.now() + '-' + Math.random().toString(36).substr(2, 4),
-        Lot_ID: lot.Lot_ID,
-        Tx_Type: 'Sales_Dispatch',
-        Quantity: -take,
-        Reference_ID: `شحن مبيعات للعملاء (${ref}) - باتش رقم: ${lot.Lot_Number}`,
-        Performed_By: currentUserRole,
-        Timestamp: Date.now()
-      });
+    wmsTransactions.unshift({
+      Tx_ID: 'tx-' + Date.now() + '-' + Math.random().toString(36).substr(2, 4),
+      Lot_ID: lot.Lot_ID,
+      Tx_Type: 'Sales_Dispatch',
+      Quantity: -requiredQty,
+      Reference_ID: `شحن مبيعات للعملاء (${ref}) - باتش رقم: ${lot.Lot_Number}`,
+      Performed_By: currentUserRole,
+      Timestamp: Date.now()
     });
 
     saveWMS(true);
@@ -4911,7 +4920,7 @@
     renderWMSViews();
 
     if (window.showToast) {
-      window.showToast(`تم شحن وصرف كمية ${requiredQty} من المنتج [${productName}] بنجاح (رقم الباتش: ${shippedLots.join('، ')}) 🚚`, 'success');
+      window.showToast(`تم شحن وصرف كمية ${requiredQty} من المنتج [${lot.Material_Name}] بنجاح (رقم الباتش: ${lot.Lot_Number}) 🚚`, 'success');
     }
   }
 
