@@ -3905,9 +3905,66 @@
 
     // Sales/FEFO Form
     setupSalesAutocomplete();
+    window.currentSalesInvoiceItems = [];
 
     const salesQty = document.getElementById('wms-sales-qty');
     if (salesQty) salesQty.addEventListener('input', updateFEFORecommendation);
+
+    const btnSalesAddItem = document.getElementById('wms-btn-sales-add-item');
+    if (btnSalesAddItem) {
+      btnSalesAddItem.addEventListener('click', () => {
+        const select = document.getElementById('wms-sales-product');
+        const inputQty = document.getElementById('wms-sales-qty');
+        const inputSearch = document.getElementById('wms-sales-product-search');
+
+        if (!select || !inputQty || !inputSearch) return;
+
+        const lotId = select.value;
+        const qty = parseFloat(inputQty.value) || 0;
+
+        if (!lotId) {
+          alert('الرجاء اختيار المنتج والباتش أولاً!');
+          return;
+        }
+        if (qty <= 0) {
+          alert('الرجاء تحديد كمية شحن صالحة أكبر من الصفر!');
+          return;
+        }
+
+        const lot = stockLots.find(l => l && String(l.Lot_ID) === String(lotId));
+        if (!lot) {
+          alert('الباتش المحدد غير موجود!');
+          return;
+        }
+
+        if (qty > lot.Current_Qty) {
+          alert(`الكمية المطلوبة (${qty} ${lot.Unit}) أكبر من الرصيد المتوفر في الباتش (${lot.Current_Qty} ${lot.Unit})!`);
+          return;
+        }
+
+        const exists = window.currentSalesInvoiceItems.some(item => String(item.lotId) === String(lotId));
+        if (exists) {
+          alert('هذا المنتج وهذا الباتش مضاف مسبقاً للفاتورة الحالية!');
+          return;
+        }
+
+        window.currentSalesInvoiceItems.push({
+          lotId: lot.Lot_ID,
+          name: lot.Material_Name,
+          lotNumber: lot.Lot_Number,
+          qty: qty,
+          unit: lot.Unit,
+          expiry: lot.Expiry_Date
+        });
+
+        inputSearch.value = '';
+        select.value = '';
+        inputQty.value = '';
+
+        document.getElementById('wms-fefo-recommendation').classList.add('hidden');
+        renderSalesInvoiceTable();
+      });
+    }
 
     const formSales = document.getElementById('wms-form-sales');
     if (formSales) formSales.addEventListener('submit', handleSalesSubmit);
@@ -4717,10 +4774,54 @@
   function populateSalesProductsDropdown() {
     const searchInput = document.getElementById('wms-sales-product-search');
     const hiddenProduct = document.getElementById('wms-sales-product');
+    const salesQty = document.getElementById('wms-sales-qty');
     if (searchInput) searchInput.value = '';
     if (hiddenProduct) hiddenProduct.value = '';
+    if (salesQty) salesQty.value = '';
+    
+    renderSalesInvoiceTable();
     updateFEFORecommendation();
   }
+
+  function renderSalesInvoiceTable() {
+    const tbody = document.getElementById('wms-sales-invoice-tbody');
+    if (!tbody) return;
+
+    tbody.innerHTML = '';
+    if (!window.currentSalesInvoiceItems || window.currentSalesInvoiceItems.length === 0) {
+      tbody.innerHTML = `
+        <tr id="wms-sales-invoice-empty-row">
+          <td colspan="6" style="text-align: center; color: var(--text-dim); padding: 20px;">لم يتم إضافة أي بنود للفاتورة بعد. الرجاء إضافة بنود أعلاه.</td>
+        </tr>
+      `;
+      return;
+    }
+
+    window.currentSalesInvoiceItems.forEach((item, index) => {
+      const tr = document.createElement('tr');
+      tr.style.borderBottom = '1px solid rgba(255,255,255,0.05)';
+      tr.innerHTML = `
+        <td style="padding: 10px;">${item.name}</td>
+        <td style="padding: 10px;"><strong style="color: var(--amber);">${item.lotNumber}</strong></td>
+        <td style="padding: 10px; font-weight: bold; color: var(--cyan);">${item.qty}</td>
+        <td style="padding: 10px;">${item.unit}</td>
+        <td style="padding: 10px; color: var(--rose);">${item.expiry}</td>
+        <td style="padding: 10px; text-align: center;">
+          <button type="button" class="btn btn-secondary btn-sm" onclick="removeSalesInvoiceItem(${index})" style="padding: 2px 6px; border-color: var(--rose); color: var(--rose); font-size: 0.75rem;">حذف</button>
+        </td>
+      `;
+      tbody.appendChild(tr);
+    });
+
+    if (window.lucide) window.lucide.createIcons();
+  }
+
+  window.removeSalesInvoiceItem = function(index) {
+    if (window.currentSalesInvoiceItems) {
+      window.currentSalesInvoiceItems.splice(index, 1);
+      renderSalesInvoiceTable();
+    }
+  };
 
   function setupSalesAutocomplete() {
     const inputSearch = document.getElementById('wms-sales-product-search');
@@ -4882,45 +4983,77 @@
 
   function handleSalesSubmit(e) {
     e.preventDefault();
-    const lotId = document.getElementById('wms-sales-product').value;
-    const requiredQty = parseFloat(document.getElementById('wms-sales-qty').value) || 0;
-    const ref = document.getElementById('wms-sales-ref').value.trim() || 'فاتورة شحن مبيعات';
+    const ref = document.getElementById('wms-sales-ref').value.trim();
 
-    if (!lotId || requiredQty <= 0) return;
-
-    const lot = stockLots.find(l => l && String(l.Lot_ID) === String(lotId));
-    if (!lot) {
-      alert('اللوت أو الباتش المحدد غير موجود في المخازن!');
+    if (!window.currentSalesInvoiceItems || window.currentSalesInvoiceItems.length === 0) {
+      alert('الرجاء إضافة منتج واحد على الأقل للشحنة قبل التأكيد!');
       return;
     }
 
-    if (requiredQty > lot.Current_Qty) {
-      alert(`الرصيد في الباتش المحدد غير كافٍ! المتوفر: ${lot.Current_Qty} ${lot.Unit}، المطلوب: ${requiredQty} ${lot.Unit}`);
+    if (!ref) {
+      alert('الرجاء تحديد الجهة المستلمة أو رقم الفاتورة/العميل!');
       return;
     }
 
-    lot.Current_Qty = parseFloat((lot.Current_Qty - requiredQty).toFixed(3));
-    lot.updatedAt = Date.now();
+    // Validate quantities for all items
+    let errorOccurred = false;
+    for (const item of window.currentSalesInvoiceItems) {
+      const lot = stockLots.find(l => l && String(l.Lot_ID) === String(item.lotId));
+      if (!lot) {
+        alert(`الباتش المحدد للمنتج [${item.name}] غير موجود!`);
+        errorOccurred = true;
+        break;
+      }
+      if (item.qty > lot.Current_Qty) {
+        alert(`الرصيد في الباتش [${lot.Lot_Number}] للمنتج [${item.name}] غير كافٍ! المتوفر: ${lot.Current_Qty} ${lot.Unit}، المطلوب: ${item.qty} ${lot.Unit}`);
+        errorOccurred = true;
+        break;
+      }
+    }
 
-    wmsTransactions.unshift({
-      Tx_ID: 'tx-' + Date.now() + '-' + Math.random().toString(36).substr(2, 4),
-      Lot_ID: lot.Lot_ID,
-      Tx_Type: 'Sales_Dispatch',
-      Quantity: -requiredQty,
-      Reference_ID: `شحن مبيعات للعملاء (${ref}) - باتش رقم: ${lot.Lot_Number}`,
-      Performed_By: currentUserRole,
-      Timestamp: Date.now()
+    if (errorOccurred) return;
+
+    // Deduct stock and save transactions
+    let shippedLots = [];
+    window.currentSalesInvoiceItems.forEach(item => {
+      const lot = stockLots.find(l => l && String(l.Lot_ID) === String(item.lotId));
+      if (lot) {
+        lot.Current_Qty = parseFloat((lot.Current_Qty - item.qty).toFixed(3));
+        lot.updatedAt = Date.now();
+        shippedLots.push(`${lot.Material_Name} (الباتش: ${lot.Lot_Number})`);
+
+        wmsTransactions.unshift({
+          Tx_ID: 'tx-' + Date.now() + '-' + Math.random().toString(36).substr(2, 4),
+          Lot_ID: lot.Lot_ID,
+          Tx_Type: 'Sales_Dispatch',
+          Quantity: -item.qty,
+          Reference_ID: `شحن مبيعات للعملاء (${ref}) - باتش رقم: ${lot.Lot_Number}`,
+          Performed_By: currentUserRole,
+          Timestamp: Date.now()
+        });
+      }
     });
 
     saveWMS(true);
     
+    window.currentSalesInvoiceItems = [];
     document.getElementById('wms-form-sales').reset();
+    renderSalesInvoiceTable();
+    
+    // Clear line entry inputs
+    const searchInput = document.getElementById('wms-sales-product-search');
+    const hiddenProduct = document.getElementById('wms-sales-product');
+    const salesQty = document.getElementById('wms-sales-qty');
+    if (searchInput) searchInput.value = '';
+    if (hiddenProduct) hiddenProduct.value = '';
+    if (salesQty) salesQty.value = '';
+
     document.getElementById('wms-fefo-recommendation').classList.add('hidden');
     currentWMSTab = 'ready';
     renderWMSViews();
 
     if (window.showToast) {
-      window.showToast(`تم شحن وصرف كمية ${requiredQty} من المنتج [${lot.Material_Name}] بنجاح (رقم الباتش: ${lot.Lot_Number}) 🚚`, 'success');
+      window.showToast(`تم شحن وصرف الشحنة [${ref}] بنجاح للمنتجات التالية: ${shippedLots.join('، ')} 🚚`, 'success');
     }
   }
 

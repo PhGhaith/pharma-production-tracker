@@ -417,38 +417,66 @@
         <div id="wms-view-sales" class="wms-sub-view hidden">
           <div class="section-header" style="margin-bottom: 16px;">
             <h3>صرف الشحن والمبيعات للمنتجات التامة</h3>
-            <p style="font-size: 0.8rem; color: var(--text-dim);">يقوم النظام باقتراح وصرف المنتجات المفرج عنها (Released) ذات تاريخ الانتهاء الأقرب أولاً</p>
+            <p style="font-size: 0.8rem; color: var(--text-dim);">تجهيز وصرف الشحنات متعددة المنتجات والباتشات من رصيد المنتجات التامة المفرج عنها</p>
           </div>
-          <form id="wms-form-sales" style="background: var(--bg-card); padding: 20px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.08);">
-            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin-bottom: 20px;">
-              <div class="form-group" style="position: relative;">
-                <label>اختر المنتج التام للصرف *</label>
-                <input type="text" id="wms-sales-product-search" placeholder="🔍 اكتب للبحث عن منتج تام..." required style="width: 100%; box-sizing: border-box; padding: 8px; border-radius: 4px; background: #1e293b; border: 1px solid rgba(255,255,255,0.15); color: #fff;">
-                <input type="hidden" id="wms-sales-product" required>
+          
+          <div style="background: var(--bg-card); padding: 20px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.08); margin-bottom: 20px;">
+            <h4 style="margin: 0 0 12px 0; color: var(--cyan); font-size: 0.95rem;">إضافة منتج/باتش جديد للشحنة:</h4>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)) 120px; gap: 16px; align-items: flex-end;">
+              <div class="form-group" style="position: relative; margin: 0;">
+                <label>اختر المنتج التام والباتش *</label>
+                <input type="text" id="wms-sales-product-search" placeholder="🔍 اكتب للبحث باسم المنتج أو الباتش..." style="width: 100%; box-sizing: border-box; padding: 8px; border-radius: 4px; background: #1e293b; border: 1px solid rgba(255,255,255,0.15); color: #fff;">
+                <input type="hidden" id="wms-sales-product">
                 <div id="wms-sales-product-dropdown" class="hidden" style="position: absolute; left: 0; right: 0; background: #0b0f19; border: 1px solid rgba(6, 182, 212, 0.3); border-radius: 4px; max-height: 180px; overflow-y: auto; z-index: 9999; box-shadow: 0 10px 25px rgba(0,0,0,0.8); margin-top: 2px;"></div>
               </div>
-              <div class="form-group">
+              <div class="form-group" style="margin: 0;">
                 <label>الكمية المطلوبة للشحن *</label>
-                <input type="number" step="0.01" id="wms-sales-qty" placeholder="الكمية المطلوبة" required style="width: 100%; box-sizing: border-box; padding: 8px; border-radius: 4px; background: #1e293b; border: 1px solid rgba(255,255,255,0.15); color: #fff;">
+                <input type="number" step="0.01" id="wms-sales-qty" placeholder="الكمية المطلوبة" style="width: 100%; box-sizing: border-box; padding: 8px; border-radius: 4px; background: #1e293b; border: 1px solid rgba(255,255,255,0.15); color: #fff;">
               </div>
-              <div class="form-group">
-                <label>الجهة المستلمة / رقم العميل</label>
-                <input type="text" id="wms-sales-ref" placeholder="مثال: فاتورة بيع رقم 10292" style="width: 100%; box-sizing: border-box; padding: 8px; border-radius: 4px; background: #1e293b; border: 1px solid rgba(255,255,255,0.15); color: #fff;">
-              </div>
+              <button type="button" class="btn btn-secondary" id="wms-btn-sales-add-item" style="border-color: var(--cyan); color: var(--cyan); height: 38px; padding: 0 12px; display: inline-flex; align-items: center; justify-content: center; gap: 4px;">
+                <i data-lucide="plus" style="width: 16px; height: 16px;"></i> إضافة للفاتورة
+              </button>
             </div>
             
-            <div id="wms-fefo-recommendation" class="hidden" style="background: rgba(6, 182, 212, 0.05); border: 1px solid rgba(6, 182, 212, 0.2); border-radius: 6px; padding: 12px 16px; margin-bottom: 20px; font-size: 0.85rem;">
+            <div id="wms-fefo-recommendation" class="hidden" style="background: rgba(6, 182, 212, 0.05); border: 1px solid rgba(6, 182, 212, 0.2); border-radius: 6px; padding: 12px 16px; margin-top: 16px; font-size: 0.85rem;">
               <h5 style="color: var(--cyan); margin: 0 0 6px 0; display: flex; align-items: center; gap: 6px;">
-                <i data-lucide="sparkles" style="width: 16px; height: 16px;"></i> توصية الصرف الذكية:
+                <i data-lucide="sparkles" style="width: 16px; height: 16px;"></i> تفاصيل اللوت المحدد للخط الحالي:
               </h5>
               <div id="wms-fefo-details" style="color: #e2e8f0; line-height: 1.4;">
-                <!-- Recommedations injected here -->
+                <!-- Details injected here -->
               </div>
             </div>
+          </div>
 
-            <div style="display: flex; justify-content: flex-end;">
-              <button type="submit" class="btn btn-primary" id="wms-btn-sales-submit">
-                <i data-lucide="truck"></i> تأكيد صرف وشحن الشحنة
+          <form id="wms-form-sales" style="background: var(--bg-card); padding: 20px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.08);">
+            <h4 style="margin: 0 0 12px 0; color: #fff; font-size: 0.95rem;">جدول بنود الشحنة الحالية (الفاتورة):</h4>
+            <div class="table-container" style="overflow-x: auto; background: rgba(0,0,0,0.15); border-radius: 6px; border: 1px solid rgba(255,255,255,0.05); margin-bottom: 20px;">
+              <table class="pharma-table" style="width: 100%; border-collapse: collapse; text-align: right;">
+                <thead>
+                  <tr style="background: rgba(255,255,255,0.02); border-bottom: 1px solid rgba(255,255,255,0.08);">
+                    <th style="padding: 10px; text-align: right;">اسم المنتج التام</th>
+                    <th style="padding: 10px; text-align: right;">رقم الباتش (اللوت)</th>
+                    <th style="padding: 10px; text-align: right;">الكمية المنصرفة</th>
+                    <th style="padding: 10px; text-align: right;">الوحدة</th>
+                    <th style="padding: 10px; text-align: right;">تاريخ انتهاء الصلاحية</th>
+                    <th style="padding: 10px; text-align: center; width: 80px;">إجراء</th>
+                  </tr>
+                </thead>
+                <tbody id="wms-sales-invoice-tbody">
+                  <tr id="wms-sales-invoice-empty-row">
+                    <td colspan="6" style="text-align: center; color: var(--text-dim); padding: 20px;">لم يتم إضافة أي بنود للفاتورة بعد. الرجاء إضافة بنود أعلاه.</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr auto; gap: 20px; align-items: flex-end;">
+              <div class="form-group" style="margin: 0;">
+                <label>الجهة المستلمة / رقم الفاتورة أو العميل *</label>
+                <input type="text" id="wms-sales-ref" placeholder="مثال: فاتورة بيع رقم 10292" required style="width: 100%; box-sizing: border-box; padding: 8px; border-radius: 4px; background: #1e293b; border: 1px solid rgba(255,255,255,0.15); color: #fff;">
+              </div>
+              <button type="submit" class="btn btn-primary" id="wms-btn-sales-submit" style="height: 38px; display: inline-flex; align-items: center; gap: 6px;">
+                <i data-lucide="truck"></i> تأكيد صرف وشحن الشحنة بالكامل
               </button>
             </div>
           </form>
@@ -1006,7 +1034,7 @@
   <script src="xlsx.full.min.js"></script>
   <script src="pharmaMath.js?v=15.1"></script>
   <script src="mockData.js?v=15.0"></script>
-  <script src="app_v11.js?v=9.5"></script>
+  <script src="app_v11.js?v=9.6"></script>
   <script>
     lucide.createIcons();
   </script>
