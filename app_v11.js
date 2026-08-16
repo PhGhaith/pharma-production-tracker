@@ -313,6 +313,8 @@
     });
 
     startQCUnreleasedNotifier();
+
+
   }
 
   function startQCUnreleasedNotifier() {
@@ -5528,5 +5530,9 @@
     inputLogAcceptedKg.value = total.toFixed(3);
   }
 
-  document.addEventListener('DOMContentLoaded', init);
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
+  }
 })();
