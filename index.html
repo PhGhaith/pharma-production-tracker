@@ -416,6 +416,7 @@
                 <select id="wms-in-type" required style="width: 100%; box-sizing: border-box; padding: 8px; border-radius: 4px; background: #1e293b; border: 1px solid rgba(255,255,255,0.15); color: #fff; height: 38px;">
                   <option value="raw">مادة أولية خام 🧪</option>
                   <option value="packaging">مادة تعبئة وتغليف 🏷️</option>
+                  <option value="ready">منتج تام جاهز 📦</option>
                 </select>
               </div>
               <div class="form-group">
@@ -1099,6 +1100,39 @@
               </div>
             </div>
           </div>
+
+      <!-- Material Dispensation Invoice Section (فاتورة صرف المواد الموزونة) -->
+      <div id="weighing-invoice-section" class="hidden" style="margin-top: 1.5rem; background: rgba(16, 185, 129, 0.05); border: 1px solid rgba(16, 185, 129, 0.2); border-radius: 8px; padding: 1.25rem;">
+        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(16, 185, 129, 0.2); padding-bottom: 8px; margin-bottom: 12px;">
+          <h4 style="margin: 0; color: var(--emerald); display: flex; align-items: center; gap: 8px; font-size: 0.95rem; font-weight: bold;">
+            <i data-lucide="receipt"></i> فاتورة صرف المواد الموزونة للتشغيلة (Dispensation Bill)
+          </h4>
+          <span id="weighing-invoice-date" style="font-size: 0.75rem; color: var(--text-dim);">التاريخ: -</span>
+        </div>
+        
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 12px; font-size: 0.82rem; color: var(--text-dim);">
+          <div><strong>رقم الإضبارة:</strong> <span id="weighing-invoice-batch-no" style="color: #fff;">-</span></div>
+          <div><strong>اسم المستحضر:</strong> <span id="weighing-invoice-product-name" style="color: #fff;">-</span></div>
+        </div>
+
+        <table class="qc-table" style="margin-top: 8px; width: 100%;">
+          <thead>
+            <tr>
+              <th style="text-align: right; padding: 8px; color: var(--text-dim);">المادة الخام</th>
+              <th style="text-align: center; padding: 8px; color: var(--text-dim);">رقم اللوت (Lot No)</th>
+              <th style="text-align: left; padding: 8px; color: var(--text-dim);">الكمية المصروفة</th>
+            </tr>
+          </thead>
+          <tbody id="weighing-invoice-tbody">
+            <!-- Injected dynamically -->
+          </tbody>
+        </table>
+        
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 12px; font-size: 0.85rem; border-top: 1px dashed rgba(255,255,255,0.1); padding-top: 10px;">
+          <div><strong>الحالة:</strong> <span class="wms-badge released" style="background: rgba(16, 185, 129, 0.2); color: var(--emerald); padding: 2px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: bold; border: 1px solid rgba(16, 185, 129, 0.3);">تم الصرف والتحقق 🟢</span></div>
+          <div><strong>إجمالي كمية الوجبة الموزونة:</strong> <strong id="weighing-invoice-total" style="color: var(--cyan);">0 kg</strong></div>
+        </div>
+      </div>
 
           <!-- History Section -->
           <div class="history-section">

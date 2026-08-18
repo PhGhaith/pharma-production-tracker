@@ -4,6 +4,29 @@
  */
 
 (function () {
+  // Global override for parseFloat and parseInt to transparently support Arabic/Persian digits and decimals
+  const _originalParseFloat = window.parseFloat;
+  window.parseFloat = function(val) {
+    if (typeof val === 'string') {
+      val = val.replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d))
+               .replace(/[۰-۹]/g, d => '۰۱۲۳۴۵۶۷۸۹'.indexOf(d))
+               .replace(/،/g, '.')
+               .replace(/,/g, '.');
+    }
+    return _originalParseFloat(val);
+  };
+
+  const _originalParseInt = window.parseInt;
+  window.parseInt = function(val, radix) {
+    if (typeof val === 'string') {
+      val = val.replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d))
+               .replace(/[۰-۹]/g, d => '۰۱۲۳۴۵۶۷۸۹'.indexOf(d))
+               .replace(/،/g, '.')
+               .replace(/,/g, '.');
+    }
+    return _originalParseInt(val, radix);
+  };
+
   const MASTER_STORAGE_KEY = 'pharma_production_batches_master_v2';
   const WMS_STOCK_LOTS_KEY = 'pharma_wms_stock_lots_v1';
   const WMS_TRANSACTIONS_KEY = 'pharma_wms_transactions_v1';
@@ -31,33 +54,6 @@
     const separator = CLOUD_API_BASE.includes('?') ? '&' : '?';
     return `${CLOUD_API_BASE}${separator}cb=${Date.now()}`;
   }
-
-  function cleanArabicNumbers(str) {
-    if (str === null || str === undefined) return '';
-    str = String(str);
-    const arabicNums = [/٠/g, /١/g, /٢/g, /٣/g, /٤/g, /٥/g, /٦/g, /٧/g, /٨/g, /٩/g];
-    for (let i = 0; i < 10; i++) {
-      str = str.replace(arabicNums[i], i);
-    }
-    str = str.replace(/،/g, '.').replace(/,/g, '.');
-    return str;
-  }
-
-  const _originalParseFloat = window.parseFloat;
-  const parseFloat = function(val) {
-    if (typeof val === 'string') {
-      val = cleanArabicNumbers(val);
-    }
-    return _originalParseFloat(val);
-  };
-
-  const _originalParseInt = window.parseInt;
-  const parseInt = function(val, radix) {
-    if (typeof val === 'string') {
-      val = cleanArabicNumbers(val);
-    }
-    return _originalParseInt(val, radix);
-  };
 
   // Application State
   let batches = [];
@@ -1941,6 +1937,7 @@
     renderQCLotsClearanceTable(batch);
     renderQCForm(batch);
     renderHistoryList(batch);
+    renderWeighingInvoice(batch);
 
     if (btnDeleteBatch) {
       if (currentUserRole === 'qc') {
@@ -2925,6 +2922,74 @@
       `;
       stageHistoryList.appendChild(item);
     });
+  }
+
+  function renderWeighingInvoice(batch) {
+    const section = document.getElementById('weighing-invoice-section');
+    const tbody = document.getElementById('weighing-invoice-tbody');
+    const invoiceDate = document.getElementById('weighing-invoice-date');
+    const invoiceBatchNo = document.getElementById('weighing-invoice-batch-no');
+    const invoiceProductName = document.getElementById('weighing-invoice-product-name');
+    const invoiceTotal = document.getElementById('weighing-invoice-total');
+
+    if (!section || !tbody) return;
+
+    // The Weighing stage is always stage index 0
+    const weighingStage = batch.stages && batch.stages[0];
+    const formulation = weighingStage && weighingStage.formulation;
+
+    if (!weighingStage || !Array.isArray(formulation) || formulation.length === 0) {
+      section.classList.add('hidden');
+      return;
+    }
+
+    // Populate header info
+    invoiceBatchNo.textContent = batch.batchNo || '-';
+    invoiceProductName.textContent = batch.productName || '-';
+    
+    // Find the latest timestamp or date for the weighing logs
+    let dateStr = 'قيد التحضير';
+    if (batch.logs && batch.logs.length > 0) {
+      // Find the first log referencing the weighing stage
+      const wLog = batch.logs.find(l => l && l.text && (l.text.includes('مرحلة [الوزن]') || l.text.includes('مرحلة [Weighing]') || l.text.includes('مرحلة [وزن]')));
+      if (wLog) {
+        dateStr = wLog.time;
+      } else {
+        // Fallback to the latest log or batch creation date
+        dateStr = batch.logs[batch.logs.length - 1].time;
+      }
+    }
+    invoiceDate.textContent = `التاريخ: ${dateStr}`;
+
+    // Populate rows
+    tbody.innerHTML = '';
+    let totalQty = 0;
+
+    formulation.forEach(row => {
+      const lotId = row.Lot_ID || row.lotId;
+      const qtyVal = row.Quantity || row.qty || 0;
+      
+      const lot = stockLots.find(l => l && String(l.Lot_ID) === String(lotId));
+      const materialName = lot ? lot.Material_Name : 'مادة محذوفة/غير معروفة';
+      const lotNumber = lot ? lot.Lot_Number : '-';
+      const unit = lot ? lot.Unit : 'kg';
+
+      totalQty += qtyVal;
+
+      const tr = document.createElement('tr');
+      tr.style.borderBottom = '1px solid rgba(255, 255, 255, 0.05)';
+      tr.innerHTML = `
+        <td style="padding: 8px; font-weight: bold; color: var(--cyan); text-align: right;">${materialName}</td>
+        <td style="padding: 8px; text-align: center; color: var(--amber); font-family: monospace;">${lotNumber}</td>
+        <td style="padding: 8px; text-align: left; font-weight: bold; color: var(--emerald);">${qtyVal.toFixed(3)} ${unit}</td>
+      `;
+      tbody.appendChild(tr);
+    });
+
+    invoiceTotal.textContent = `${totalQty.toFixed(3)} kg`;
+    section.classList.remove('hidden');
+
+    if (window.lucide) window.lucide.createIcons();
   }
 
   function evaluateQCCompliance(rangeStr, resultStr) {
@@ -5623,13 +5688,14 @@
       Tx_Type: 'Inbound_Purchase',
       Quantity: qty,
       Material_Type: type, // Explicit type!
-      Reference_ID: type === 'packaging' ? 'استلام مادة تعبئة وتغليف جديدة' : 'استلام مادة أولية جديدة للمستودع',
+      Reference_ID: type === 'packaging' ? 'استلام مادة تعبئة وتغليف جديدة' : (type === 'ready' ? 'استلام منتج جاهز جديد للمستودع' : 'استلام مادة أولية جديدة للمستودع'),
       Performed_By: currentUserRole,
       Timestamp: Date.now()
     });
 
     saveWMS(true);
-    logUserActivity('استلام وارد جديد', `تم استلام لوت وارد جديد للمادة ${name} (لوت: ${lotNum}) بكمية ${qty} ${unit} وحفظه في الحجر الصحي.`);
+    const typeLabel = type === 'packaging' ? 'مادة تعبئة وتغليف' : (type === 'ready' ? 'منتج جاهز' : 'مادة أولية');
+    logUserActivity('استلام وارد جديد', `تم استلام لوت وارد جديد لـ ${typeLabel} (${name}) (لوت: ${lotNum}) بكمية ${qty} ${unit} وحفظه في الحجر الصحي.`);
     document.getElementById('wms-form-inbound').reset();
     currentWMSTab = type === 'raw' ? 'stock' : (type === 'packaging' ? 'packaging' : 'ready');
     renderWMSViews();
@@ -5692,16 +5758,10 @@
     if (!inputSearch || !hiddenProduct || !dropdown) return;
 
     function getReleasedProducts() {
-      const isRawMaterial = lot => {
-        if (!lot || !lot.Unit) return false;
-        const u = lot.Unit.toLowerCase();
-        return u === 'kg' || u === 'g' || u === 'l' || u === 'كغ' || u === 'غ' || u === 'جرام' || u === 'لتر';
-      };
-      
       const addedLotIds = (window.currentSalesInvoiceItems || []).map(item => String(item.lotId));
       
       return stockLots
-        .filter(lot => lot && lot.Status === 'Released' && lot.Current_Qty > 0 && !isRawMaterial(lot) && !addedLotIds.includes(String(lot.Lot_ID)))
+        .filter(lot => lot && lot.Status === 'Released' && lot.Current_Qty > 0 && lot.Material_Type === 'ready' && !addedLotIds.includes(String(lot.Lot_ID)))
         .map(lot => ({
           lotId: lot.Lot_ID,
           name: lot.Material_Name,
@@ -5973,7 +6033,7 @@
     dropdown.style.boxShadow = '0 10px 25px rgba(0,0,0,0.8)';
     dropdown.style.marginTop = '2px';
 
-    const releasedLots = stockLots.filter(l => l && l.Status === 'Released' && l.Current_Qty > 0);
+    const releasedLots = stockLots.filter(l => l && l.Status === 'Released' && l.Current_Qty > 0 && l.Material_Type === 'raw');
 
     // Set initial value if selectedLotId is provided
     if (selectedLotId) {
