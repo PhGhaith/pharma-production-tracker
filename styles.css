@@ -1289,3 +1289,17 @@ body {
   font-size: 0.78rem;
   color: var(--text-dim);
 }
+
+/* Settings Dropdown style overrides */
+#settings-dropdown-menu .btn {
+  font-size: 0.8rem !important;
+  border: 1px solid transparent !important;
+  background: transparent !important;
+  transition: all 0.2s ease !important;
+  width: 100% !important;
+  margin: 0 !important;
+}
+#settings-dropdown-menu .btn:hover {
+  background: rgba(255, 255, 255, 0.05) !important;
+  border-color: rgba(255, 255, 255, 0.15) !important;
+}

@@ -1264,6 +1264,19 @@
   }
 
   function setupEventListeners() {
+    // System settings dropdown toggle
+    const btnSettingsDropdown = document.getElementById('btn-settings-dropdown');
+    const settingsDropdownMenu = document.getElementById('settings-dropdown-menu');
+    if (btnSettingsDropdown && settingsDropdownMenu) {
+      btnSettingsDropdown.addEventListener('click', (e) => {
+        e.stopPropagation();
+        settingsDropdownMenu.classList.toggle('hidden');
+      });
+      document.addEventListener('click', () => {
+        settingsDropdownMenu.classList.add('hidden');
+      });
+    }
+
     window.openBatchDetail = openBatchDetail;
     if (btnExportBackup) btnExportBackup.addEventListener('click', exportBackupData);
     if (btnImportBackup) btnImportBackup.addEventListener('click', () => inputBackupFile.click());
@@ -1351,6 +1364,102 @@
     if (btnDeleteBatch) {
       btnDeleteBatch.addEventListener('click', () => {
         if (activeBatchId) deleteBatch(activeBatchId);
+      });
+    }
+
+    // Admin Edit Batch Modal listeners
+    const btnEditBatch = document.getElementById('btn-edit-batch');
+    const modalEditBatch = document.getElementById('modal-edit-batch');
+    const closeEditBatchModalBtn = document.getElementById('close-edit-batch-modal');
+    const cancelEditBatchBtn = document.getElementById('btn-cancel-edit-batch');
+    const formEditBatch = document.getElementById('form-edit-batch');
+
+    const closeEditBatchModal = () => {
+      if (modalEditBatch) modalEditBatch.classList.add('hidden');
+    };
+
+    if (btnEditBatch) {
+      btnEditBatch.addEventListener('click', () => {
+        const batch = batches.find(b => b && String(b.id) === String(activeBatchId));
+        if (!batch) return;
+
+        // Populate form
+        document.getElementById('edit-batch-id').value = batch.id;
+        document.getElementById('edit-batch-product-name').value = batch.productName || '';
+        document.getElementById('edit-batch-number').value = batch.batchNo || '';
+        document.getElementById('edit-batch-pharma-form').value = batch.pharmaForm || 'solid';
+        document.getElementById('edit-batch-total-weight').value = batch.totalWeightKg || '';
+        document.getElementById('edit-batch-prior-no').value = batch.priorBatchNo || '';
+        document.getElementById('edit-batch-carry-over').value = batch.carryOverKg || 0;
+        document.getElementById('edit-batch-units-per-blister').value = batch.unitsPerBlister || '';
+        document.getElementById('edit-batch-secondary-pack').value = batch.secondaryPackQty || '';
+        document.getElementById('edit-batch-exp-date').value = batch.expDate || '';
+
+        // Dynamically adjust labels for pharma form
+        const adjustEditLabels = () => {
+          const form = document.getElementById('edit-batch-pharma-form').value;
+          const term = getTerminology(form);
+          document.getElementById('edit-label-units-per-blister').textContent = `عدد الحبات بـ ${term.unitName} (${term.packName}) *`;
+          document.getElementById('edit-label-secondary-pack').textContent = `التغليف الثانوي (${term.packPlural} بالكرتونة) *`;
+        };
+        adjustEditLabels();
+        document.getElementById('edit-batch-pharma-form').addEventListener('change', adjustEditLabels);
+
+        if (modalEditBatch) modalEditBatch.classList.remove('hidden');
+      });
+    }
+
+    if (closeEditBatchModalBtn) closeEditBatchModalBtn.addEventListener('click', closeEditBatchModal);
+    if (cancelEditBatchBtn) cancelEditBatchBtn.addEventListener('click', closeEditBatchModal);
+
+    if (formEditBatch) {
+      formEditBatch.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const batchId = document.getElementById('edit-batch-id').value;
+        const batch = batches.find(b => b && String(b.id) === String(batchId));
+        if (!batch) return;
+
+        const oldName = batch.productName;
+        const oldNo = batch.batchNo;
+
+        // Save properties
+        batch.productName = document.getElementById('edit-batch-product-name').value.trim();
+        batch.batchNo = document.getElementById('edit-batch-number').value.trim();
+        batch.pharmaForm = document.getElementById('edit-batch-pharma-form').value;
+        batch.totalWeightKg = parseFloat(document.getElementById('edit-batch-total-weight').value) || 0;
+        batch.priorBatchNo = document.getElementById('edit-batch-prior-no').value.trim();
+        batch.carryOverKg = parseFloat(document.getElementById('edit-batch-carry-over').value) || 0;
+        batch.unitsPerBlister = parseInt(document.getElementById('edit-batch-units-per-blister').value, 10) || 1;
+        batch.secondaryPackQty = parseInt(document.getElementById('edit-batch-secondary-pack').value, 10) || 1;
+        batch.expDate = document.getElementById('edit-batch-exp-date').value.trim();
+        batch.updatedAt = Date.now();
+        batch.version = (batch.version || 0) + 1;
+
+        // Save
+        localStorage.setItem(MASTER_STORAGE_KEY, JSON.stringify(batches));
+
+        // Create broadcast notification
+        if (!Array.isArray(notificationsHistory)) notificationsHistory = [];
+        notificationsHistory.unshift({
+          id: 'notif-' + Date.now(),
+          title: 'تعديل مواصفات تشغيلة 📢',
+          body: `قام الأدمن بتعديل إعدادات ومواصفات التشغيلة [${batch.productName}] (رقم الباتش: ${batch.batchNo}). يرجى أخذ العلم بكافة الدوائر.`,
+          timestamp: Date.now(),
+          isRead: false
+        });
+        localStorage.setItem(NOTIFICATIONS_STORAGE_KEY, JSON.stringify(notificationsHistory));
+        if (typeof updateNotificationsUI === 'function') updateNotificationsUI();
+
+        // Log user activity
+        logUserActivity('تعديل إضبارة', `قام الأدمن بتعديل مواصفات التشغيلة [${batch.productName}] (رقم الباتش: ${batch.batchNo}) من المسميات السابقة (${oldName} - #${oldNo}).`);
+
+        closeEditBatchModal();
+        closeBatchDetailModal();
+        renderApp();
+
+        if (window.showToast) {
+          window.showToast(`تم تعديل التشغيلة بنجاح وبث التنبيه 📢`, 'success');
+        }
       });
     }
 
@@ -1841,6 +1950,15 @@
       }
     }
 
+    const btnEditBatch = document.getElementById('btn-edit-batch');
+    if (btnEditBatch) {
+      if (currentUserRole === 'admin') {
+        btnEditBatch.classList.remove('hidden');
+      } else {
+        btnEditBatch.classList.add('hidden');
+      }
+    }
+
     if (elModalBatchDetail) elModalBatchDetail.classList.remove('hidden');
     if (window.lucide) window.lucide.createIcons();
   }
@@ -2043,13 +2161,26 @@
         }
       }
       updateWeighingFormulationTotal();
-    } else {
-      if (elWeighingFormulationContainer) elWeighingFormulationContainer.classList.add('hidden');
-      if (inputLogAcceptedKg) {
-        inputLogAcceptedKg.readOnly = false;
-        inputLogAcceptedKg.style.background = '';
-        inputLogAcceptedKg.style.cursor = '';
+    }
+
+    // Primary Packaging consumption Dynamic View toggle (Runs in both Edit and Normal Modes)
+    const isPackagingStage = (batch.pharmaForm === 'solid' || batch.pharmaForm === 'capsule') ? (stage.id === 'blistering') : (stage.id === 'filling');
+    const elPackagingMaterialsContainer = document.getElementById('packaging-materials-container');
+    const elPackagingMaterialsTbody = document.getElementById('packaging-materials-tbody');
+    if (isPackagingStage) {
+      if (elPackagingMaterialsContainer) elPackagingMaterialsContainer.classList.remove('hidden');
+      if (elPackagingMaterialsTbody) {
+        elPackagingMaterialsTbody.innerHTML = '';
+        if (stage.packaging_materials && stage.packaging_materials.length > 0) {
+          stage.packaging_materials.forEach(row => {
+            addPackagingMaterialRow(row.Lot_ID || row.lotId, row.Quantity || row.qty);
+          });
+        } else {
+          addPackagingMaterialRow('', 0);
+        }
       }
+    } else {
+      if (elPackagingMaterialsContainer) elPackagingMaterialsContainer.classList.add('hidden');
     }
 
     let maxAllowedTotal = batch.totalWeightKg;
@@ -2289,6 +2420,59 @@
       if (!isValid) return;
     }
 
+    let packagingRows = [];
+    const isPackagingStage = (batch.pharmaForm === 'solid' || batch.pharmaForm === 'capsule') ? (stage.id === 'blistering') : (stage.id === 'filling');
+    if (isPackagingStage) {
+      const elPackagingMaterialsTbody = document.getElementById('packaging-materials-tbody');
+      if (elPackagingMaterialsTbody) {
+        const rows = elPackagingMaterialsTbody.querySelectorAll('tr');
+        let isValid = true;
+        for (let i = 0; i < rows.length; i++) {
+          const lotEl = rows[i].querySelector('.wms-lot-id-hidden');
+          const input = rows[i].querySelector('.wms-qty-input');
+          const lotId = lotEl ? lotEl.value : '';
+          const qty = parseFloat(input.value) || 0;
+
+          if (!lotId || qty <= 0) {
+            alert('يرجى اختيار مادة تغليف صالحة وتحديد الكمية المستهلكة لجميع الأسطر!');
+            isValid = false;
+            break;
+          }
+
+          const lot = stockLots.find(l => l && String(l.Lot_ID) === String(lotId));
+          if (!lot) {
+            alert('المادة المحددة غير موجودة بالمستودع!');
+            isValid = false;
+            break;
+          }
+
+          if (lot.Status !== 'Released') {
+            alert(`لا يمكن استخدام اللوت [${lot.Lot_Number}] للمادة [${lot.Material_Name}] لأنه غير مفرج عنه (الحالة الحالية: ${lot.Status})! يجب أن تكون حالة المادة "Released" قبل استهلاكها.`);
+            isValid = false;
+            break;
+          }
+
+          let oldQtyForLot = 0;
+          if (isEditCorrectionMode && Array.isArray(stage.packaging_materials)) {
+            const oldRow = stage.packaging_materials.find(or => String(or.Lot_ID || or.lotId) === String(lotId));
+            if (oldRow) {
+              oldQtyForLot = oldRow.Quantity || oldRow.qty || 0;
+            }
+          }
+
+          if (qty > (lot.Current_Qty + oldQtyForLot)) {
+            alert(`الكمية المطلوبة لمادة التغليف [${lot.Material_Name}] (${qty}) أكبر من الرصيد المتوفر باللوت [${lot.Lot_Number}] مضافاً إليه الكمية المستهلكة سابقاً (${(lot.Current_Qty + oldQtyForLot).toFixed(3)})!`);
+            isValid = false;
+            break;
+          }
+
+          packagingRows.push({ lotId, qty, lotName: lot.Material_Name, lotNumber: lot.Lot_Number, unit: lot.Unit });
+        }
+
+        if (!isValid) return;
+      }
+    }
+
     // QC Gate Validation Checks
     if (!Array.isArray(batch.qc_runs)) batch.qc_runs = [];
     
@@ -2444,6 +2628,45 @@
             Tx_Type: 'Dispense_Production',
             Quantity: -row.qty,
             Reference_ID: `صرف لإنتاج تشغيلة ${batch.productName} (#${batch.batchNo})`,
+            Performed_By: currentUserRole,
+            Timestamp: Date.now()
+          });
+        });
+        saveWMS();
+      } else if (isPackagingStage) {
+        // WMS Revert & Apply logic for Packaging Correction
+        // 1. Revert old stock deductions
+        if (stage.packaging_materials && stage.packaging_materials.length > 0) {
+          stage.packaging_materials.forEach(oldRow => {
+            const lotId = oldRow.Lot_ID || oldRow.lotId;
+            const qty = oldRow.Quantity || oldRow.qty;
+            const lot = stockLots.find(l => l && String(l.Lot_ID) === String(lotId));
+            if (lot) {
+              lot.Current_Qty = parseFloat((lot.Current_Qty + qty).toFixed(3));
+              lot.updatedAt = Date.now();
+            }
+          });
+        }
+        // 2. Delete previous WMS transactions for this batch's packaging
+        wmsTransactions = wmsTransactions.filter(tx => tx && !(tx.Tx_Type === 'Dispense_Production' && tx.Reference_ID === `صرف للتعبئة والتغليف لإنتاج تشغيلة ${batch.productName} (#${batch.batchNo})`));
+
+        // 3. Save new packaging array
+        stage.packaging_materials = packagingRows.map(r => ({ Lot_ID: r.lotId, Quantity: r.qty }));
+        
+        // 4. Deduct new quantities and log transactions
+        packagingRows.forEach(row => {
+          const lot = stockLots.find(l => l && String(l.Lot_ID) === String(row.lotId));
+          if (lot) {
+            lot.Current_Qty = parseFloat((lot.Current_Qty - row.qty).toFixed(3));
+            lot.updatedAt = Date.now();
+          }
+
+          wmsTransactions.unshift({
+            Tx_ID: 'tx-' + Date.now() + '-' + Math.random().toString(36).substr(2, 4),
+            Lot_ID: row.lotId,
+            Tx_Type: 'Dispense_Production',
+            Quantity: -row.qty,
+            Reference_ID: `صرف للتعبئة والتغليف لإنتاج تشغيلة ${batch.productName} (#${batch.batchNo})`,
             Performed_By: currentUserRole,
             Timestamp: Date.now()
           });
@@ -2609,6 +2832,30 @@
           Tx_Type: 'Dispense_Production',
           Quantity: -row.qty,
           Reference_ID: `صرف لإنتاج تشغيلة ${batch.productName} (#${batch.batchNo})`,
+          Performed_By: currentUserRole,
+          Timestamp: Date.now()
+        });
+      });
+      saveWMS();
+    }
+
+    // If Packaging stage, execute WMS packaging stock deductions
+    if (isPackagingStage) {
+      stage.packaging_materials = packagingRows.map(r => ({ Lot_ID: r.lotId, Quantity: r.qty }));
+      packagingRows.forEach(row => {
+        const lot = stockLots.find(l => l && String(l.Lot_ID) === String(row.lotId));
+        if (lot) {
+          lot.Current_Qty = parseFloat((lot.Current_Qty - row.qty).toFixed(3));
+          lot.updatedAt = Date.now();
+        }
+
+        // Log transaction in WMS history
+        wmsTransactions.unshift({
+          Tx_ID: 'tx-' + Date.now() + '-' + Math.random().toString(36).substr(2, 4),
+          Lot_ID: row.lotId,
+          Tx_Type: 'Dispense_Production',
+          Quantity: -row.qty,
+          Reference_ID: `صرف للتعبئة والتغليف لإنتاج تشغيلة ${batch.productName} (#${batch.batchNo})`,
           Performed_By: currentUserRole,
           Timestamp: Date.now()
         });
@@ -4337,6 +4584,14 @@
       });
     }
 
+    // Packaging materials dynamically adding rows
+    const btnAddPackagingRow = document.getElementById('btn-add-packaging-row');
+    if (btnAddPackagingRow) {
+      btnAddPackagingRow.addEventListener('click', () => {
+        addPackagingMaterialRow('', 0);
+      });
+    }
+
 
 
     // Sales/FEFO Form
@@ -4527,6 +4782,7 @@
         let deleteBtnHtml = '';
         if (currentUserRole === 'admin' || currentUserRole === 'wms') {
           deleteBtnHtml = `
+            <button class="${btnClass}" style="${style} border-color: var(--amber); color: var(--amber);" onclick="openReconciliationModal('${lot.Lot_ID}')" title="تسوية الرصيد">تسوية ⚖️</button>
             <button class="${btnClass}" style="${style} border-color: var(--rose); color: var(--rose);" onclick="deleteStockLot('${lot.Lot_ID}')" title="حذف اللوت نهائياً">
               <i data-lucide="trash-2" style="width: 12px; height: 12px; display: inline-block; vertical-align: middle;"></i>
             </button>
@@ -4559,10 +4815,19 @@
         }
       }
 
+      let attachmentHtml = '';
+      if (lot.Release_Attachment) {
+        attachmentHtml = `
+          <a href="#" onclick="downloadQCReleaseAttachment('${lot.Lot_ID}'); return false;" style="margin-right: 6px; color: var(--cyan);" title="عرض/تحميل مستند الإفراج النهائي: ${lot.Release_Attachment_Name || 'مرفق'}">
+            <i data-lucide="paperclip" style="width: 14px; height: 14px; display: inline-block; vertical-align: middle;"></i>
+          </a>
+        `;
+      }
+
       tr.innerHTML = `
         <td style="padding: 12px; font-weight: bold; color: var(--cyan);">${lot.Material_Code}</td>
         <td style="padding: 12px; color: #fff;">${lot.Material_Name}</td>
-        <td style="padding: 12px;"><strong style="color: var(--amber); font-family: monospace;">${lot.Lot_Number}</strong></td>
+        <td style="padding: 12px;"><strong style="color: var(--amber); font-family: monospace;">${lot.Lot_Number}</strong>${attachmentHtml}</td>
         <td style="padding: 12px; font-weight: bold; color: var(--emerald);">${lot.Current_Qty} ${lot.Unit}</td>
         <td style="padding: 12px; color: var(--rose);">${lot.Expiry_Date}</td>
         <td style="padding: 12px;">${statusMap[lot.Status] || lot.Status}</td>
@@ -4622,6 +4887,7 @@
         let deleteBtnHtml = '';
         if (currentUserRole === 'admin' || currentUserRole === 'wms') {
           deleteBtnHtml = `
+            <button class="${btnClass}" style="${style} border-color: var(--amber); color: var(--amber);" onclick="openReconciliationModal('${lot.Lot_ID}')" title="تسوية الرصيد">تسوية ⚖️</button>
             <button class="${btnClass}" style="${style} border-color: var(--rose); color: var(--rose);" onclick="deleteStockLot('${lot.Lot_ID}')" title="حذف اللوت نهائياً">
               <i data-lucide="trash-2" style="width: 12px; height: 12px; display: inline-block; vertical-align: middle;"></i>
             </button>
@@ -4649,10 +4915,19 @@
         }
       }
 
+      let attachmentHtml = '';
+      if (lot.Release_Attachment) {
+        attachmentHtml = `
+          <a href="#" onclick="downloadQCReleaseAttachment('${lot.Lot_ID}'); return false;" style="margin-right: 6px; color: var(--cyan);" title="عرض/تحميل مستند الإفراج النهائي: ${lot.Release_Attachment_Name || 'مرفق'}">
+            <i data-lucide="paperclip" style="width: 14px; height: 14px; display: inline-block; vertical-align: middle;"></i>
+          </a>
+        `;
+      }
+
       tr.innerHTML = `
         <td style="padding: 12px; font-weight: bold; color: var(--cyan);">${lot.Material_Code}</td>
         <td style="padding: 12px; color: #fff;">${lot.Material_Name}</td>
-        <td style="padding: 12px;"><strong style="color: var(--amber); font-family: monospace;">${lot.Lot_Number}</strong></td>
+        <td style="padding: 12px;"><strong style="color: var(--amber); font-family: monospace;">${lot.Lot_Number}</strong>${attachmentHtml}</td>
         <td style="padding: 12px; font-weight: bold; color: var(--emerald);">${lot.Current_Qty} ${lot.Unit}</td>
         <td style="padding: 12px; color: var(--rose);">${lot.Expiry_Date}</td>
         <td style="padding: 12px;">${statusMap[lot.Status] || lot.Status}</td>
@@ -4712,6 +4987,7 @@
         let deleteBtnHtml = '';
         if (currentUserRole === 'admin' || currentUserRole === 'wms') {
           deleteBtnHtml = `
+            <button class="${btnClass}" style="${style} border-color: var(--amber); color: var(--amber);" onclick="openReconciliationModal('${lot.Lot_ID}')" title="تسوية الرصيد">تسوية ⚖️</button>
             <button class="${btnClass}" style="${style} border-color: var(--rose); color: var(--rose);" onclick="deleteStockLot('${lot.Lot_ID}')" title="حذف اللوت نهائياً">
               <i data-lucide="trash-2" style="width: 12px; height: 12px; display: inline-block; vertical-align: middle;"></i>
             </button>
@@ -4744,10 +5020,19 @@
         }
       }
 
+      let attachmentHtml = '';
+      if (lot.Release_Attachment) {
+        attachmentHtml = `
+          <a href="#" onclick="downloadQCReleaseAttachment('${lot.Lot_ID}'); return false;" style="margin-right: 6px; color: var(--cyan);" title="عرض/تحميل مستند الإفراج النهائي: ${lot.Release_Attachment_Name || 'مرفق'}">
+            <i data-lucide="paperclip" style="width: 14px; height: 14px; display: inline-block; vertical-align: middle;"></i>
+          </a>
+        `;
+      }
+
       tr.innerHTML = `
         <td style="padding: 12px; font-weight: bold; color: var(--cyan);">${lot.Material_Code}</td>
         <td style="padding: 12px; color: #fff;">${lot.Material_Name}</td>
-        <td style="padding: 12px;"><strong style="color: var(--amber); font-family: monospace;">${lot.Lot_Number}</strong></td>
+        <td style="padding: 12px;"><strong style="color: var(--amber); font-family: monospace;">${lot.Lot_Number}</strong>${attachmentHtml}</td>
         <td style="padding: 12px; font-weight: bold; color: var(--emerald);">${lot.Current_Qty} ${lot.Unit}</td>
         <td style="padding: 12px; color: var(--rose);">${lot.Expiry_Date}</td>
         <td style="padding: 12px;">${statusMap[lot.Status] || lot.Status}</td>
@@ -4762,6 +5047,15 @@
   window.changeLotStatus = function(lotId, newStatus) {
     const lot = stockLots.find(l => l && String(l.Lot_ID) === String(lotId));
     if (!lot) return;
+
+    if (newStatus === 'Released' && lot.Material_Type === 'ready') {
+      document.getElementById('release-lot-id').value = lotId;
+      document.getElementById('release-product-name').textContent = lot.Material_Name;
+      document.getElementById('release-lot-number').textContent = lot.Lot_Number;
+      document.getElementById('release-attachment-file').value = '';
+      document.getElementById('modal-qc-final-release').classList.remove('hidden');
+      return;
+    }
 
     const oldStatus = lot.Status;
     lot.Status = newStatus;
@@ -4812,6 +5106,17 @@
               stage.version = (stage.version || 0) + 1;
             }
           }
+          if (stage && Array.isArray(stage.packaging_materials)) {
+            const originalLength = stage.packaging_materials.length;
+            stage.packaging_materials = stage.packaging_materials.filter(row => {
+              const id = row.Lot_ID || row.lotId;
+              return String(id) !== String(lotId);
+            });
+            if (stage.packaging_materials.length !== originalLength) {
+              singleBatchModified = true;
+              stage.version = (stage.version || 0) + 1;
+            }
+          }
         });
         if (singleBatchModified) {
           batchModified = true;
@@ -4851,6 +5156,82 @@
       window.showToast('تم حذف اللوت وتطهير سجلات أوزان التشغيلات بنجاح 🗑️', 'success');
     }
   };
+
+  window.openReconciliationModal = function(lotId) {
+    const lot = stockLots.find(l => l && String(l.Lot_ID) === String(lotId));
+    if (!lot) return;
+
+    document.getElementById('recon-lot-id').value = lot.Lot_ID;
+    document.getElementById('recon-material-code').value = lot.Material_Code;
+    document.getElementById('recon-material-name').value = lot.Material_Name;
+    document.getElementById('recon-lot-number').value = lot.Lot_Number;
+    document.getElementById('recon-qty').value = lot.Current_Qty;
+    document.getElementById('recon-expiry-date').value = lot.Expiry_Date;
+    document.getElementById('recon-storage-location').value = lot.Storage_Location || '';
+    document.getElementById('recon-unit-label').textContent = lot.Unit || 'kg';
+
+    document.getElementById('modal-wms-reconciliation').classList.remove('hidden');
+  };
+
+  // Bind close buttons for Reconciliation Modal
+  const closeReconciliationModal = () => {
+    document.getElementById('modal-wms-reconciliation').classList.add('hidden');
+  };
+  const closeReconBtn = document.getElementById('close-wms-reconciliation-modal');
+  if (closeReconBtn) closeReconBtn.addEventListener('click', closeReconciliationModal);
+  const cancelReconBtn = document.getElementById('btn-cancel-wms-reconciliation');
+  if (cancelReconBtn) cancelReconBtn.addEventListener('click', closeReconciliationModal);
+
+  const formReconciliation = document.getElementById('form-wms-reconciliation');
+  if (formReconciliation) {
+    formReconciliation.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const lotId = document.getElementById('recon-lot-id').value;
+      const lot = stockLots.find(l => l && String(l.Lot_ID) === String(lotId));
+      if (!lot) return;
+
+      const oldQty = lot.Current_Qty;
+      const oldLotNo = lot.Lot_Number;
+      const oldExpiry = lot.Expiry_Date;
+      const oldLocation = lot.Storage_Location;
+
+      const newQty = parseFloat(document.getElementById('recon-qty').value) || 0;
+      const newLotNo = document.getElementById('recon-lot-number').value.trim();
+      const newExpiry = document.getElementById('recon-expiry-date').value.trim();
+      const newLocation = document.getElementById('recon-storage-location').value.trim();
+
+      const diff = parseFloat((newQty - oldQty).toFixed(3));
+
+      // Apply adjustments
+      lot.Current_Qty = newQty;
+      lot.Lot_Number = newLotNo;
+      lot.Expiry_Date = newExpiry;
+      lot.Storage_Location = newLocation;
+      lot.updatedAt = Date.now();
+
+      // Log WMS transaction
+      wmsTransactions.unshift({
+        Tx_ID: 'tx-' + Date.now() + '-' + Math.random().toString(36).substr(2, 4),
+        Lot_ID: lot.Lot_ID,
+        Tx_Type: 'Stock_Adjustment',
+        Quantity: diff,
+        Material_Type: lot.Material_Type || 'raw',
+        Reference_ID: `تسوية وتعديل رصيد مخزني يدوي`,
+        Performed_By: currentUserRole,
+        Timestamp: Date.now()
+      });
+
+      saveWMS(true);
+      logUserActivity('تسوية مخزنية', `تم إجراء تسوية للوت ${oldLotNo} للمادة ${lot.Material_Name}: تعديل الكمية من ${oldQty} إلى ${newQty} ${lot.Unit}، واللوت من ${oldLotNo} إلى ${newLotNo}، والصلاحية من ${oldExpiry} إلى ${newExpiry}.`);
+      
+      closeReconciliationModal();
+      renderWMSViews();
+
+      if (window.showToast) {
+        window.showToast('تمت تسوية وتحديث اللوت بنجاح ⚖️', 'success');
+      }
+    });
+  }
 
   function renderTransactionsLog() {
     const tbody = document.getElementById('wms-history-tbody');
@@ -5710,6 +6091,164 @@
     elWeighingFormulationTbody.appendChild(tr);
   }
 
+  function addPackagingMaterialRow(selectedLotId = '', qty = 0) {
+    const elPackagingMaterialsTbody = document.getElementById('packaging-materials-tbody');
+    if (!elPackagingMaterialsTbody) return;
+    const tr = document.createElement('tr');
+    tr.style.borderBottom = '1px solid rgba(255, 255, 255, 0.05)';
+    
+    // Searchable Select Container
+    const container = document.createElement('div');
+    container.className = 'wms-searchable-select-container';
+    container.style.position = 'relative';
+    container.style.width = '100%';
+
+    const inputSearch = document.createElement('input');
+    inputSearch.type = 'text';
+    inputSearch.className = 'wms-lot-search-input';
+    inputSearch.placeholder = 'ابحث باسم المادة، كودها، أو رقم اللوت...';
+    inputSearch.style.width = '100%';
+    inputSearch.style.background = '#1e293b';
+    inputSearch.style.color = '#fff';
+    inputSearch.style.border = '1px solid rgba(255,255,255,0.15)';
+    inputSearch.style.padding = '6px';
+    inputSearch.style.borderRadius = '4px';
+    inputSearch.style.boxSizing = 'border-box';
+    inputSearch.autocomplete = 'off';
+
+    const hiddenLotId = document.createElement('input');
+    hiddenLotId.type = 'hidden';
+    hiddenLotId.className = 'wms-lot-id-hidden';
+    hiddenLotId.value = selectedLotId;
+
+    const dropdown = document.createElement('div');
+    dropdown.className = 'wms-autocomplete-dropdown hidden';
+    dropdown.style.position = 'absolute';
+    dropdown.style.top = '100%';
+    dropdown.style.left = '0';
+    dropdown.style.right = '0';
+    dropdown.style.background = '#0b0f19';
+    dropdown.style.border = '1px solid rgba(6, 182, 212, 0.3)';
+    dropdown.style.borderRadius = '4px';
+    dropdown.style.maxHeight = '180px';
+    dropdown.style.overflowY = 'auto';
+    dropdown.style.zIndex = '9999';
+    dropdown.style.boxShadow = '0 10px 25px rgba(0,0,0,0.8)';
+    dropdown.style.marginTop = '2px';
+
+    const releasedLots = stockLots.filter(l => l && l.Status === 'Released' && l.Current_Qty > 0 && l.Material_Type === 'packaging');
+
+    // Set initial value if selectedLotId is provided
+    if (selectedLotId) {
+      const initialLot = stockLots.find(l => String(l.Lot_ID) === String(selectedLotId));
+      if (initialLot) {
+        inputSearch.value = `${initialLot.Material_Name} [Code: ${initialLot.Material_Code}] - L: ${initialLot.Lot_Number} (الرصيد: ${initialLot.Current_Qty} ${initialLot.Unit})`;
+      } else {
+        inputSearch.value = `لوت غير معروف (${selectedLotId})`;
+      }
+    }
+
+    function populateDropdown(query = '') {
+      dropdown.innerHTML = '';
+      const filtered = releasedLots.filter(lot => {
+        const text = `${lot.Material_Name} ${lot.Material_Code} ${lot.Lot_Number}`.toLowerCase();
+        return text.includes(query.toLowerCase());
+      });
+
+      if (filtered.length === 0) {
+        dropdown.innerHTML = '<div style="padding: 8px; color: var(--text-dim); text-align: center; font-size: 0.8rem;">لا توجد لوتات تغليف مفرجة مطابقة</div>';
+        return;
+      }
+
+      filtered.forEach(lot => {
+        const item = document.createElement('div');
+        item.style.padding = '8px';
+        item.style.cursor = 'pointer';
+        item.style.borderBottom = '1px solid rgba(255,255,255,0.05)';
+        item.style.fontSize = '0.78rem';
+        item.style.transition = 'background 0.2s';
+        item.innerHTML = `<strong>${lot.Material_Name}</strong> <span style="color: var(--text-dim);">[Code: ${lot.Material_Code}]</span><br><span style="color: var(--amber);">Lot: ${lot.Lot_Number}</span> <span style="color: var(--emerald); float: left;">الرصيد: ${lot.Current_Qty} ${lot.Unit}</span>`;
+        
+        item.addEventListener('mouseenter', () => {
+          item.style.background = 'rgba(6, 182, 212, 0.15)';
+        });
+        item.addEventListener('mouseleave', () => {
+          item.style.background = '';
+        });
+
+        item.addEventListener('mousedown', (e) => {
+          e.preventDefault(); // Prevent input blur from firing before selection
+          inputSearch.value = `${lot.Material_Name} [Code: ${lot.Material_Code}] - L: ${lot.Lot_Number} (الرصيد: ${lot.Current_Qty} ${lot.Unit})`;
+          hiddenLotId.value = lot.Lot_ID;
+          dropdown.classList.add('hidden');
+        });
+
+        dropdown.appendChild(item);
+      });
+    }
+
+    inputSearch.addEventListener('focus', () => {
+      dropdown.classList.remove('hidden');
+      populateDropdown(inputSearch.value);
+    });
+
+    inputSearch.addEventListener('blur', () => {
+      setTimeout(() => {
+        dropdown.classList.add('hidden');
+      }, 200);
+    });
+
+    inputSearch.addEventListener('input', (e) => {
+      hiddenLotId.value = '';
+      dropdown.classList.remove('hidden');
+      populateDropdown(e.target.value);
+    });
+
+    container.appendChild(inputSearch);
+    container.appendChild(hiddenLotId);
+    container.appendChild(dropdown);
+
+    const inputQty = document.createElement('input');
+    inputQty.type = 'number';
+    inputQty.step = '0.001';
+    inputQty.required = true;
+    inputQty.value = qty > 0 ? qty : '';
+    inputQty.placeholder = 'الكمية';
+    inputQty.className = 'wms-qty-input';
+    inputQty.style.width = '100%';
+    inputQty.style.background = '#1e293b';
+    inputQty.style.color = '#fff';
+    inputQty.style.border = '1px solid rgba(255,255,255,0.15)';
+    inputQty.style.padding = '6px';
+    inputQty.style.borderRadius = '4px';
+    inputQty.style.boxSizing = 'border-box';
+
+    const btnDel = document.createElement('button');
+    btnDel.type = 'button';
+    btnDel.className = 'btn btn-secondary btn-sm';
+    btnDel.style.borderColor = 'var(--rose)';
+    btnDel.style.color = 'var(--rose)';
+    btnDel.style.padding = '4px';
+    btnDel.innerHTML = '&times;';
+    btnDel.addEventListener('click', () => {
+      tr.remove();
+    });
+
+    const tdSelect = document.createElement('td');
+    tdSelect.appendChild(container);
+    const tdInput = document.createElement('td');
+    tdInput.appendChild(inputQty);
+    const tdAction = document.createElement('td');
+    tdAction.style.textAlign = 'center';
+    tdAction.appendChild(btnDel);
+
+    tr.appendChild(tdSelect);
+    tr.appendChild(tdInput);
+    tr.appendChild(tdAction);
+
+    elPackagingMaterialsTbody.appendChild(tr);
+  }
+
   function updateWeighingFormulationTotal() {
     if (!elWeighingFormulationTbody || !inputLogAcceptedKg) return;
     let total = 0;
@@ -5849,9 +6388,6 @@
     if (currentQCTab === 'quarantine') {
       tbodyId = 'qc-pending-tbody';
       targetStatus = 'Quarantine';
-    } else if (currentQCTab === 'released') {
-      tbodyId = 'qc-released-tbody';
-      targetStatus = 'Released';
     } else if (currentQCTab === 'rejected') {
       tbodyId = 'qc-rejected-tbody';
       targetStatus = 'Rejected';
@@ -5915,6 +6451,15 @@
   window.changeLotStatusFromQC = function(lotId, newStatus) {
     const lot = stockLots.find(l => l && String(l.Lot_ID) === String(lotId));
     if (!lot) return;
+
+    if (newStatus === 'Released' && lot.Material_Type === 'ready') {
+      document.getElementById('release-lot-id').value = lotId;
+      document.getElementById('release-product-name').textContent = lot.Material_Name;
+      document.getElementById('release-lot-number').textContent = lot.Lot_Number;
+      document.getElementById('release-attachment-file').value = '';
+      document.getElementById('modal-qc-final-release').classList.remove('hidden');
+      return;
+    }
     
     const oldStatus = lot.Status;
     lot.Status = newStatus;
@@ -5939,6 +6484,89 @@
     if (window.showToast) {
       window.showToast(`تم تحديث حالة اللوت بنجاح إلى [${newStatus}] 🔬`, 'success');
     }
+  };
+
+  // Bind close buttons for QC Final Release Modal
+  const closeQCReleaseModal = () => {
+    document.getElementById('modal-qc-final-release').classList.add('hidden');
+  };
+  const closeQCReleaseBtn = document.getElementById('close-qc-final-release-modal');
+  if (closeQCReleaseBtn) closeQCReleaseBtn.addEventListener('click', closeQCReleaseModal);
+  const cancelQCReleaseBtn = document.getElementById('btn-cancel-qc-final-release');
+  if (cancelQCReleaseBtn) cancelQCReleaseBtn.addEventListener('click', closeQCReleaseModal);
+
+  const formQCRelease = document.getElementById('form-qc-final-release');
+  if (formQCRelease) {
+    formQCRelease.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const lotId = document.getElementById('release-lot-id').value;
+      const lot = stockLots.find(l => l && String(l.Lot_ID) === String(lotId));
+      if (!lot) return;
+
+      const fileInput = document.getElementById('release-attachment-file');
+      const file = fileInput.files[0];
+
+      const oldStatus = lot.Status;
+
+      const finalizeRelease = (attachmentBase64 = null, attachmentName = null) => {
+        lot.Status = 'Released';
+        lot.updatedAt = Date.now();
+        if (attachmentBase64) {
+          lot.Release_Attachment = attachmentBase64;
+          lot.Release_Attachment_Name = attachmentName;
+        }
+
+        // Log transaction
+        wmsTransactions.unshift({
+          Tx_ID: 'tx-' + Date.now() + '-' + Math.random().toString(36).substr(2, 4),
+          Lot_ID: lotId,
+          Tx_Type: 'QC_Status_Change',
+          Quantity: 0,
+          Reference_ID: `تحرير وإفراج نهائي للمنتج مع مستند جودة`,
+          Performed_By: currentUserRole,
+          Timestamp: Date.now()
+        });
+
+        saveWMS(true);
+        logUserActivity('إفراج نهائي لمنتج', `تم تحرير وإفراج نهائي للمنتج ${lot.Material_Name} (الباتش: ${lot.Lot_Number}) ${attachmentName ? 'مع إرفاق مستند: ' + attachmentName : ''}.`);
+        
+        closeQCReleaseModal();
+        
+        if (typeof renderQCViews === 'function') renderQCViews();
+        if (typeof renderWMSViews === 'function') renderWMSViews();
+
+        if (window.showToast) {
+          window.showToast(`تم الإفراج النهائي وتحرير الباتش [${lot.Lot_Number}] بنجاح 🔓`, 'success');
+        }
+      };
+
+      if (file) {
+        if (file.size > 1024 * 1024) {
+          alert('حجم الملف المرفق أكبر من 1MB! يرجى اختيار ملف أصغر حجماً لتفادي امتلاء الذاكرة.');
+          return;
+        }
+        const reader = new FileReader();
+        reader.onload = function(evt) {
+          finalizeRelease(evt.target.result, file.name);
+        };
+        reader.readAsDataURL(file);
+      } else {
+        finalizeRelease();
+      }
+    });
+  }
+
+  window.downloadQCReleaseAttachment = function(lotId) {
+    const lot = stockLots.find(l => l && String(l.Lot_ID) === String(lotId));
+    if (!lot || !lot.Release_Attachment) return;
+    
+    // Create temporary download anchor
+    const link = document.createElement('a');
+    link.href = lot.Release_Attachment;
+    link.download = lot.Release_Attachment_Name || 'release_document';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   // =========================================================================

@@ -89,36 +89,6 @@
           <span id="sync-text">مزامنة سحابية لحظية 🟢 (اضغط للمزامنة اليدوية)</span>
         </div>
 
-        <!-- Server Settings Button -->
-        <button id="btn-server-settings" class="btn btn-secondary" style="border-color: var(--cyan); color: var(--cyan);" title="ضبط رابط سيرفر قاعدة البيانات السحابية">
-          <i data-lucide="settings"></i>
-          <span>إعدادات السيرفر</span>
-        </button>
-
-        <!-- Logout Button -->
-        <button id="btn-logout" class="btn btn-secondary hidden" style="border-color: var(--rose); color: var(--rose);" title="تسجيل الخروج وقفل الشاشة">
-          <i data-lucide="log-out"></i>
-          <span>خروج</span>
-        </button>
-
-        <!-- Reset Memory & Reconnect Button -->
-        <button id="btn-reset-cache" class="btn btn-secondary" style="border-color: var(--rose); color: var(--rose);" title="تفريغ الذاكرة المحلية بالكامل وإعادة المزامنة النظيفة من السحابية">
-          <i data-lucide="refresh-cw"></i>
-          <span>تفريغ الذاكرة وإعادة الاتصال</span>
-        </button>
-
-        <!-- Backup & Restore Buttons -->
-        <button id="btn-export-backup" class="btn btn-secondary" style="border-color: var(--amber); color: var(--amber);" title="تنزيل وتصدير كافة البيانات التي قمت بتعبئتها">
-          <i data-lucide="download"></i>
-          <span>تصدير نسخة احتياطية</span>
-        </button>
-
-        <button id="btn-import-backup" class="btn btn-secondary" style="border-color: var(--cyan); color: var(--cyan);" title="استرجاع كافة البيانات والتشغيلات المعبأة بنقرة واحدة">
-          <i data-lucide="upload"></i>
-          <span>استرجاع نسخة احتياطية</span>
-        </button>
-        <input type="file" id="input-backup-file" accept=".json" class="hidden">
-
         <!-- Notifications Center Button -->
         <button id="btn-notifications-drawer" class="btn btn-secondary" style="border-color: var(--cyan); color: var(--cyan); position: relative; padding: 8px 12px;" title="فتح مركز الإشعارات">
           <i data-lucide="bell"></i>
@@ -126,11 +96,53 @@
           <span id="notifications-badge" class="hidden" style="position: absolute; top: -5px; right: -5px; background: var(--rose); color: white; border-radius: 50%; width: 18px; height: 18px; font-size: 0.68rem; display: flex; align-items: center; justify-content: center; font-weight: bold; border: 2px solid var(--bg-card);">0</span>
         </button>
 
-        <!-- Role Switcher Button -->
-        <button id="btn-role-switcher" class="btn btn-secondary" style="border-color: var(--primary); color: var(--primary);" title="تغيير صلاحيات الحساب والدور الحالي">
-          <i data-lucide="user-check"></i>
-          <span id="role-switcher-text">الصلاحية: مشرف 👑</span>
-        </button>
+        <!-- System Settings Dropdown -->
+        <div class="settings-dropdown-wrapper" style="position: relative; display: inline-block;">
+          <button id="btn-settings-dropdown" class="btn btn-secondary" style="border-color: var(--cyan); color: var(--cyan); display: flex; align-items: center; gap: 8px; cursor: pointer;">
+            <i data-lucide="settings"></i>
+            <span>إعدادات النظام ⚙️</span>
+            <i data-lucide="chevron-down" style="width: 14px; height: 14px;"></i>
+          </button>
+          
+          <div id="settings-dropdown-menu" class="hidden" style="position: absolute; top: 115%; left: 0; background: #0f172a; border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); z-index: 9999; display: flex; flex-direction: column; gap: 4px; padding: 8px; width: 240px; box-sizing: border-box;">
+            
+            <!-- Role Switcher Button -->
+            <button id="btn-role-switcher" class="btn btn-secondary" style="border-color: var(--primary); color: var(--primary); width: 100%; text-align: right; justify-content: flex-start; padding: 8px 12px;" title="تغيير صلاحيات الحساب والدور الحالي">
+              <i data-lucide="user-check" style="width: 16px; height: 16px; margin-left: 8px;"></i>
+              <span id="role-switcher-text">الصلاحية: مشرف 👑</span>
+            </button>
+
+            <!-- Server Settings Button -->
+            <button id="btn-server-settings" class="btn btn-secondary" style="border-color: var(--cyan); color: var(--cyan); width: 100%; text-align: right; justify-content: flex-start; padding: 8px 12px;" title="ضبط رابط سيرفر قاعدة البيانات السحابية">
+              <i data-lucide="settings" style="width: 16px; height: 16px; margin-left: 8px;"></i>
+              <span>إعدادات السيرفر</span>
+            </button>
+
+            <!-- Backup & Restore Buttons -->
+            <button id="btn-export-backup" class="btn btn-secondary" style="border-color: var(--amber); color: var(--amber); width: 100%; text-align: right; justify-content: flex-start; padding: 8px 12px;" title="تنزيل وتصدير كافة البيانات التي قمت بتعبئتها">
+              <i data-lucide="download" style="width: 16px; height: 16px; margin-left: 8px;"></i>
+              <span>تصدير نسخة احتياطية</span>
+            </button>
+
+            <button id="btn-import-backup" class="btn btn-secondary" style="border-color: var(--cyan); color: var(--cyan); width: 100%; text-align: right; justify-content: flex-start; padding: 8px 12px;" title="استرجاع كافة البيانات والتشغيلات المعبأة بنقرة واحدة">
+              <i data-lucide="upload" style="width: 16px; height: 16px; margin-left: 8px;"></i>
+              <span>استرجاع نسخة احتياطية</span>
+            </button>
+
+            <!-- Reset Memory & Reconnect Button -->
+            <button id="btn-reset-cache" class="btn btn-secondary" style="border-color: var(--rose); color: var(--rose); width: 100%; text-align: right; justify-content: flex-start; padding: 8px 12px;" title="تفريغ الذاكرة المحلية بالكامل وإعادة المزامنة النظيفة من السحابية">
+              <i data-lucide="refresh-cw" style="width: 16px; height: 16px; margin-left: 8px;"></i>
+              <span>تفريغ الذاكرة وإعادة الاتصال</span>
+            </button>
+
+            <!-- Logout Button -->
+            <button id="btn-logout" class="btn btn-secondary hidden" style="border-color: var(--rose); color: var(--rose); width: 100%; text-align: right; justify-content: flex-start; padding: 8px 12px;" title="تسجيل الخروج وقفل الشاشة">
+              <i data-lucide="log-out" style="width: 16px; height: 16px; margin-left: 8px;"></i>
+              <span>خروج</span>
+            </button>
+          </div>
+        </div>
+        <input type="file" id="input-backup-file" accept=".json" class="hidden">
 
         <button id="btn-new-batch" class="btn btn-primary">
           <i data-lucide="plus-circle"></i>
@@ -295,7 +307,7 @@
                 <tr style="background: rgba(255,255,255,0.02); border-bottom: 1px solid rgba(255,255,255,0.08);">
                   <th style="padding: 12px; text-align: right;">رمز المادة</th>
                   <th style="padding: 12px; text-align: right;">اسم المادة</th>
-                  <th style="padding: 12px; text-align: right;">رقم التشغيلة (الفئة/اللوت)</th>
+                  <th style="padding: 12px; text-align: right;">رقم اللوت (Lot No)</th>
                   <th style="padding: 12px; text-align: right;">الكمية المتوفرة</th>
                   <th style="padding: 12px; text-align: right;">تاريخ انتهاء الصلاحية</th>
                   <th style="padding: 12px; text-align: right;">حالة المادة</th>
@@ -415,7 +427,7 @@
                 <input type="text" id="wms-in-name" placeholder="مثال: Paracetamol Powder" required style="width: 100%; box-sizing: border-box; padding: 8px; border-radius: 4px; background: #1e293b; border: 1px solid rgba(255,255,255,0.15); color: #fff;">
               </div>
               <div class="form-group">
-                <label>رقم التشغيلة / اللوت (Lot No / الفئة) *</label>
+                 <label>رقم اللوت (Lot No) *</label>
                 <input type="text" id="wms-in-lot" placeholder="مثال: LOT-PA-901" required style="width: 100%; box-sizing: border-box; padding: 8px; border-radius: 4px; background: #1e293b; border: 1px solid rgba(255,255,255,0.15); color: #fff;">
               </div>
               <div class="form-group">
@@ -653,7 +665,6 @@
         <section class="controls-bar" style="margin-bottom: 20px;">
           <div class="filter-tabs" id="qc-sub-tabs" style="display: flex; gap: 8px;">
             <button class="filter-tab active" data-qc-tab="quarantine">بانتظار التحليل والقرار 🔒</button>
-            <button class="filter-tab" data-qc-tab="released">المواد والمنتجات المقبولة ✅</button>
             <button class="filter-tab" data-qc-tab="rejected">المواد والمنتجات المرفوضة ❌</button>
           </div>
         </section>
@@ -674,28 +685,6 @@
                 </tr>
               </thead>
               <tbody id="qc-pending-tbody">
-                <!-- Injected dynamically -->
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        <!-- QC Sub-view: Released -->
-        <div id="qc-view-released" class="qc-sub-view hidden">
-          <div class="table-container" style="overflow-x: auto; background: var(--bg-card); border-radius: 8px; border: 1px solid rgba(255,255,255,0.08);">
-            <table class="pharma-table" style="width: 100%; border-collapse: collapse; text-align: right;">
-              <thead>
-                <tr style="background: rgba(255,255,255,0.02); border-bottom: 1px solid rgba(255,255,255,0.08);">
-                  <th style="padding: 12px; text-align: right;">كود المادة</th>
-                  <th style="padding: 12px; text-align: right;">اسم المادة / المنتج</th>
-                  <th style="padding: 12px; text-align: right;">رقم اللوت</th>
-                  <th style="padding: 12px; text-align: right;">النوع</th>
-                  <th style="padding: 12px; text-align: right;">الكمية المتوفرة</th>
-                  <th style="padding: 12px; text-align: right;">تاريخ الصلاحية</th>
-                  <th style="padding: 12px; text-align: center; width: 280px;">القرار الجودي السريع (QC Decision)</th>
-                </tr>
-              </thead>
-              <tbody id="qc-released-tbody">
                 <!-- Injected dynamically -->
               </tbody>
             </table>
@@ -1005,6 +994,28 @@
                 </button>
               </div>
 
+              <!-- Dynamic packaging materials consumption block (only visible during Packaging/Filling stage) -->
+              <div id="packaging-materials-container" class="hidden" style="margin-top: 1rem; border-top: 1px dashed rgba(255,255,255,0.1); padding-top: 1.25rem;">
+                <h5 style="color: var(--cyan); margin: 0 0 10px 0; display: flex; align-items: center; gap: 6px;">
+                  <i data-lucide="package" style="width: 16px; height: 16px;"></i> تسجيل تفاصيل مواد التغليف الأولي المستهلكة وصرف اللوتات المفرج عنها:
+                </h5>
+                <table class="weighing-formulation-table">
+                  <thead>
+                    <tr>
+                      <th style="text-align: right; padding: 8px;">مادة التغليف الأولي المفرج عنها (Released Lot) *</th>
+                      <th style="text-align: right; padding: 8px; width: 150px;">الكمية المستهلكة *</th>
+                      <th style="text-align: center; padding: 8px; width: 70px;">إجراء</th>
+                    </tr>
+                  </thead>
+                  <tbody id="packaging-materials-tbody">
+                    <!-- Dynamic packaging material rows here -->
+                  </tbody>
+                </table>
+                <button type="button" class="btn btn-secondary btn-sm" id="btn-add-packaging-row" style="margin-top: 10px; border-color: var(--cyan); color: var(--cyan); padding: 4px 8px; font-size: 0.78rem;">
+                  <i data-lucide="plus-circle" style="width: 14px; height: 14px; display: inline-block; vertical-align: middle;"></i> + إضافة مادة تغليف للاستهلاك
+                </button>
+              </div>
+
               <!-- Carry-over Stage Progress Checkbox Container -->
               <div id="stage-carry-over-progress-container" style="margin-top: 1rem;"></div>
 
@@ -1099,10 +1110,16 @@
         </div>
 
         <div class="modal-footer space-between">
-          <button type="button" class="btn btn-danger" id="btn-delete-batch">
-            <i data-lucide="trash-2"></i>
-            <span>إلغاء وحذف هذه التشغيلة</span>
-          </button>
+          <div style="display: flex; gap: 8px;">
+            <button type="button" class="btn btn-danger" id="btn-delete-batch">
+              <i data-lucide="trash-2"></i>
+              <span>إلغاء وحذف هذه التشغيلة</span>
+            </button>
+            <button type="button" class="btn btn-primary" id="btn-edit-batch" style="background: var(--cyan); border-color: var(--cyan); color: #0f172a;">
+              <i data-lucide="edit"></i>
+              <span>تعديل الإضبارة 📄</span>
+            </button>
+          </div>
           <button type="button" class="btn btn-secondary" id="close-detail-btn">إغلاق الشاشة</button>
         </div>
       </div>
@@ -1226,7 +1243,7 @@
             <i data-lucide="file-spreadsheet" style="width: 48px; height: 48px; color: var(--cyan);"></i>
             <div style="text-align: center; display: flex; flex-direction: column; align-items: center; gap: 8px;">
               <p style="margin: 0; font-weight: bold;">اضغط هنا لتحميل أو سحب ملف الأكسل الافتتاحي (.xlsx / .xls / .csv)</p>
-              <p style="margin: 0; font-size: 0.72rem; color: var(--text-dim);">يتم جلب الأعمدة آلياً: رمز المادة، اسم المادة، الوحدة، الكمية، الفئة (اللوت)، وتاريخ انتهاء الصلاحية</p>
+              <p style="margin: 0; font-size: 0.72rem; color: var(--text-dim);">يتم جلب الأعمدة آلياً: رمز المادة، اسم المادة، الوحدة، الكمية، رقم اللوت، وتاريخ انتهاء الصلاحية</p>
             </div>
             <button type="button" class="btn btn-primary" onclick="document.getElementById('wms-excel-file').click()">
               <i data-lucide="upload"></i> اختيار ملف الأكسل
@@ -1256,7 +1273,7 @@
                   <tr style="background: rgba(255,255,255,0.03);">
                     <th style="padding: 10px; text-align: right;">رمز المادة</th>
                     <th style="padding: 10px; text-align: right;">اسم المادة</th>
-                    <th style="padding: 10px; text-align: right;">اللوت (الفئة)</th>
+                     <th style="padding: 10px; text-align: right;">رقم اللوت</th>
                     <th style="padding: 10px; text-align: right;">الكمية</th>
                     <th style="padding: 10px; text-align: right;">الوحدة</th>
                     <th style="padding: 10px; text-align: right;">تاريخ الصلاحية</th>
@@ -1273,6 +1290,181 @@
               </button>
             </div>
           </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal: WMS Stock Reconciliation (Reconciliation / Adjust Balance) -->
+    <div id="modal-wms-reconciliation" class="modal-overlay hidden">
+      <div class="modal-card" style="max-width: 500px;">
+        <div class="modal-header">
+          <div class="modal-title" style="display: flex; align-items: center; gap: 8px;">
+            <i data-lucide="scale" style="color: var(--cyan); width: 22px; height: 22px;"></i>
+            <div>
+              <h3 style="margin: 0; font-size: 1.05rem; font-weight: bold; color: #fff;">تسوية الرصيد وتعديل اللوت ⚖️</h3>
+              <p style="margin: 0; font-size: 0.75rem; color: var(--text-dim);">تعديل كمية وتفاصيل لوت المخزن مباشرة</p>
+            </div>
+          </div>
+          <button class="btn-close-modal" id="close-wms-reconciliation-modal" style="font-size: 1.5rem; background: none; border: none; color: #fff; cursor: pointer;">&times;</button>
+        </div>
+        <div class="modal-body" style="direction: rtl;">
+          <form id="form-wms-reconciliation">
+            <input type="hidden" id="recon-lot-id">
+            <div class="form-group" style="margin-bottom: 1rem;">
+              <label>رمز المادة</label>
+              <input type="text" id="recon-material-code" readonly style="background: rgba(255,255,255,0.05); color: var(--text-dim); cursor: not-allowed; width: 100%; box-sizing: border-box; padding: 8px; border-radius: 4px; border: 1px solid rgba(255,255,255,0.15);">
+            </div>
+            <div class="form-group" style="margin-bottom: 1rem;">
+              <label>اسم المادة / المنتج</label>
+              <input type="text" id="recon-material-name" readonly style="background: rgba(255,255,255,0.05); color: var(--text-dim); cursor: not-allowed; width: 100%; box-sizing: border-box; padding: 8px; border-radius: 4px; border: 1px solid rgba(255,255,255,0.15);">
+            </div>
+            <div class="form-group" style="margin-bottom: 1rem;">
+              <label>رقم اللوت (Lot No) *</label>
+              <input type="text" id="recon-lot-number" required style="width: 100%; box-sizing: border-box; padding: 8px; border-radius: 4px; background: #1e293b; border: 1px solid rgba(255,255,255,0.15); color: #fff;">
+            </div>
+            <div class="form-group" style="margin-bottom: 1rem;">
+              <label>الكمية الحالية المتوفرة *</label>
+              <div style="display: flex; gap: 8px; align-items: center;">
+                <input type="number" step="0.001" id="recon-qty" required style="flex: 1; box-sizing: border-box; padding: 8px; border-radius: 4px; background: #1e293b; border: 1px solid rgba(255,255,255,0.15); color: #fff;">
+                <span id="recon-unit-label" style="font-weight: bold; color: var(--cyan);">kg</span>
+              </div>
+            </div>
+            <div class="form-group" style="margin-bottom: 1rem;">
+              <label>تاريخ انتهاء الصلاحية *</label>
+              <input type="text" id="recon-expiry-date" required placeholder="MM/YYYY أو YYYY-MM-DD" style="width: 100%; box-sizing: border-box; padding: 8px; border-radius: 4px; background: #1e293b; border: 1px solid rgba(255,255,255,0.15); color: #fff;">
+            </div>
+            <div class="form-group" style="margin-bottom: 1.5rem;">
+              <label>موقع التخزين</label>
+              <input type="text" id="recon-storage-location" style="width: 100%; box-sizing: border-box; padding: 8px; border-radius: 4px; background: #1e293b; border: 1px solid rgba(255,255,255,0.15); color: #fff;">
+            </div>
+            <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: 12px; padding: 0;">
+              <button type="button" class="btn btn-secondary" id="btn-cancel-wms-reconciliation">إلغاء</button>
+              <button type="submit" class="btn btn-primary">
+                <i data-lucide="scale"></i> تأكيد التسوية وتعديل الرصيد
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal: QC Final Release with Attachment -->
+    <div id="modal-qc-final-release" class="modal-overlay hidden">
+      <div class="modal-card" style="max-width: 450px;">
+        <div class="modal-header">
+          <div class="modal-title" style="display: flex; align-items: center; gap: 8px;">
+            <i data-lucide="unlock" style="color: var(--emerald); width: 22px; height: 22px;"></i>
+            <div>
+              <h3 style="margin: 0; font-size: 1.05rem; font-weight: bold; color: #fff;">تحرير وإفراج نهائي للمنتج 🔓</h3>
+              <p style="margin: 0; font-size: 0.75rem; color: var(--text-dim);">إفراج عن الباتش الجاهز للتسويق مع إرفاق مستند اختيارياً</p>
+            </div>
+          </div>
+          <button class="btn-close-modal" id="close-qc-final-release-modal" style="font-size: 1.5rem; background: none; border: none; color: #fff; cursor: pointer;">&times;</button>
+        </div>
+        <div class="modal-body" style="direction: rtl;">
+          <form id="form-qc-final-release">
+            <input type="hidden" id="release-lot-id">
+            
+            <div style="background: rgba(255,255,255,0.02); padding: 12px; border-radius: 6px; margin-bottom: 16px; border: 1px solid rgba(255,255,255,0.05);">
+              <div style="margin-bottom: 4px;"><strong>المنتج:</strong> <span id="release-product-name" style="color: var(--cyan);"></span></div>
+              <div><strong>رقم الباتش (اللوت):</strong> <span id="release-lot-number" style="color: var(--amber);"></span></div>
+            </div>
+
+            <div class="form-group" style="margin-bottom: 1.25rem;">
+              <label style="font-weight: bold; margin-bottom: 6px; display: block;">إرفاق مستند التحرير / الإفراج الصيدلاني (اختياري)</label>
+              <input type="file" id="release-attachment-file" accept="image/*,application/pdf,.doc,.docx" style="width: 100%; box-sizing: border-box; padding: 6px; border-radius: 4px; background: #1e293b; border: 1px solid rgba(255,255,255,0.15); color: #fff;">
+              <p style="margin: 4px 0 0 0; font-size: 0.72rem; color: var(--rose);">تنبيه: يفضل أن يكون حجم الملف أقل من 1MB لسرعة المزامنة.</p>
+            </div>
+
+            <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: 12px; padding: 0;">
+              <button type="button" class="btn btn-secondary" id="btn-cancel-qc-final-release">إلغاء</button>
+              <button type="submit" class="btn btn-primary" style="background: var(--emerald); border-color: var(--emerald);">
+                <i data-lucide="check"></i> تأكيد التحرير والإفراج النهائي 🔓
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal: Edit Batch Specifications (Admin Only) -->
+    <div id="modal-edit-batch" class="modal-overlay hidden">
+      <div class="modal-card" style="max-width: 550px; max-height: 90vh; overflow-y: auto;">
+        <div class="modal-header">
+          <div class="modal-title" style="display: flex; align-items: center; gap: 8px;">
+            <i data-lucide="edit" style="color: var(--cyan); width: 22px; height: 22px;"></i>
+            <div>
+              <h3 style="margin: 0; font-size: 1.05rem; font-weight: bold; color: #fff;">تعديل بيانات وإعدادات الإضبارة 📄</h3>
+              <p style="margin: 0; font-size: 0.75rem; color: var(--text-dim);">صلاحية خاصة بمدير النظام للأخطاء والتصحيحات</p>
+            </div>
+          </div>
+          <button class="btn-close-modal" id="close-edit-batch-modal" style="font-size: 1.5rem; background: none; border: none; color: #fff; cursor: pointer;">&times;</button>
+        </div>
+        <div class="modal-body" style="direction: rtl;">
+          <form id="form-edit-batch">
+            <input type="hidden" id="edit-batch-id">
+            
+            <div class="form-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
+              <div class="form-group">
+                <label>اسم المنتج الصيدلاني *</label>
+                <input type="text" id="edit-batch-product-name" required style="width: 100%; box-sizing: border-box; padding: 8px; border-radius: 4px; background: #1e293b; border: 1px solid rgba(255,255,255,0.15); color: #fff;">
+              </div>
+              <div class="form-group">
+                <label>رقم التشغيلة / الباتش *</label>
+                <input type="text" id="edit-batch-number" required style="width: 100%; box-sizing: border-box; padding: 8px; border-radius: 4px; background: #1e293b; border: 1px solid rgba(255,255,255,0.15); color: #fff;">
+              </div>
+            </div>
+
+            <div class="form-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
+              <div class="form-group">
+                <label>الشكل الصيدلاني *</label>
+                <select id="edit-batch-pharma-form" required style="width: 100%; box-sizing: border-box; padding: 8px; border-radius: 4px; background: #1e293b; border: 1px solid rgba(255,255,255,0.15); color: #fff; height: 38px;">
+                  <option value="solid">أقراص صلبة</option>
+                  <option value="capsule">كبسول</option>
+                  <option value="suppository">تحاميل</option>
+                  <option value="cream">كريمات ومراهم</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label>الوزن الإجمالي المستهدف (كغ) *</label>
+                <input type="number" step="0.1" id="edit-batch-total-weight" required style="width: 100%; box-sizing: border-box; padding: 8px; border-radius: 4px; background: #1e293b; border: 1px solid rgba(255,255,255,0.15); color: #fff;">
+              </div>
+            </div>
+
+            <div class="form-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
+              <div class="form-group">
+                <label>رقم الباتش السابق (Prior Batch)</label>
+                <input type="text" id="edit-batch-prior-no" style="width: 100%; box-sizing: border-box; padding: 8px; border-radius: 4px; background: #1e293b; border: 1px solid rgba(255,255,255,0.15); color: #fff;">
+              </div>
+              <div class="form-group">
+                <label>كمية البودرة المنقولة (كغ)</label>
+                <input type="number" step="0.1" id="edit-batch-carry-over" style="width: 100%; box-sizing: border-box; padding: 8px; border-radius: 4px; background: #1e293b; border: 1px solid rgba(255,255,255,0.15); color: #fff;">
+              </div>
+            </div>
+
+            <div class="form-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
+              <div class="form-group">
+                <label id="edit-label-units-per-blister">عدد الحبات بالظرف/البلستر *</label>
+                <input type="number" id="edit-batch-units-per-blister" required style="width: 100%; box-sizing: border-box; padding: 8px; border-radius: 4px; background: #1e293b; border: 1px solid rgba(255,255,255,0.15); color: #fff;">
+              </div>
+              <div class="form-group">
+                <label id="edit-label-secondary-pack">التغليف الثانوي (الظروف بالكرتونة) *</label>
+                <input type="number" id="edit-batch-secondary-pack" required style="width: 100%; box-sizing: border-box; padding: 8px; border-radius: 4px; background: #1e293b; border: 1px solid rgba(255,255,255,0.15); color: #fff;">
+              </div>
+            </div>
+
+            <div class="form-group" style="margin-bottom: 1.5rem;">
+              <label>تاريخ انتهاء صلاحية الوجبة *</label>
+              <input type="text" id="edit-batch-exp-date" required placeholder="MM/YYYY أو YYYY-MM-DD" style="width: 100%; box-sizing: border-box; padding: 8px; border-radius: 4px; background: #1e293b; border: 1px solid rgba(255,255,255,0.15); color: #fff;">
+            </div>
+
+            <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: 12px; padding: 0;">
+              <button type="button" class="btn btn-secondary" id="btn-cancel-edit-batch">إلغاء</button>
+              <button type="submit" class="btn btn-primary">
+                <i data-lucide="save"></i> حفظ تعديلات الإضبارة وبث التنبيه 📢
+              </button>
+            </div>
+          </form>
         </div>
       </div>
     </div>
