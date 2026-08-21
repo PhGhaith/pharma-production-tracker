@@ -2490,6 +2490,7 @@
     const stage = batch.stages[activeStageIndex];
     if (!stage) return;
     const isBlisterStage = activeStageIndex === batch.stages.length - 1;
+    const isVisualInspection = stage.id === 'visual_inspection';
     const term = getTerminology(batch.pharmaForm);
 
     if (currentUserRole === 'qc' || currentUserRole === 'wms' || currentUserRole === 'observer') {
