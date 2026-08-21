@@ -905,10 +905,10 @@
     // Toggle add batch button visibility
     const btnNewBatch = document.getElementById('btn-new-batch');
     if (btnNewBatch) {
-      if (currentUserRole === 'qc') {
-        btnNewBatch.classList.add('hidden');
-      } else {
+      if (currentUserRole === 'admin' || currentUserRole === 'production') {
         btnNewBatch.classList.remove('hidden');
+      } else {
+        btnNewBatch.classList.add('hidden');
       }
     }
 
@@ -1038,7 +1038,7 @@
                   <i data-lucide="eye" style="width: 12px; height: 12px; display: inline-block; vertical-align: middle;"></i>
                   <span style="vertical-align: middle;">تفاصيل</span>
                 </button>
-                ${currentUserRole !== 'qc' ? `
+                ${(currentUserRole === 'admin' || currentUserRole === 'production') ? `
                 <button class="btn btn-secondary btn-sm" onclick="deleteBatch('${batch.id}')" style="padding: 4px 8px; font-size: 0.75rem; border-color: var(--rose); color: var(--rose);">
                   <i data-lucide="trash-2" style="width: 12px; height: 12px; display: inline-block; vertical-align: middle;"></i>
                   <span style="vertical-align: middle;">حذف</span>
@@ -1105,7 +1105,7 @@
             </div>
             <div class="header-right-actions">
               <span class="pharma-badge ${batch.pharmaForm}">${batch.pharmaFormLabel || FORM_LABELS_MAP[batch.pharmaForm] || '-'}</span>
-              ${currentUserRole !== 'qc' ? `
+              ${(currentUserRole === 'admin' || currentUserRole === 'production') ? `
               <button class="btn-icon-delete" title="إلغاء وحذف الباتش" onclick="event.stopPropagation(); deleteBatch('${batch.id}');">
                 <i data-lucide="trash-2"></i>
               </button>
@@ -1360,6 +1360,129 @@
     if (btnDeleteBatch) {
       btnDeleteBatch.addEventListener('click', () => {
         if (activeBatchId) deleteBatch(activeBatchId);
+      });
+    }
+
+    const btnWeightAddendum = document.getElementById('btn-weight-addendum');
+    if (btnWeightAddendum) {
+      btnWeightAddendum.addEventListener('click', () => {
+        if (currentUserRole !== 'admin') {
+          alert('عذراً، هذا الإجراء مخصص لمدير النظام فقط.');
+          return;
+        }
+        const batch = batches.find(b => String(b.id) === String(activeBatchId));
+        if (!batch) return;
+        const weighingStage = batch.stages && batch.stages[0];
+        if (!weighingStage) return;
+
+        const formulation = weighingStage.formulation || [];
+        if (formulation.length === 0) {
+          alert('لا توجد مواد خام مضافة لهذه التشغيلة لإضافة ملحق وزن لها!');
+          return;
+        }
+
+        let promptText = 'يرجى اختيار رقم المادة المراد إضافة ملحق وزن لها:\n';
+        const materialsList = [];
+        formulation.forEach((row, index) => {
+          const lotId = row.Lot_ID || row.lotId;
+          const lot = stockLots.find(l => l && String(l.Lot_ID) === String(lotId));
+          const materialName = lot ? lot.Material_Name : 'مادة غير معروفة';
+          const lotNumber = lot ? lot.Lot_Number : '-';
+          materialsList.push({ index: index + 1, row, lot, materialName, lotNumber });
+          promptText += `${index + 1} - ${materialName} (لوت: ${lotNumber})\n`;
+        });
+
+        const selectionInput = prompt(promptText);
+        if (selectionInput === null) return;
+        const selectedIndex = parseInt(selectionInput) - 1;
+        const selectedMaterial = materialsList[selectedIndex];
+        if (!selectedMaterial) {
+          alert('اختيار غير صحيح!');
+          return;
+        }
+
+        const qtyInput = prompt(`الرجاء إدخال الكمية الإضافية المراد صرفها للمادة [${selectedMaterial.materialName}]:\n(مثال: 500 g أو 1.5 kg)`);
+        if (qtyInput === null) return;
+
+        const match = qtyInput.match(/^\s*([0-9]*\.?[0-9]+)\s*(g|kg|غ|كغ)?\s*$/i);
+        if (!match) {
+          alert('تنسيق الكمية غير صحيح! يرجى إدخال رقم يليه الوحدة (kg أو g).');
+          return;
+        }
+
+        const value = parseFloat(match[1]);
+        let unit = (match[2] || 'kg').toLowerCase();
+        if (unit === 'غ') unit = 'g';
+        if (unit === 'كغ') unit = 'kg';
+
+        if (value <= 0) {
+          alert('الكمية يجب أن تكون أكبر من الصفر!');
+          return;
+        }
+
+        const addedQtyInKg = unit === 'g' ? (value / 1000) : value;
+        const lot = selectedMaterial.lot;
+        if (!lot) {
+          alert('اللوت المرتبط بهذه المادة لم يعد موجوداً بالمستودع!');
+          return;
+        }
+
+        const isLotInGrams = lot.Unit === 'g' || lot.Unit === 'غ' || lot.Unit === 'جرام';
+        const lotQtyInKg = isLotInGrams ? (lot.Current_Qty / 1000) : lot.Current_Qty;
+
+        if (addedQtyInKg > lotQtyInKg) {
+          const displayMax = lotQtyInKg * (unit === 'g' ? 1000 : 1);
+          alert(`الرصيد المتاح في المخزن لهذه المادة هو ${displayMax.toFixed(3)} ${unit} فقط. لا يمكن صرف ${value} ${unit}!`);
+          return;
+        }
+
+        const dispenseQty = isLotInGrams ? (addedQtyInKg * 1000) : addedQtyInKg;
+        lot.Current_Qty = parseFloat((lot.Current_Qty - dispenseQty).toFixed(3));
+        lot.updatedAt = Date.now();
+
+        selectedMaterial.row.Quantity = (selectedMaterial.row.Quantity || selectedMaterial.row.qty || 0) + addedQtyInKg;
+        if (selectedMaterial.row.userQty !== undefined && selectedMaterial.row.userUnit === unit) {
+          selectedMaterial.row.userQty += value;
+        } else {
+          selectedMaterial.row.userQty = selectedMaterial.row.Quantity;
+          selectedMaterial.row.userUnit = 'kg';
+        }
+
+        weighingStage.acceptedKg = (weighingStage.acceptedKg || 0) + addedQtyInKg;
+        weighingStage.doneKg = (weighingStage.acceptedKg || 0) + (weighingStage.rejectedKg || 0);
+
+        wmsTransactions.unshift({
+          Tx_ID: 'tx-' + Date.now() + '-' + Math.random().toString(36).substr(2, 4),
+          Lot_ID: lot.Lot_ID,
+          Tx_Type: 'Dispense_Production',
+          Quantity: -addedQtyInKg,
+          Reference_ID: `ملحق صرف إضافي (Admin) لتشغيلة ${batch.productName} (#${batch.batchNo})`,
+          Performed_By: currentUserRole,
+          Timestamp: Date.now()
+        });
+
+        if (!Array.isArray(batch.logs)) batch.logs = [];
+        batch.logs.unshift({
+          time: new Date().toLocaleString('en-US'),
+          text: `صرف ملحق وزن إضافي (بواسطة المشرف 👑): إضافة ${value} ${unit} للمادة [${selectedMaterial.materialName}] (الباتش: ${lot.Lot_Number}).`
+        });
+
+        saveWMS();
+        batch.version = (batch.version || 0) + 1;
+        batch.updatedAt = Date.now();
+        saveBatches(true);
+
+        renderWorkflowTimeline(batch);
+        renderStageLogger(batch);
+        renderHistoryList(batch);
+        renderWeighingInvoice(batch);
+        renderApp();
+
+        if (window.showToast) {
+          window.showToast('تمت إضافة ملحق الوزن بنجاح وخصم الرصيد من المستودع ⚖️🟢', 'success');
+        } else {
+          alert('تمت إضافة ملحق الوزن بنجاح وخصم الرصيد من المستودع ⚖️🟢');
+        }
       });
     }
 
@@ -1940,10 +2063,19 @@
     renderWeighingInvoice(batch);
 
     if (btnDeleteBatch) {
-      if (currentUserRole === 'qc') {
-        btnDeleteBatch.classList.add('hidden');
-      } else {
+      if (currentUserRole === 'admin' || currentUserRole === 'production') {
         btnDeleteBatch.classList.remove('hidden');
+      } else {
+        btnDeleteBatch.classList.add('hidden');
+      }
+    }
+
+    const btnWeightAddendum = document.getElementById('btn-weight-addendum');
+    if (btnWeightAddendum) {
+      if (currentUserRole === 'admin') {
+        btnWeightAddendum.classList.remove('hidden');
+      } else {
+        btnWeightAddendum.classList.add('hidden');
       }
     }
 
@@ -1967,7 +2099,7 @@
   }
 
   window.deleteBatch = function(batchId) {
-    if (currentUserRole === 'qc') {
+    if (currentUserRole !== 'admin' && currentUserRole !== 'production') {
       alert('عذراً، لا تملك الصلاحية لحذف التشغيلات/الأضابير التصنيعية.');
       return;
     }
@@ -2151,7 +2283,7 @@
         elWeighingFormulationTbody.innerHTML = '';
         if (stage.formulation && stage.formulation.length > 0) {
           stage.formulation.forEach(row => {
-            addWeighingFormulationRow(row.Lot_ID || row.lotId, row.Quantity || row.qty);
+            addWeighingFormulationRow(row.Lot_ID || row.lotId, row.userQty || row.Quantity || row.qty, row.userUnit || 'kg');
           });
         } else {
           addWeighingFormulationRow('', 0);
@@ -2274,9 +2406,9 @@
     if (logStageRejectedKg) logStageRejectedKg.textContent = `${stageRejKg} kg`;
     if (logStageRejectedBlisters) logStageRejectedBlisters.textContent = `(${PharmaMath.formatNumber(rejMath.totalBlisters)} ${unitLabel} مرفوض/إعادة تشغيل)`;
 
-    // Role Authorization for Production Logger
-    const isQCOrWMS = currentUserRole === 'qc' || currentUserRole === 'wms';
-    if (isQCOrWMS) {
+        // Role Authorization for Production Logger
+    const isReadOnlyLogger = currentUserRole === 'qc' || currentUserRole === 'wms' || currentUserRole === 'observer';
+    if (isReadOnlyLogger) {
       if (inputLogAcceptedKg) inputLogAcceptedKg.disabled = true;
       if (inputLogRejectedKg) inputLogRejectedKg.disabled = true;
       if (btnSubmitStageLog) {
@@ -2360,12 +2492,12 @@
     const isBlisterStage = activeStageIndex === batch.stages.length - 1;
     const term = getTerminology(batch.pharmaForm);
 
-    if (currentUserRole === 'qc' || currentUserRole === 'wms') {
+    if (currentUserRole === 'qc' || currentUserRole === 'wms' || currentUserRole === 'observer') {
       alert('عذراً، لا تملك صلاحيات إدارة الإنتاج لتسجيل الإنجاز.');
       return;
     }
 
-    let formulationRows = [];
+        let formulationRows = [];
     if (activeStageIndex === 0) {
       const rows = elWeighingFormulationTbody.querySelectorAll('tr');
       let isValid = true;
@@ -2374,6 +2506,9 @@
         const input = rows[i].querySelector('.wms-qty-input');
         const lotId = lotEl ? lotEl.value : '';
         const qty = parseFloat(input.value) || 0;
+        
+        const rowUnitSelect = rows[i].querySelector('.wms-row-unit-select');
+        const rowUnit = rowUnitSelect ? rowUnitSelect.value : 'kg';
 
         if (!lotId || qty <= 0) {
           alert('يرجى اختيار لوت صالح وتحديد الكمية الموزونة لجميع أسطر المواد الخام!');
@@ -2398,20 +2533,31 @@
         if (isEditCorrectionMode && Array.isArray(stage.formulation)) {
           const oldRow = stage.formulation.find(or => String(or.Lot_ID || or.lotId) === String(lotId));
           if (oldRow) {
-            oldQtyForLot = oldRow.Quantity || oldRow.qty || 0;
+            oldQtyForLot = oldRow.Quantity || oldRow.qty || 0; // stored in kg
           }
         }
 
-        const isGram = lot.Unit === 'g' || lot.Unit === 'غ' || lot.Unit === 'جرام';
-        const lotQtyInKg = isGram ? (lot.Current_Qty / 1000) : lot.Current_Qty;
+        const isLotInGrams = lot.Unit === 'g' || lot.Unit === 'غ' || lot.Unit === 'جرام';
+        const lotQtyInKg = isLotInGrams ? (lot.Current_Qty / 1000) : lot.Current_Qty;
 
-        if (qty > (lotQtyInKg + oldQtyForLot)) {
-          alert(`الكمية المطلوبة للمادة [${lot.Material_Name}] (${qty} kg) أكبر من الرصيد المتوفر باللوت [${lot.Lot_Number}] مضافاً إليه الكمية المصروفة سابقاً (${(lotQtyInKg + oldQtyForLot).toFixed(3)} kg)!`);
+        const qtyInKg = rowUnit === 'g' ? (qty / 1000) : qty;
+
+        if (qtyInKg > (lotQtyInKg + oldQtyForLot)) {
+          const displayMax = (lotQtyInKg + oldQtyForLot) * (rowUnit === 'g' ? 1000 : 1);
+          alert(`الكمية المطلوبة للمادة [${lot.Material_Name}] (${qty} ${rowUnit}) أكبر من الرصيد المتوفر باللوت [${lot.Lot_Number}] مضافاً إليه الكمية المصروفة سابقاً (${displayMax.toFixed(3)} ${rowUnit})!`);
           isValid = false;
           break;
         }
 
-        formulationRows.push({ lotId, qty, lotName: lot.Material_Name, lotNumber: lot.Lot_Number, unit: lot.Unit });
+        formulationRows.push({
+          lotId,
+          qty: qtyInKg,
+          userQty: qty,
+          userUnit: rowUnit,
+          lotName: lot.Material_Name,
+          lotNumber: lot.Lot_Number,
+          unit: lot.Unit
+        });
       }
 
       if (!isValid) return;
@@ -2607,7 +2753,7 @@
         wmsTransactions = wmsTransactions.filter(tx => tx && !(tx.Tx_Type === 'Dispense_Production' && tx.Reference_ID === `صرف لإنتاج تشغيلة ${batch.productName} (#${batch.batchNo})`));
 
         // 3. Save new formulation array
-        stage.formulation = formulationRows.map(r => ({ Lot_ID: r.lotId, Quantity: r.qty }));
+        stage.formulation = formulationRows.map(r => ({ Lot_ID: r.lotId, Quantity: r.qty, userQty: r.userQty, userUnit: r.userUnit }));
         
         // 4. Deduct new quantities and log transactions
         formulationRows.forEach(row => {
@@ -2751,8 +2897,13 @@
       addAcceptedKg = PharmaMath.blistersToKg(addAcceptedBlisters, batch.isCoated, batch.preCoatingMg, batch.postCoatingMg, batch.unitsPerBlister);
       addRejectedKg = PharmaMath.blistersToKg(addRejectedBlisters, batch.isCoated, batch.preCoatingMg, batch.postCoatingMg, batch.unitsPerBlister);
     } else {
-      addAcceptedKg = parseFloat(inputLogAcceptedKg.value) || 0;
-      addRejectedKg = parseFloat(inputLogRejectedKg.value) || 0;
+      if (activeStageIndex === 0) {
+        addAcceptedKg = formulationRows.reduce((sum, r) => sum + r.qty, 0);
+        addRejectedKg = 0;
+      } else {
+        addAcceptedKg = parseFloat(inputLogAcceptedKg.value) || 0;
+        addRejectedKg = parseFloat(inputLogRejectedKg.value) || 0;
+      }
 
       const accMath = PharmaMath.kgToBlistersAndLots(addAcceptedKg, batch.isCoated, batch.preCoatingMg, batch.postCoatingMg, batch.unitsPerBlister, batch.totalWeightKg, batch.lotsCount);
       const rejMath = PharmaMath.kgToBlistersAndLots(addRejectedKg, batch.isCoated, batch.preCoatingMg, batch.postCoatingMg, batch.unitsPerBlister, batch.totalWeightKg, batch.lotsCount);
@@ -2812,7 +2963,7 @@
 
     // If Weighing stage, execute WMS stock deductions
     if (activeStageIndex === 0) {
-      stage.formulation = formulationRows.map(r => ({ Lot_ID: r.lotId, Quantity: r.qty }));
+      stage.formulation = formulationRows.map(r => ({ Lot_ID: r.lotId, Quantity: r.qty, userQty: r.userQty, userUnit: r.userUnit }));
       formulationRows.forEach(row => {
         const lot = stockLots.find(l => l && String(l.Lot_ID) === String(row.lotId));
         if (lot) {
@@ -2879,7 +3030,7 @@
         logMsg = `تسجيل إنجاز بالبليستر والتغليف: (${addAcceptedBlisters} ${term.packName} مقبول = ${addAcceptedKg} kg) و (${addRejectedBlisters} ${term.packName} مرفوض = ${addRejectedKg} kg)`;
       }
     } else if (activeStageIndex === 0) {
-      const detailsStr = formulationRows.map(r => `${r.lotName} (لوت: ${r.lotNumber}) بوزن ${r.qty} ${r.unit}`).join('، ');
+      const detailsStr = formulationRows.map(r => `${r.lotName} (لوت: ${r.lotNumber}) بوزن ${r.userQty} ${r.userUnit === 'g' ? 'غ' : 'كغ'}`).join('، ');
       logMsg = `تسجيل إنجاز بالوزن الميداني للمواد الخام: إجمالي مقبول ${addAcceptedKg} kg. تفاصيل المواد الموزونة المصروفة: [ ${detailsStr} ]`;
     } else {
       logMsg = `تسجيل إنجاز بمرحلة [${stage.name}]: (${addAcceptedKg} kg مقبول = ${PharmaMath.formatNumber(addAcceptedBlisters)} ${uLabel}) و (${addRejectedKg} kg مرفوض = ${PharmaMath.formatNumber(addRejectedBlisters)} ${uLabel})`;
@@ -2972,7 +3123,19 @@
       const lot = stockLots.find(l => l && String(l.Lot_ID) === String(lotId));
       const materialName = lot ? lot.Material_Name : 'مادة محذوفة/غير معروفة';
       const lotNumber = lot ? lot.Lot_Number : '-';
-      const unit = lot ? lot.Unit : 'kg';
+      
+      let displayQty = qtyVal;
+      let displayUnit = lot ? lot.Unit : 'kg';
+      
+      if (row.userQty !== undefined && row.userUnit !== undefined) {
+        displayQty = row.userQty;
+        displayUnit = row.userUnit;
+      } else {
+        const isGram = displayUnit === 'g' || displayUnit === 'غ' || displayUnit === 'جرام';
+        if (isGram) {
+          displayQty = qtyVal * 1000;
+        }
+      }
 
       totalQty += qtyVal;
 
@@ -2981,7 +3144,7 @@
       tr.innerHTML = `
         <td style="padding: 8px; font-weight: bold; color: var(--cyan); text-align: right;">${materialName}</td>
         <td style="padding: 8px; text-align: center; color: var(--amber); font-family: monospace;">${lotNumber}</td>
-        <td style="padding: 8px; text-align: left; font-weight: bold; color: var(--emerald);">${qtyVal.toFixed(3)} ${unit}</td>
+        <td style="padding: 8px; text-align: left; font-weight: bold; color: var(--emerald);">${displayQty.toFixed(3)} ${displayUnit}</td>
       `;
       tbody.appendChild(tr);
     });
@@ -4004,7 +4167,8 @@
       admin: '9999',
       production: '1234',
       qc: '5555',
-      wms: '8888'
+      wms: '8888',
+      observer: '0000'
     };
     
     if (rolePinMap[selectedRole] && pin !== rolePinMap[selectedRole]) {
@@ -4046,8 +4210,9 @@
     const roleNames = {
       admin: 'الصلاحية: مشرف 👑',
       production: 'الصلاحية: الإنتاج ⚙️',
-      qc: 'الصلاحية: الجودة 🧪',
-      wms: 'الصلاحية: المستودع 📦'
+      qc: 'الصلاحية: الرقابة النوعية QC 🧪',
+      wms: 'الصلاحية: المستودع 📦',
+      observer: 'الصلاحية: مراقب 👁️'
     };
     roleSwitcherText.textContent = roleNames[currentUserRole] || 'الصلاحية: مشرف 👑';
   }
@@ -4890,13 +5055,17 @@
       }
 
       tr.innerHTML = `
-        <td style="padding: 12px; font-weight: bold; color: var(--cyan);">${lot.Material_Code}</td>
-        <td style="padding: 12px; color: #fff;">${lot.Material_Name}</td>
-        <td style="padding: 12px;"><strong style="color: var(--amber); font-family: monospace;">${lot.Lot_Number}</strong>${attachmentHtml}</td>
-        <td style="padding: 12px; font-weight: bold; color: var(--emerald);">${lot.Current_Qty} ${lot.Unit}</td>
-        <td style="padding: 12px; color: var(--rose);">${lot.Expiry_Date}</td>
-        <td style="padding: 12px;">${statusMap[lot.Status] || lot.Status}</td>
-        <td style="padding: 12px; text-align: center;">${actionsHtml}</td>
+        <td style="padding: 8px; font-weight: bold; color: var(--cyan);">${lot.Material_Code || '-'}</td>
+        <td style="padding: 8px; color: #fff;">${lot.Material_Name || '-'}</td>
+        <td style="padding: 8px;"><strong style="color: var(--amber); font-family: monospace;">${lot.Lot_Number || '-'}</strong>${attachmentHtml}</td>
+        <td style="padding: 8px; color: var(--text-dim);">${lot.Supplier || '-'}</td>
+        <td style="padding: 8px; color: var(--text-dim);">${lot.Production_Date || '-'}</td>
+        <td style="padding: 8px; color: var(--text-dim);">${lot.Entry_Date || '-'}</td>
+        <td style="padding: 8px; color: var(--rose);">${lot.Expiry_Date || '-'}</td>
+        <td style="padding: 8px; font-weight: bold; color: var(--emerald);">${lot.Current_Qty} ${lot.Unit}</td>
+        <td style="padding: 8px; color: var(--cyan);">${lot.Storage_Location || '-'}</td>
+        <td style="padding: 8px;">${statusMap[lot.Status] || lot.Status}</td>
+        <td style="padding: 8px; text-align: center;">${actionsHtml}</td>
       `;
       tbody.appendChild(tr);
     });
@@ -4990,13 +5159,17 @@
       }
 
       tr.innerHTML = `
-        <td style="padding: 12px; font-weight: bold; color: var(--cyan);">${lot.Material_Code}</td>
-        <td style="padding: 12px; color: #fff;">${lot.Material_Name}</td>
-        <td style="padding: 12px;"><strong style="color: var(--amber); font-family: monospace;">${lot.Lot_Number}</strong>${attachmentHtml}</td>
-        <td style="padding: 12px; font-weight: bold; color: var(--emerald);">${lot.Current_Qty} ${lot.Unit}</td>
-        <td style="padding: 12px; color: var(--rose);">${lot.Expiry_Date}</td>
-        <td style="padding: 12px;">${statusMap[lot.Status] || lot.Status}</td>
-        <td style="padding: 12px; text-align: center;">${actionsHtml}</td>
+        <td style="padding: 8px; font-weight: bold; color: var(--cyan);">${lot.Material_Code || '-'}</td>
+        <td style="padding: 8px; color: #fff;">${lot.Material_Name || '-'}</td>
+        <td style="padding: 8px;"><strong style="color: var(--amber); font-family: monospace;">${lot.Lot_Number || '-'}</strong>${attachmentHtml}</td>
+        <td style="padding: 8px; color: var(--text-dim);">${lot.Supplier || '-'}</td>
+        <td style="padding: 8px; color: var(--text-dim);">${lot.Production_Date || '-'}</td>
+        <td style="padding: 8px; color: var(--text-dim);">${lot.Entry_Date || '-'}</td>
+        <td style="padding: 8px; color: var(--rose);">${lot.Expiry_Date || '-'}</td>
+        <td style="padding: 8px; font-weight: bold; color: var(--emerald);">${lot.Current_Qty} ${lot.Unit}</td>
+        <td style="padding: 8px; color: var(--cyan);">${lot.Storage_Location || '-'}</td>
+        <td style="padding: 8px;">${statusMap[lot.Status] || lot.Status}</td>
+        <td style="padding: 8px; text-align: center;">${actionsHtml}</td>
       `;
       tbody.appendChild(tr);
     });
@@ -5095,13 +5268,17 @@
       }
 
       tr.innerHTML = `
-        <td style="padding: 12px; font-weight: bold; color: var(--cyan);">${lot.Material_Code}</td>
-        <td style="padding: 12px; color: #fff;">${lot.Material_Name}</td>
-        <td style="padding: 12px;"><strong style="color: var(--amber); font-family: monospace;">${lot.Lot_Number}</strong>${attachmentHtml}</td>
-        <td style="padding: 12px; font-weight: bold; color: var(--emerald);">${lot.Current_Qty} ${lot.Unit}</td>
-        <td style="padding: 12px; color: var(--rose);">${lot.Expiry_Date}</td>
-        <td style="padding: 12px;">${statusMap[lot.Status] || lot.Status}</td>
-        <td style="padding: 12px; text-align: center;">${actionsHtml}</td>
+        <td style="padding: 8px; font-weight: bold; color: var(--cyan);">${lot.Material_Code || '-'}</td>
+        <td style="padding: 8px; color: #fff;">${lot.Material_Name || '-'}</td>
+        <td style="padding: 8px;"><strong style="color: var(--amber); font-family: monospace;">${lot.Lot_Number || '-'}</strong>${attachmentHtml}</td>
+        <td style="padding: 8px; color: var(--text-dim);">${lot.Supplier || '-'}</td>
+        <td style="padding: 8px; color: var(--text-dim);">${lot.Production_Date || '-'}</td>
+        <td style="padding: 8px; color: var(--text-dim);">${lot.Entry_Date || '-'}</td>
+        <td style="padding: 8px; color: var(--rose);">${lot.Expiry_Date || '-'}</td>
+        <td style="padding: 8px; font-weight: bold; color: var(--emerald);">${lot.Current_Qty} ${lot.Unit}</td>
+        <td style="padding: 8px; color: var(--cyan);">${lot.Storage_Location || '-'}</td>
+        <td style="padding: 8px;">${statusMap[lot.Status] || lot.Status}</td>
+        <td style="padding: 8px; text-align: center;">${actionsHtml}</td>
       `;
       tbody.appendChild(tr);
     });
@@ -5664,6 +5841,9 @@
     const unit = document.getElementById('wms-in-unit').value;
     const expiry = document.getElementById('wms-in-expiry').value;
     const location = document.getElementById('wms-in-location').value.trim();
+    const supplier = document.getElementById('wms-in-supplier').value.trim();
+    const effective = document.getElementById('wms-in-effective').value;
+    const entry = document.getElementById('wms-in-entry').value;
 
     const lotId = 'lot-in-' + Date.now() + '-' + Math.random().toString(36).substr(2, 5);
     const newLot = {
@@ -5676,6 +5856,9 @@
       Status: 'Quarantine',
       Expiry_Date: expiry,
       Storage_Location: location,
+      Supplier: supplier,
+      Production_Date: effective,
+      Entry_Date: entry || '-',
       Material_Type: type, // Explicit type!
       updatedAt: Date.now()
     };
@@ -5706,6 +5889,14 @@
   }
 
   function populateSalesProductsDropdown() {
+    const searchInput = document.getElementById('wms-sales-product-search');
+    const hiddenProduct = document.getElementById('wms-sales-product');
+    const salesQty = document.getElementById('wms-sales-qty');
+    if (searchInput) searchInput.value = '';
+    if (hiddenProduct) hiddenProduct.value = '';
+    if (salesQty) salesQty.value = '';
+    
+    window.currentSalesInvoiceItems = [];
     renderSalesInvoiceTable();
     updateFEFORecommendation();
   }
@@ -5841,7 +6032,14 @@
     inputSearch.addEventListener('blur', () => {
       setTimeout(() => {
         dropdown.classList.add('hidden');
-      }, 250);
+        const lots = getReleasedProducts();
+        const exists = lots.some(l => `${l.name} [الباتش: ${l.lotNumber}]` === inputSearch.value);
+        if (!exists) {
+          inputSearch.value = '';
+          hiddenProduct.value = '';
+          updateFEFORecommendation();
+        }
+      }, 200);
     });
   }
 
@@ -6309,14 +6507,18 @@
     elPackagingMaterialsTbody.appendChild(tr);
   }
 
-  function updateWeighingFormulationTotal() {
+    function updateWeighingFormulationTotal() {
     if (!elWeighingFormulationTbody || !inputLogAcceptedKg) return;
     let total = 0;
     const rows = elWeighingFormulationTbody.querySelectorAll('tr');
     rows.forEach(row => {
       const input = row.querySelector('.wms-qty-input');
       const val = parseFloat(input?.value) || 0;
-      total += val;
+      const selectUnit = row.querySelector('.wms-row-unit-select');
+      const unit = selectUnit ? selectUnit.value : 'kg';
+      
+      const qtyInKg = unit === 'g' ? (val / 1000) : val;
+      total += qtyInKg;
     });
     inputLogAcceptedKg.value = total.toFixed(3);
   }
@@ -6333,9 +6535,10 @@
   function logUserActivity(actionType, details) {
     const roleLabels = {
       admin: 'مدير النظام 👑',
-      qc: 'الرقابة النوعية 🧪',
+      qc: 'الرقابة النوعية QC 🧪',
       wms: 'أمين المستودع 📦',
-      operator: 'مشغل الإنتاج ⚙️'
+      production: 'إدارة الإنتاج ⚙️',
+      observer: 'المراقب 👁️'
     };
     const logEntry = {
       timestamp: new Date().toLocaleString('en-US'),
@@ -6419,19 +6622,16 @@
   }
 
   function renderQCViews() {
-    let pen = 0, pas = 0, fail = 0;
+    let pen = 0, fail = 0;
     stockLots.forEach(lot => {
       if (!lot) return;
       if (lot.Status === 'Quarantine') pen++;
-      else if (lot.Status === 'Released') pas++;
       else if (lot.Status === 'Rejected') fail++;
     });
 
     const elPen = document.getElementById('qc-stat-pending');
-    const elPas = document.getElementById('qc-stat-passed');
     const elFail = document.getElementById('qc-stat-failed');
     if (elPen) elPen.textContent = `المعلقة: ${pen} لوت`;
-    if (elPas) elPas.textContent = `المقبولة: ${pas} لوت`;
     if (elFail) elFail.textContent = `المرفوضة: ${fail} لوت`;
 
     const subViews = document.querySelectorAll('.qc-sub-view');

@@ -238,6 +238,32 @@
           <div id="batches-grid" class="batches-grid">
             <!-- Batches cards injected dynamically -->
           </div>
+
+          <!-- Production Activity Log Section -->
+          <section class="activity-log-section" style="margin-top: 30px; background: var(--bg-card); padding: 20px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.08);">
+            <div class="section-header" style="margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center;">
+              <div>
+                <h3 style="margin: 0; font-size: 1rem; color: #fff;"><i data-lucide="activity" style="width:16px;height:16px;display:inline-block;vertical-align:middle;margin-left:6px;color:var(--cyan);"></i>سجل حركة وإنجازات إدارة الإنتاج (Production Trail Log)</h3>
+                <p style="margin: 4px 0 0 0; font-size: 0.75rem; color: var(--text-dim);">تتبع عمليات الوزن والتحضير والضغط والتلبيس والتعبئة بالوقت والتاريخ</p>
+              </div>
+            </div>
+            <div class="table-container" style="overflow-x: auto; max-height: 250px; overflow-y: auto;">
+              <table class="pharma-table" style="width: 100%; border-collapse: collapse; text-align: right; font-size: 0.82rem;">
+                <thead>
+                  <tr style="background: rgba(255,255,255,0.02); border-bottom: 1px solid rgba(255,255,255,0.08);">
+                    <th style="padding: 8px; text-align: right;">رقم الحركة</th>
+                    <th style="padding: 8px; text-align: right;">المستخدم / الدور</th>
+                    <th style="padding: 8px; text-align: right;">نوع الإجراء</th>
+                    <th style="padding: 8px; text-align: right;">التفاصيل</th>
+                    <th style="padding: 8px; text-align: right;">التاريخ والوقت</th>
+                  </tr>
+                </thead>
+                <tbody id="production-activity-tbody">
+                  <!-- Production logs injected here -->
+                </tbody>
+              </table>
+            </div>
+          </section>
         </section>
       </div>
 
@@ -305,13 +331,17 @@
             <table class="pharma-table" style="width: 100%; border-collapse: collapse; text-align: right;">
               <thead>
                 <tr style="background: rgba(255,255,255,0.02); border-bottom: 1px solid rgba(255,255,255,0.08);">
-                  <th style="padding: 12px; text-align: right;">رمز المادة</th>
-                  <th style="padding: 12px; text-align: right;">اسم المادة</th>
-                  <th style="padding: 12px; text-align: right;">رقم اللوت (Lot No)</th>
-                  <th style="padding: 12px; text-align: right;">الكمية المتوفرة</th>
-                  <th style="padding: 12px; text-align: right;">تاريخ انتهاء الصلاحية</th>
-                  <th style="padding: 12px; text-align: right;">حالة المادة</th>
-                  <th style="padding: 12px; text-align: center; width: 220px;">إجراءات الجودة والتحكم</th>
+                  <th style="padding: 8px; text-align: right;">رمز المادة</th>
+                  <th style="padding: 8px; text-align: right;">اسم المادة</th>
+                  <th style="padding: 8px; text-align: right;">رقم اللوت (Lot No)</th>
+                  <th style="padding: 8px; text-align: right;">المورد</th>
+                  <th style="padding: 8px; text-align: right;">تاريخ الإنتاج</th>
+                  <th style="padding: 8px; text-align: right;">تاريخ الدخول</th>
+                  <th style="padding: 8px; text-align: right;">تاريخ انتهاء الصلاحية</th>
+                  <th style="padding: 8px; text-align: right;">الكمية المتوفرة</th>
+                  <th style="padding: 8px; text-align: right;">مكان التخزين</th>
+                  <th style="padding: 8px; text-align: right;">حالة المادة</th>
+                  <th style="padding: 8px; text-align: center; width: 180px;">إجراءات الجودة والتحكم</th>
                 </tr>
               </thead>
               <tbody id="wms-stock-tbody">
@@ -345,13 +375,17 @@
             <table class="pharma-table" style="width: 100%; border-collapse: collapse; text-align: right;">
               <thead>
                 <tr style="background: rgba(255,255,255,0.02); border-bottom: 1px solid rgba(255,255,255,0.08);">
-                  <th style="padding: 12px; text-align: right;">كود المادة</th>
-                  <th style="padding: 12px; text-align: right;">اسم المادة</th>
-                  <th style="padding: 12px; text-align: right;">رقم اللوت (الباتش)</th>
-                  <th style="padding: 12px; text-align: right;">الكمية المتوفرة</th>
-                  <th style="padding: 12px; text-align: right;">تاريخ انتهاء الصلاحية</th>
-                  <th style="padding: 12px; text-align: right;">حالة المادة</th>
-                  <th style="padding: 12px; text-align: center; width: 220px;">إجراءات الجودة والتحكم</th>
+                  <th style="padding: 8px; text-align: right;">رمز المادة</th>
+                  <th style="padding: 8px; text-align: right;">اسم المادة</th>
+                  <th style="padding: 8px; text-align: right;">رقم اللوت (الباتش)</th>
+                  <th style="padding: 8px; text-align: right;">المورد</th>
+                  <th style="padding: 8px; text-align: right;">تاريخ الإنتاج</th>
+                  <th style="padding: 8px; text-align: right;">تاريخ الدخول</th>
+                  <th style="padding: 8px; text-align: right;">تاريخ انتهاء الصلاحية</th>
+                  <th style="padding: 8px; text-align: right;">الكمية المتوفرة</th>
+                  <th style="padding: 8px; text-align: right;">مكان التخزين</th>
+                  <th style="padding: 8px; text-align: right;">حالة المادة</th>
+                  <th style="padding: 8px; text-align: center; width: 180px;">إجراءات الجودة والتحكم</th>
                 </tr>
               </thead>
               <tbody id="wms-packaging-tbody">
@@ -385,13 +419,17 @@
             <table class="pharma-table" style="width: 100%; border-collapse: collapse; text-align: right;">
               <thead>
                 <tr style="background: rgba(255,255,255,0.02); border-bottom: 1px solid rgba(255,255,255,0.08);">
-                  <th style="padding: 12px; text-align: right;">رمز المنتج</th>
-                  <th style="padding: 12px; text-align: right;">اسم المنتج</th>
-                  <th style="padding: 12px; text-align: right;">رقم لوت المنتج</th>
-                  <th style="padding: 12px; text-align: right;">الكمية المتوفرة (الرصيد الجاهز)</th>
-                  <th style="padding: 12px; text-align: right;">تاريخ انتهاء الصلاحية</th>
-                  <th style="padding: 12px; text-align: right;">حالة المنتج</th>
-                  <th style="padding: 12px; text-align: center; width: 220px;">إجراءات الجودة والتحكم</th>
+                  <th style="padding: 8px; text-align: right;">رمز المنتج</th>
+                  <th style="padding: 8px; text-align: right;">اسم المنتج</th>
+                  <th style="padding: 8px; text-align: right;">رقم لوت المنتج</th>
+                  <th style="padding: 8px; text-align: right;">المورد</th>
+                  <th style="padding: 8px; text-align: right;">تاريخ الإنتاج</th>
+                  <th style="padding: 8px; text-align: right;">تاريخ الدخول</th>
+                  <th style="padding: 8px; text-align: right;">تاريخ انتهاء الصلاحية</th>
+                  <th style="padding: 8px; text-align: right;">الكمية المتوفرة (الرصيد الجاهز)</th>
+                  <th style="padding: 8px; text-align: right;">مكان التخزين</th>
+                  <th style="padding: 8px; text-align: right;">حالة المنتج</th>
+                  <th style="padding: 8px; text-align: center; width: 180px;">إجراءات الجودة والتحكم</th>
                 </tr>
               </thead>
               <tbody id="wms-ready-tbody">
@@ -496,8 +534,20 @@
                 </div>
               </div>
               <div class="form-group">
-                <label>موقع التخزين المقترح</label>
-                <input type="text" id="wms-in-location" placeholder="مثال: مستودع المواد الخام 1" style="width: 100%; box-sizing: border-box; padding: 8px; border-radius: 4px; background: #1e293b; border: 1px solid rgba(255,255,255,0.15); color: #fff;">
+                <label>موقع التخزين المقترح *</label>
+                <input type="text" id="wms-in-location" placeholder="مثال: مستودع المواد الخام 1" required style="width: 100%; box-sizing: border-box; padding: 8px; border-radius: 4px; background: #1e293b; border: 1px solid rgba(255,255,255,0.15); color: #fff;">
+              </div>
+              <div class="form-group">
+                <label>اسم المورد *</label>
+                <input type="text" id="wms-in-supplier" placeholder="مثال: شركة المواد الكيماوية الوطنية" required style="width: 100%; box-sizing: border-box; padding: 8px; border-radius: 4px; background: #1e293b; border: 1px solid rgba(255,255,255,0.15); color: #fff;">
+              </div>
+              <div class="form-group">
+                <label>تاريخ الإنتاج / بداية الفعالية *</label>
+                <input type="date" id="wms-in-effective" required style="width: 100%; box-sizing: border-box; padding: 8px; border-radius: 4px; background: #1e293b; border: 1px solid rgba(255,255,255,0.15); color: #fff; height: 38px;">
+              </div>
+              <div class="form-group">
+                <label>تاريخ دخول المعمل (اختياري)</label>
+                <input type="date" id="wms-in-entry" style="width: 100%; box-sizing: border-box; padding: 8px; border-radius: 4px; background: #1e293b; border: 1px solid rgba(255,255,255,0.15); color: #fff; height: 38px;">
               </div>
             </div>
             <div style="display: flex; justify-content: flex-end;">
@@ -656,7 +706,6 @@
             <div style="display: flex; gap: 8px;">
               <!-- Quick Stats -->
               <span class="wms-badge quarantine" style="padding: 6px 12px; font-size: 0.85rem;" id="qc-stat-pending">المعلقة: 0 لوت</span>
-              <span class="wms-badge released" style="padding: 6px 12px; font-size: 0.85rem;" id="qc-stat-passed">المقبولة: 0 لوت</span>
               <span class="wms-badge rejected" style="padding: 6px 12px; font-size: 0.85rem;" id="qc-stat-failed">المرفوضة: 0 لوت</span>
             </div>
           </div>
@@ -713,6 +762,32 @@
             </table>
           </div>
         </div>
+
+        <!-- QC Activity Log Section -->
+        <section class="activity-log-section" style="margin-top: 30px; background: var(--bg-card); padding: 20px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.08);">
+          <div class="section-header" style="margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center;">
+            <div>
+              <h3 style="margin: 0; font-size: 1rem; color: #fff;"><i data-lucide="activity" style="width:16px;height:16px;display:inline-block;vertical-align:middle;margin-left:6px;color:var(--cyan);"></i>سجل حركات وإجراءات الرقابة النوعية (QC Trail Log)</h3>
+              <p style="margin: 4px 0 0 0; font-size: 0.75rem; color: var(--text-dim);">تتبع اختبارات المعايرة، الانحلال، التجانس، والزرع الجرثومي وقرارات الإفراج/الرفض</p>
+            </div>
+          </div>
+          <div class="table-container" style="overflow-x: auto; max-height: 250px; overflow-y: auto;">
+            <table class="pharma-table" style="width: 100%; border-collapse: collapse; text-align: right; font-size: 0.82rem;">
+              <thead>
+                <tr style="background: rgba(255,255,255,0.02); border-bottom: 1px solid rgba(255,255,255,0.08);">
+                  <th style="padding: 8px; text-align: right;">رقم الحركة</th>
+                  <th style="padding: 8px; text-align: right;">المستخدم / الدور</th>
+                  <th style="padding: 8px; text-align: right;">نوع الإجراء</th>
+                  <th style="padding: 8px; text-align: right;">التفاصيل</th>
+                  <th style="padding: 8px; text-align: right;">التاريخ والوقت</th>
+                </tr>
+              </thead>
+              <tbody id="qc-activity-tbody">
+                <!-- QC logs injected here -->
+              </tbody>
+            </table>
+          </div>
+        </section>
       </div>
 
       <!-- VIEW 4: User Activity Log (Audit Trail) Container -->
@@ -982,7 +1057,8 @@
                   <thead>
                     <tr>
                       <th style="text-align: right; padding: 8px;">المادة الخام المفرج عنها (Released Lot) *</th>
-                      <th style="text-align: right; padding: 8px; width: 150px;">الكمية الموزونة (كغ) *</th>
+                      <th style="text-align: right; padding: 8px; width: 130px;">الكمية الموزونة *</th>
+                      <th style="text-align: right; padding: 8px; width: 100px;">الوحدة *</th>
                       <th style="text-align: center; padding: 8px; width: 70px;">إجراء</th>
                     </tr>
                   </thead>
@@ -1144,10 +1220,14 @@
         </div>
 
         <div class="modal-footer space-between">
-          <div style="display: flex; gap: 8px;">
+          <div style="display: flex; gap: 8px; flex-wrap: wrap;">
             <button type="button" class="btn btn-danger" id="btn-delete-batch">
               <i data-lucide="trash-2"></i>
               <span>إلغاء وحذف هذه التشغيلة</span>
+            </button>
+            <button type="button" class="btn btn-secondary" id="btn-weight-addendum" style="border-color: var(--cyan); color: var(--cyan);">
+              <i data-lucide="scale"></i>
+              <span>إضافة ملحق وزن (Admin) ⚖️</span>
             </button>
             <button type="button" class="btn btn-primary" id="btn-edit-batch" style="background: var(--cyan); border-color: var(--cyan); color: #0f172a;">
               <i data-lucide="edit"></i>
@@ -1213,8 +1293,9 @@
             <select id="select-user-role" style="background: #1e293b; color: #ffffff; border: 1px solid rgba(255,255,255,0.15); padding: 8px 12px; border-radius: 4px; font-size: 0.9rem; width: 100%; box-sizing: border-box; outline: none; cursor: pointer; margin-top: 5px;">
               <option value="admin" style="background: #1e293b; color: #ffffff;">مشرف النظام (Admin) - كامل الصلاحيات 👑</option>
               <option value="production" style="background: #1e293b; color: #ffffff;">إدارة الإنتاج (Production Operator) - تسجيل إنجازات ومراحل الإنتاج ⚙️</option>
-              <option value="qc" style="background: #1e293b; color: #ffffff;">قسم الجودة (QC Lab Analyst) - إدخال الفحوصات المخبرية وتخليص اللوتات 🧪</option>
+              <option value="qc" style="background: #1e293b; color: #ffffff;">قسم الرقابة النوعية QC (QC Lab Analyst) - إدخال الفحوصات المخبرية وتخليص اللوتات 🧪</option>
               <option value="wms" style="background: #1e293b; color: #ffffff;">قسم المستودعات (WMS Operator) - إدارة الأرصدة والمخزون وحركات الصرف 📦</option>
+              <option value="observer" style="background: #1e293b; color: #ffffff;">مراقب (Observer) - وضع المراقبة والقراءة فقط 👁️</option>
             </select>
           </div>
 
@@ -1414,6 +1495,60 @@
               <button type="button" class="btn btn-secondary" id="btn-cancel-qc-final-release">إلغاء</button>
               <button type="submit" class="btn btn-primary" style="background: var(--emerald); border-color: var(--emerald);">
                 <i data-lucide="check"></i> تأكيد التحرير والإفراج النهائي 🔓
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal: Weight Addendum (ملحق وزن للأدمن) -->
+    <div id="modal-weight-addendum" class="modal-overlay hidden">
+      <div class="modal-card" style="max-width: 450px;">
+        <div class="modal-header">
+          <div class="modal-title" style="display: flex; align-items: center; gap: 8px;">
+            <i data-lucide="scale" style="color: var(--cyan); width: 22px; height: 22px;"></i>
+            <div>
+              <h3 style="margin: 0; font-size: 1.05rem; font-weight: bold; color: #fff;">إضافة ملحق وزن للتشغيلة ⚖️</h3>
+              <p style="margin: 0; font-size: 0.75rem; color: var(--text-dim);">إضافة وصرف مواد خام إضافية وتوسيع خلطة الباتش</p>
+            </div>
+          </div>
+          <button class="btn-close-modal" id="close-weight-addendum-modal" style="font-size: 1.5rem; background: none; border: none; color: #fff; cursor: pointer;">&times;</button>
+        </div>
+        <div class="modal-body" style="direction: rtl;">
+          <form id="form-weight-addendum">
+            <div style="background: rgba(255,255,255,0.02); padding: 12px; border-radius: 6px; margin-bottom: 16px; border: 1px solid rgba(255,255,255,0.05);">
+              <div style="margin-bottom: 4px;"><strong>المنتج:</strong> <span id="addendum-product-name" style="color: var(--cyan);"></span></div>
+              <div><strong>رقم الباتش:</strong> <span id="addendum-batch-no" style="color: var(--amber);"></span></div>
+            </div>
+
+            <!-- Searchable select raw material -->
+            <div class="form-group" style="position: relative; margin-bottom: 1.25rem;">
+              <label style="font-weight: bold; margin-bottom: 6px; display: block;">اختر المادة الخام المفرج عنها *</label>
+              <input type="text" id="addendum-lot-search" placeholder="🔍 ابحث باسم المادة، كودها، أو رقم اللوت..." required style="width: 100%; box-sizing: border-box; padding: 8px; border-radius: 4px; background: #1e293b; border: 1px solid rgba(255,255,255,0.15); color: #fff;">
+              <input type="hidden" id="addendum-lot-id">
+              <div id="addendum-lot-dropdown" class="hidden" style="position: absolute; left: 0; right: 0; background: #0b0f19; border: 1px solid rgba(6, 182, 212, 0.3); border-radius: 4px; max-height: 150px; overflow-y: auto; z-index: 9999; box-shadow: 0 10px 25px rgba(0,0,0,0.8); margin-top: 2px;"></div>
+            </div>
+
+            <!-- Quantity & Unit -->
+            <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 12px; margin-bottom: 1.25rem;">
+              <div class="form-group" style="margin: 0;">
+                <label style="font-weight: bold; margin-bottom: 6px; display: block;">الكمية المصروفة المضافة *</label>
+                <input type="number" step="0.001" id="addendum-qty" required placeholder="مثال: 50" style="width: 100%; box-sizing: border-box; padding: 8px; border-radius: 4px; background: #1e293b; border: 1px solid rgba(255,255,255,0.15); color: #fff; height: 38px;">
+              </div>
+              <div class="form-group" style="margin: 0;">
+                <label style="font-weight: bold; margin-bottom: 6px; display: block;">الوحدة *</label>
+                <select id="addendum-unit" style="width: 100%; box-sizing: border-box; padding: 8px; border-radius: 4px; background: #1e293b; border: 1px solid rgba(255,255,255,0.15); color: #fff; height: 38px;">
+                  <option value="kg">kg (كيلوغرام)</option>
+                  <option value="g">g (غرام)</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: 10px; padding-top: 15px; border-top: 1px solid rgba(255,255,255,0.08);">
+              <button type="button" class="btn btn-secondary" id="btn-cancel-weight-addendum">إلغاء</button>
+              <button type="submit" class="btn btn-primary" style="background: var(--cyan); border-color: var(--cyan); color: #000;">
+                <span>صرف وإضافة ملحق الوزن</span>
               </button>
             </div>
           </form>
