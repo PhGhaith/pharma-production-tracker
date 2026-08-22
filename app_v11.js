@@ -55,6 +55,15 @@
     return `${CLOUD_API_BASE}${separator}cb=${Date.now()}`;
   }
 
+  function generateShortTxId() {
+    const d = new Date();
+    const yy = String(d.getFullYear()).slice(-2);
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    const rand = Math.floor(100 + Math.random() * 900);
+    return `TX-${yy}${mm}${dd}-${rand}`;
+  }
+
   // Application State
   let batches = [];
   let stockLots = [];
@@ -1552,7 +1561,7 @@
 
         // Transaction log
         wmsTransactions.unshift({
-          Tx_ID: 'tx-' + Date.now() + '-' + Math.random().toString(36).substr(2, 4),
+          Tx_ID: generateShortTxId(),
           Lot_ID: lot.Lot_ID,
           Tx_Type: 'Dispense_Production',
           Quantity: -addedQtyInKg,
@@ -2895,7 +2904,7 @@
         }
 
         wmsTransactions.unshift({
-          Tx_ID: 'tx-' + Date.now() + '-' + Math.random().toString(36).substr(2, 4),
+          Tx_ID: generateShortTxId(),
           Lot_ID: row.lotId,
           Tx_Type: 'Dispense_Production',
           Quantity: -row.qty,
@@ -3004,7 +3013,7 @@
         }
 
         wmsTransactions.unshift({
-          Tx_ID: 'tx-' + Date.now() + '-' + Math.random().toString(36).substr(2, 4),
+          Tx_ID: generateShortTxId(),
           Lot_ID: row.lotId,
           Tx_Type: 'Dispense_Production',
           Quantity: -row.qty,
@@ -3201,7 +3210,7 @@
           }
 
           wmsTransactions.unshift({
-            Tx_ID: 'tx-' + Date.now() + '-' + Math.random().toString(36).substr(2, 4),
+            Tx_ID: generateShortTxId(),
             Lot_ID: row.lotId,
             Tx_Type: 'Dispense_Production',
             Quantity: -row.qty,
@@ -3240,7 +3249,7 @@
           }
 
           wmsTransactions.unshift({
-            Tx_ID: 'tx-' + Date.now() + '-' + Math.random().toString(36).substr(2, 4),
+            Tx_ID: generateShortTxId(),
             Lot_ID: row.lotId,
             Tx_Type: 'Dispense_Production',
             Quantity: -row.qty,
@@ -3410,7 +3419,7 @@
 
         // Log transaction in WMS history
         wmsTransactions.unshift({
-          Tx_ID: 'tx-' + Date.now() + '-' + Math.random().toString(36).substr(2, 4),
+          Tx_ID: generateShortTxId(),
           Lot_ID: row.lotId,
           Tx_Type: 'Dispense_Production',
           Quantity: -row.qty,
@@ -3434,7 +3443,7 @@
 
         // Log transaction in WMS history
         wmsTransactions.unshift({
-          Tx_ID: 'tx-' + Date.now() + '-' + Math.random().toString(36).substr(2, 4),
+          Tx_ID: generateShortTxId(),
           Lot_ID: row.lotId,
           Tx_Type: 'Dispense_Production',
           Quantity: -row.qty,
@@ -5141,7 +5150,7 @@
 
         // Add WMS transaction log
         wmsTransactions.unshift({
-          Tx_ID: 'tx-' + Date.now() + '-' + Math.random().toString(36).substr(2, 4),
+          Tx_ID: generateShortTxId(),
           Lot_ID: 'system',
           Tx_Type: 'Clear_Inventory',
           Quantity: 0,
@@ -5191,7 +5200,7 @@
 
         // Add WMS transaction log
         wmsTransactions.unshift({
-          Tx_ID: 'tx-' + Date.now() + '-' + Math.random().toString(36).substr(2, 4),
+          Tx_ID: generateShortTxId(),
           Lot_ID: 'system',
           Tx_Type: 'Clear_Inventory',
           Quantity: 0,
@@ -5240,7 +5249,7 @@
 
         // Add WMS transaction log
         wmsTransactions.unshift({
-          Tx_ID: 'tx-' + Date.now() + '-' + Math.random().toString(36).substr(2, 4),
+          Tx_ID: generateShortTxId(),
           Lot_ID: 'system',
           Tx_Type: 'Clear_Inventory',
           Quantity: 0,
@@ -5783,7 +5792,7 @@
 
     // Log transaction
     const tx = {
-      Tx_ID: 'tx-' + Date.now() + '-' + Math.random().toString(36).substr(2, 4),
+      Tx_ID: generateShortTxId(),
       Lot_ID: lotId,
       Tx_Type: 'QC_Status_Change',
       Quantity: 0,
@@ -5931,7 +5940,7 @@
 
       // Log WMS transaction
       wmsTransactions.unshift({
-        Tx_ID: 'tx-' + Date.now() + '-' + Math.random().toString(36).substr(2, 4),
+        Tx_ID: generateShortTxId(),
         Lot_ID: lot.Lot_ID,
         Tx_Type: 'Stock_Adjustment',
         Quantity: diff,
@@ -6233,7 +6242,7 @@
       stockLots.push(newLot);
 
       wmsTransactions.unshift({
-        Tx_ID: 'tx-' + Date.now() + '-' + Math.random().toString(36).substr(2, 4),
+        Tx_ID: generateShortTxId(),
         Lot_ID: lotId,
         Tx_Type: 'Initial_Balance',
         Quantity: row.Quantity,
@@ -6344,7 +6353,7 @@
     stockLots.push(newLot);
 
     wmsTransactions.unshift({
-      Tx_ID: 'tx-' + Date.now() + '-' + Math.random().toString(36).substr(2, 4),
+      Tx_ID: generateShortTxId(),
       Lot_ID: lotId,
       Tx_Type: 'Inbound_Purchase',
       Quantity: qty,
@@ -6679,7 +6688,7 @@
         shippedLots.push(`${lot.Material_Name} (الباتش: ${lot.Lot_Number})`);
 
         wmsTransactions.unshift({
-          Tx_ID: 'tx-' + Date.now() + '-' + Math.random().toString(36).substr(2, 4),
+          Tx_ID: generateShortTxId(),
           Lot_ID: lot.Lot_ID,
           Tx_Type: 'Sales_Dispatch',
           Quantity: -item.qty,
@@ -7360,7 +7369,7 @@
     lot.updatedAt = Date.now();
 
     wmsTransactions.unshift({
-      Tx_ID: 'tx-' + Date.now() + '-' + Math.random().toString(36).substr(2, 4),
+      Tx_ID: generateShortTxId(),
       Lot_ID: lotId,
       Tx_Type: newStatus === 'Released' ? 'Released_From_Quarantine' : (newStatus === 'Rejected' ? 'Rejected_From_Quarantine' : 'Re_Quarantined'),
       Quantity: lot.Current_Qty,
@@ -7412,7 +7421,7 @@
 
         // Log transaction
         wmsTransactions.unshift({
-          Tx_ID: 'tx-' + Date.now() + '-' + Math.random().toString(36).substr(2, 4),
+          Tx_ID: generateShortTxId(),
           Lot_ID: lotId,
           Tx_Type: 'QC_Status_Change',
           Quantity: 0,
