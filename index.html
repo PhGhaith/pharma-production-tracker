@@ -978,6 +978,7 @@
         </form>
 
       </div>
+    </div>
 
     <!-- Modal: Batch Detail & Stage Progress Tracker -->
     <div id="modal-batch-detail" class="modal-overlay hidden">
@@ -1537,6 +1538,45 @@
               <button type="button" class="btn btn-secondary" id="btn-cancel-qc-final-release">إلغاء</button>
               <button type="submit" class="btn btn-primary" style="background: var(--emerald); border-color: var(--emerald);">
                 <i data-lucide="check"></i> تأكيد التحرير والإفراج النهائي 🔓
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal: QC Final Rejection with Attachment -->
+    <div id="modal-qc-final-rejection" class="modal-overlay hidden">
+      <div class="modal-card" style="max-width: 450px;">
+        <div class="modal-header">
+          <div class="modal-title" style="display: flex; align-items: center; gap: 8px;">
+            <i data-lucide="x-circle" style="color: var(--rose); width: 22px; height: 22px;"></i>
+            <div>
+              <h3 style="margin: 0; font-size: 1.05rem; font-weight: bold; color: #fff;">رفض وعزل اللوت مخبرياً ❌</h3>
+              <p style="margin: 0; font-size: 0.75rem; color: var(--text-dim);">تسجيل قرار الرفض النهائي مع إرفاق تقرير التحليل المخبري</p>
+            </div>
+          </div>
+          <button class="btn-close-modal" id="close-qc-final-rejection-modal" style="font-size: 1.5rem; background: none; border: none; color: #fff; cursor: pointer;">&times;</button>
+        </div>
+        <div class="modal-body" style="direction: rtl;">
+          <form id="form-qc-final-rejection">
+            <input type="hidden" id="rejection-lot-id">
+
+            <div style="background: rgba(255,255,255,0.02); padding: 12px; border-radius: 6px; margin-bottom: 16px; border: 1px solid rgba(255,255,255,0.05);">
+              <div style="margin-bottom: 4px;"><strong>المادة / المنتج:</strong> <span id="rejection-product-name" style="color: var(--cyan);"></span></div>
+              <div><strong>رقم اللوت (الباتش):</strong> <span id="rejection-lot-number" style="color: var(--amber);"></span></div>
+            </div>
+
+            <div class="form-group" style="margin-bottom: 1.25rem;">
+              <label style="font-weight: bold; margin-bottom: 6px; display: block;">إرفاق تقرير / شهادة الرفض المخبري (مطلوب) *</label>
+              <input type="file" id="rejection-attachment-file" accept="image/*,application/pdf,.doc,.docx" required style="width: 100%; box-sizing: border-box; padding: 6px; border-radius: 4px; background: #1e293b; border: 1px solid rgba(255,255,255,0.15); color: #fff;">
+              <p style="margin: 4px 0 0 0; font-size: 0.72rem; color: var(--rose);">تنبيه: حجم الملف المرفق يجب أن يكون أقل من 1MB.</p>
+            </div>
+
+            <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: 12px; padding: 0;">
+              <button type="button" class="btn btn-secondary" id="btn-cancel-qc-final-rejection">إلغاء</button>
+              <button type="submit" class="btn btn-primary" style="background: var(--rose); border-color: var(--rose);">
+                <i data-lucide="x"></i> تأكيد الرفض وعزل المادة ❌
               </button>
             </div>
           </form>

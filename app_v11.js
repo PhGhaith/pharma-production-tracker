@@ -5170,6 +5170,14 @@
       });
     }
 
+    const statusMap = {
+      Released: '<span class="wms-badge released"><i data-lucide="check-circle-2" style="width:12px;height:12px;"></i> مقبول ومفرج عنه</span>',
+      Quarantine: '<span class="wms-badge quarantine"><i data-lucide="shield-alert" style="width:12px;height:12px;"></i> محجور (تحت الفحص)</span>',
+      Rejected: '<span class="wms-badge rejected"><i data-lucide="x-circle" style="width:12px;height:12px;"></i> مرفوض معزول</span>',
+      Returned_To_Supplier: '<span class="wms-badge" style="background: rgba(239, 68, 68, 0.15); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.25);"><i data-lucide="truck" style="width:12px;height:12px;"></i> مرتجع للمورد 🚚</span>',
+      Destroyed: '<span class="wms-badge" style="background: rgba(239, 68, 68, 0.15); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.25);"><i data-lucide="trash-2" style="width:12px;height:12px;"></i> تالف معدم 🗑️</span>'
+    };
+
     // Clear Packaging Materials Stock
     const btnClearPackaging = document.getElementById('wms-btn-clear-packaging');
     if (btnClearPackaging) {
@@ -5488,7 +5496,9 @@
       const statusMap = {
         Released: '<span class="wms-badge released"><i data-lucide="check-circle-2" style="width:12px;height:12px;"></i> مقبول ومفرج عنه</span>',
         Quarantine: '<span class="wms-badge quarantine"><i data-lucide="shield-alert" style="width:12px;height:12px;"></i> محجور (تحت الفحص)</span>',
-        Rejected: '<span class="wms-badge rejected"><i data-lucide="x-circle" style="width:12px;height:12px;"></i> مرفوض معزول</span>'
+        Rejected: '<span class="wms-badge rejected"><i data-lucide="x-circle" style="width:12px;height:12px;"></i> مرفوض معزول</span>',
+        Returned_To_Supplier: '<span class="wms-badge" style="background: rgba(239, 68, 68, 0.15); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.25);"><i data-lucide="truck" style="width:12px;height:12px;"></i> مرتجع للمورد 🚚</span>',
+        Destroyed: '<span class="wms-badge" style="background: rgba(239, 68, 68, 0.15); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.25);"><i data-lucide="trash-2" style="width:12px;height:12px;"></i> تالف معدم 🗑️</span>'
       };
 
       // QC Actions HTML
@@ -5524,9 +5534,17 @@
             ${deleteBtnHtml}
           `;
         } else if (lot.Status === 'Rejected') {
+          let rejectActions = '';
+          if (currentUserRole === 'admin' || currentUserRole === 'wms') {
+            rejectActions = `
+              <button class="${btnClass}" style="${style} border-color: var(--rose); color: var(--rose);" onclick="zeroOutRejectedLot('${lot.Lot_ID}', 'return')" title="إرجاع الكمية للمورد">إرجاع 🚚</button>
+              <button class="${btnClass}" style="${style} border-color: var(--rose); color: var(--rose);" onclick="zeroOutRejectedLot('${lot.Lot_ID}', 'destroy')" title="إتلاف الكمية">إتلاف 🗑️</button>
+            `;
+          }
           actionsHtml = `
             <button class="${btnClass}" style="${style} border-color: var(--amber); color: var(--amber);" onclick="changeLotStatus('${lot.Lot_ID}', 'Quarantine')">حجر 🔒</button>
             <button class="${btnClass}" style="${style} border-color: var(--emerald); color: var(--emerald);" onclick="changeLotStatus('${lot.Lot_ID}', 'Released')">إفراج ✅</button>
+            ${rejectActions}
             ${deleteBtnHtml}
           `;
         }
@@ -5537,6 +5555,12 @@
         attachmentHtml = `
           <a href="#" onclick="downloadQCReleaseAttachment('${lot.Lot_ID}'); return false;" style="margin-right: 6px; color: var(--cyan);" title="عرض/تحميل مستند الإفراج النهائي: ${lot.Release_Attachment_Name || 'مرفق'}">
             <i data-lucide="paperclip" style="width: 14px; height: 14px; display: inline-block; vertical-align: middle;"></i>
+          </a>
+        `;
+      } else if (lot.Rejection_Attachment) {
+        attachmentHtml = `
+          <a href="#" onclick="downloadQCRejectionAttachment('${lot.Lot_ID}'); return false;" style="margin-right: 6px; color: var(--rose);" title="عرض/تحميل مستند الرفض المخبري: ${lot.Rejection_Attachment_Name || 'مرفق'}">
+            <i data-lucide="alert-triangle" style="width: 14px; height: 14px; display: inline-block; vertical-align: middle;"></i>
           </a>
         `;
       }
@@ -5597,7 +5621,9 @@
       const statusMap = {
         Released: '<span class="wms-badge released"><i data-lucide="check-circle-2" style="width:12px;height:12px;"></i> مقبول ومفرج عنه</span>',
         Quarantine: '<span class="wms-badge quarantine"><i data-lucide="shield-alert" style="width:12px;height:12px;"></i> محجور (تحت الفحص)</span>',
-        Rejected: '<span class="wms-badge rejected"><i data-lucide="x-circle" style="width:12px;height:12px;"></i> مرفوض معزول</span>'
+        Rejected: '<span class="wms-badge rejected"><i data-lucide="x-circle" style="width:12px;height:12px;"></i> مرفوض معزول</span>',
+        Returned_To_Supplier: '<span class="wms-badge" style="background: rgba(239, 68, 68, 0.15); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.25);"><i data-lucide="truck" style="width:12px;height:12px;"></i> مرتجع للمورد 🚚</span>',
+        Destroyed: '<span class="wms-badge" style="background: rgba(239, 68, 68, 0.15); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.25);"><i data-lucide="trash-2" style="width:12px;height:12px;"></i> تالف معدم 🗑️</span>'
       };
 
       // QC Actions HTML
@@ -5628,9 +5654,17 @@
             ${deleteBtnHtml}
           `;
         } else if (lot.Status === 'Rejected') {
+          let rejectActions = '';
+          if (currentUserRole === 'admin' || currentUserRole === 'wms') {
+            rejectActions = `
+              <button class="${btnClass}" style="${style} border-color: var(--rose); color: var(--rose);" onclick="zeroOutRejectedLot('${lot.Lot_ID}', 'return')" title="إرجاع الكمية للمورد">إرجاع 🚚</button>
+              <button class="${btnClass}" style="${style} border-color: var(--rose); color: var(--rose);" onclick="zeroOutRejectedLot('${lot.Lot_ID}', 'destroy')" title="إتلاف الكمية">إتلاف 🗑️</button>
+            `;
+          }
           actionsHtml = `
             <button class="${btnClass}" style="${style} border-color: var(--amber); color: var(--amber);" onclick="changeLotStatus('${lot.Lot_ID}', 'Quarantine')">حجر 🔒</button>
             <button class="${btnClass}" style="${style} border-color: var(--emerald); color: var(--emerald);" onclick="changeLotStatus('${lot.Lot_ID}', 'Released')">إفراج ✅</button>
+            ${rejectActions}
             ${deleteBtnHtml}
           `;
         }
@@ -5641,6 +5675,12 @@
         attachmentHtml = `
           <a href="#" onclick="downloadQCReleaseAttachment('${lot.Lot_ID}'); return false;" style="margin-right: 6px; color: var(--cyan);" title="عرض/تحميل مستند الإفراج النهائي: ${lot.Release_Attachment_Name || 'مرفق'}">
             <i data-lucide="paperclip" style="width: 14px; height: 14px; display: inline-block; vertical-align: middle;"></i>
+          </a>
+        `;
+      } else if (lot.Rejection_Attachment) {
+        attachmentHtml = `
+          <a href="#" onclick="downloadQCRejectionAttachment('${lot.Lot_ID}'); return false;" style="margin-right: 6px; color: var(--rose);" title="عرض/تحميل مستند الرفض المخبري: ${lot.Rejection_Attachment_Name || 'مرفق'}">
+            <i data-lucide="alert-triangle" style="width: 14px; height: 14px; display: inline-block; vertical-align: middle;"></i>
           </a>
         `;
       }
@@ -5701,7 +5741,9 @@
       const statusMap = {
         Released: '<span class="wms-badge released"><i data-lucide="check-circle-2" style="width:12px;height:12px;"></i> مقبول ومفرج عنه</span>',
         Quarantine: '<span class="wms-badge quarantine"><i data-lucide="shield-alert" style="width:12px;height:12px;"></i> محجور (تحت الفحص)</span>',
-        Rejected: '<span class="wms-badge rejected"><i data-lucide="x-circle" style="width:12px;height:12px;"></i> مرفوض معزول</span>'
+        Rejected: '<span class="wms-badge rejected"><i data-lucide="x-circle" style="width:12px;height:12px;"></i> مرفوض معزول</span>',
+        Returned_To_Supplier: '<span class="wms-badge" style="background: rgba(239, 68, 68, 0.15); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.25);"><i data-lucide="truck" style="width:12px;height:12px;"></i> مرتجع للمورد 🚚</span>',
+        Destroyed: '<span class="wms-badge" style="background: rgba(239, 68, 68, 0.15); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.25);"><i data-lucide="trash-2" style="width:12px;height:12px;"></i> تالف معدم 🗑️</span>'
       };
 
       // Actions HTML
@@ -5737,9 +5779,17 @@
             ${deleteBtnHtml}
           `;
         } else if (lot.Status === 'Rejected') {
+          let rejectActions = '';
+          if (currentUserRole === 'admin' || currentUserRole === 'wms') {
+            rejectActions = `
+              <button class="${btnClass}" style="${style} border-color: var(--rose); color: var(--rose);" onclick="zeroOutRejectedLot('${lot.Lot_ID}', 'return')" title="إرجاع الكمية للمورد">إرجاع 🚚</button>
+              <button class="${btnClass}" style="${style} border-color: var(--rose); color: var(--rose);" onclick="zeroOutRejectedLot('${lot.Lot_ID}', 'destroy')" title="إتلاف الكمية">إتلاف 🗑️</button>
+            `;
+          }
           actionsHtml = `
             <button class="${btnClass}" style="${style} border-color: var(--amber); color: var(--amber);" onclick="changeLotStatus('${lot.Lot_ID}', 'Quarantine')">حجر 🔒</button>
             <button class="${btnClass}" style="${style} border-color: var(--emerald); color: var(--emerald);" onclick="changeLotStatus('${lot.Lot_ID}', 'Released')">إفراج ✅</button>
+            ${rejectActions}
             ${deleteBtnHtml}
           `;
         }
@@ -5750,6 +5800,12 @@
         attachmentHtml = `
           <a href="#" onclick="downloadQCReleaseAttachment('${lot.Lot_ID}'); return false;" style="margin-right: 6px; color: var(--cyan);" title="عرض/تحميل مستند الإفراج النهائي: ${lot.Release_Attachment_Name || 'مرفق'}">
             <i data-lucide="paperclip" style="width: 14px; height: 14px; display: inline-block; vertical-align: middle;"></i>
+          </a>
+        `;
+      } else if (lot.Rejection_Attachment) {
+        attachmentHtml = `
+          <a href="#" onclick="downloadQCRejectionAttachment('${lot.Lot_ID}'); return false;" style="margin-right: 6px; color: var(--rose);" title="عرض/تحميل مستند الرفض المخبري: ${lot.Rejection_Attachment_Name || 'مرفق'}">
+            <i data-lucide="alert-triangle" style="width: 14px; height: 14px; display: inline-block; vertical-align: middle;"></i>
           </a>
         `;
       }
@@ -5783,6 +5839,15 @@
       document.getElementById('release-lot-number').textContent = lot.Lot_Number;
       document.getElementById('release-attachment-file').value = '';
       document.getElementById('modal-qc-final-release').classList.remove('hidden');
+      return;
+    }
+
+    if (newStatus === 'Rejected') {
+      document.getElementById('rejection-lot-id').value = lotId;
+      document.getElementById('rejection-product-name').textContent = lot.Material_Name;
+      document.getElementById('rejection-lot-number').textContent = lot.Lot_Number;
+      document.getElementById('rejection-attachment-file').value = '';
+      document.getElementById('modal-qc-final-rejection').classList.remove('hidden');
       return;
     }
 
@@ -7339,7 +7404,19 @@
       tr.innerHTML = `
         <td style="padding: 10px;">${lot.Material_Code || '-'}</td>
         <td style="padding: 10px; font-weight: bold;">${lot.Material_Name || '-'}</td>
-        <td style="padding: 10px;"><span style="color: var(--amber); font-weight: bold;">${lot.Lot_Number || '-'}</span></td>
+        <td style="padding: 10px;">
+          <span style="color: var(--amber); font-weight: bold;">${lot.Lot_Number || '-'}</span>
+          ${lot.Release_Attachment ? `
+            <a href="#" onclick="downloadQCReleaseAttachment('${lot.Lot_ID}'); return false;" style="margin-right: 6px; color: var(--cyan);" title="عرض/تحميل مستند الإفراج النهائي: ${lot.Release_Attachment_Name || 'مرفق'}">
+              <i data-lucide="paperclip" style="width: 12px; height: 12px; display: inline-block; vertical-align: middle;"></i>
+            </a>
+          ` : ''}
+          ${lot.Rejection_Attachment ? `
+            <a href="#" onclick="downloadQCRejectionAttachment('${lot.Lot_ID}'); return false;" style="margin-right: 6px; color: var(--rose);" title="عرض/تحميل مستند الرفض المخبري: ${lot.Rejection_Attachment_Name || 'مرفق'}">
+              <i data-lucide="alert-triangle" style="width: 12px; height: 12px; display: inline-block; vertical-align: middle;"></i>
+            </a>
+          ` : ''}
+        </td>
         <td style="padding: 10px;">${typeLabel}</td>
         <td style="padding: 10px;">${lot.Current_Qty} <small>${lot.Unit}</small></td>
         <td style="padding: 10px; color: var(--text-dim);">${lot.Expiry_Date || '-'}</td>
@@ -7364,6 +7441,15 @@
       return;
     }
     
+    if (newStatus === 'Rejected') {
+      document.getElementById('rejection-lot-id').value = lotId;
+      document.getElementById('rejection-product-name').textContent = lot.Material_Name;
+      document.getElementById('rejection-lot-number').textContent = lot.Lot_Number;
+      document.getElementById('rejection-attachment-file').value = '';
+      document.getElementById('modal-qc-final-rejection').classList.remove('hidden');
+      return;
+    }
+
     const oldStatus = lot.Status;
     lot.Status = newStatus;
     lot.updatedAt = Date.now();
@@ -7459,6 +7545,76 @@
     });
   }
 
+  // Bind close buttons for QC Final Rejection Modal
+  const closeQCRejectionModal = () => {
+    const modal = document.getElementById('modal-qc-final-rejection');
+    if (modal) modal.classList.add('hidden');
+  };
+  const closeQCRejectionBtn = document.getElementById('close-qc-final-rejection-modal');
+  if (closeQCRejectionBtn) closeQCRejectionBtn.addEventListener('click', closeQCRejectionModal);
+  const cancelQCRejectionBtn = document.getElementById('btn-cancel-qc-final-rejection');
+  if (cancelQCRejectionBtn) cancelQCRejectionBtn.addEventListener('click', closeQCRejectionModal);
+
+  const formQCRejection = document.getElementById('form-qc-final-rejection');
+  if (formQCRejection) {
+    formQCRejection.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const lotId = document.getElementById('rejection-lot-id').value;
+      const lot = stockLots.find(l => l && String(l.Lot_ID) === String(lotId));
+      if (!lot) return;
+
+      const fileInput = document.getElementById('rejection-attachment-file');
+      const file = fileInput.files[0];
+      if (!file) {
+        alert('الرجاء إرفاق تقرير أو شهادة الرفض المخبري لتأكيد العزل!');
+        return;
+      }
+
+      if (file.size > 1024 * 1024) {
+        alert('حجم الملف المرفق أكبر من 1MB! يرجى اختيار ملف أصغر حجماً لتفادي امتلاء الذاكرة.');
+        return;
+      }
+
+      const oldStatus = lot.Status;
+
+      const finalizeRejection = (attachmentBase64, attachmentName) => {
+        lot.Status = 'Rejected';
+        lot.updatedAt = Date.now();
+        lot.Rejection_Attachment = attachmentBase64;
+        lot.Rejection_Attachment_Name = attachmentName;
+
+        // Log transaction
+        wmsTransactions.unshift({
+          Tx_ID: generateShortTxId(),
+          Lot_ID: lotId,
+          Tx_Type: 'QC_Status_Change',
+          Quantity: 0,
+          Reference_ID: `رفض وعزل اللوت مخبرياً مع تقرير تحليل`,
+          Performed_By: currentUserRole,
+          Timestamp: Date.now()
+        });
+
+        saveWMS(true);
+        logUserActivity('رفض لوت (QC)', `تم رفض وعزل اللوت ${lot.Lot_Number} للمادة ${lot.Material_Name} مخبرياً مع إرفاق تقرير الرفض: ${attachmentName}.`);
+
+        closeQCRejectionModal();
+
+        if (typeof renderQCViews === 'function') renderQCViews();
+        if (typeof renderWMSViews === 'function') renderWMSViews();
+
+        if (window.showToast) {
+          window.showToast(`تم رفض وعزل اللوت [${lot.Lot_Number}] بنجاح ❌`, 'success');
+        }
+      };
+
+      const reader = new FileReader();
+      reader.onload = function(evt) {
+        finalizeRejection(evt.target.result, file.name);
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+
   window.downloadQCReleaseAttachment = function(lotId) {
     const lot = stockLots.find(l => l && String(l.Lot_ID) === String(lotId));
     if (!lot || !lot.Release_Attachment) return;
@@ -7470,6 +7626,59 @@
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+  };
+
+  window.downloadQCRejectionAttachment = function(lotId) {
+    const lot = stockLots.find(l => l && String(l.Lot_ID) === String(lotId));
+    if (!lot || !lot.Rejection_Attachment) return;
+    const link = document.createElement('a');
+    link.href = lot.Rejection_Attachment;
+    link.download = lot.Rejection_Attachment_Name || 'rejection_document';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  window.zeroOutRejectedLot = function(lotId, actionType) {
+    const lot = stockLots.find(l => l && String(l.Lot_ID) === String(lotId));
+    if (!lot) return;
+
+    const qty = parseFloat(lot.Current_Qty) || 0;
+    if (qty === 0) {
+      alert('هذا اللوت مصفر الرصيد بالفعل!');
+      return;
+    }
+
+    const actionText = actionType === 'return' ? 'إرجاع للمورد' : 'إتلاف وتخلص';
+    const confirmMsg = actionType === 'return' 
+      ? `هل أنت متأكد من إرجاع كامل كمية هذا اللوت المرفوض (${qty} ${lot.Unit}) للمورد؟ سيتم تصفير الرصيد وتوثيق الإجراء.`
+      : `هل أنت متأكد من إتلاف كامل كمية هذا اللوت المرفوض (${qty} ${lot.Unit})؟ سيتم تصفير الرصيد وتوثيق الإجراء.`;
+
+    if (!confirm(confirmMsg)) return;
+
+    lot.Current_Qty = 0;
+    const oldStatus = lot.Status;
+    lot.Status = actionType === 'return' ? 'Returned_To_Supplier' : 'Destroyed';
+    lot.updatedAt = Date.now();
+
+    wmsTransactions.unshift({
+      Tx_ID: generateShortTxId(),
+      Lot_ID: lotId,
+      Tx_Type: actionType === 'return' ? 'Return_To_Supplier' : 'Material_Destruction',
+      Quantity: -qty,
+      Reference_ID: actionType === 'return' ? `إرجاع للمورد - تصفير رصيد مرفوض` : `إتلاف وتخلص من رصيد مرفوض`,
+      Performed_By: currentUserRole,
+      Timestamp: Date.now()
+    });
+
+    saveWMS(true);
+    
+    logUserActivity(actionType === 'return' ? 'إرجاع للمورد' : 'إتلاف مادة', `تم تصفير رصيد اللوت ${lot.Lot_Number} للمادة ${lot.Material_Name} (الكمية المصفرة: ${qty} ${lot.Unit}) عن طريق ${actionText}.`);
+
+    renderWMSViews();
+    if (window.showToast) {
+      window.showToast(`تم ${actionText} اللوت وتصفير رصيده بنجاح ⚖️❌`, 'success');
+    }
   };
 
   window.downloadBatchStageReleaseCertificate = function(batchId) {
