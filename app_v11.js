@@ -64,6 +64,51 @@
     return `TX-${yy}${mm}${dd}-${rand}`;
   }
 
+  function compressImageAndConvertToBase64(file, callback) {
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        callback(e.target.result);
+      };
+      reader.readAsDataURL(file);
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = function(e) {
+      const img = new Image();
+      img.onload = function() {
+        const canvas = document.createElement('canvas');
+        let width = img.width;
+        let height = img.height;
+        const max_size = 1000;
+        
+        if (width > height) {
+          if (width > max_size) {
+            height *= max_size / width;
+            width = max_size;
+          }
+        } else {
+          if (height > max_size) {
+            width *= max_size / height;
+            height = max_size;
+          }
+        }
+        
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, width, height);
+        
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.6);
+        callback(dataUrl);
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  }
+
   // Application State
   let batches = [];
   let stockLots = [];
@@ -454,7 +499,13 @@
 
   function saveBatches(triggerCloudUpload = true) {
     sanitizeBatchesCoatingName(batches);
-    localStorage.setItem(MASTER_STORAGE_KEY, JSON.stringify(batches));
+    try {
+      localStorage.setItem(MASTER_STORAGE_KEY, JSON.stringify(batches));
+    } catch (e) {
+      if (e.name === 'QuotaExceededError' || e.code === 22) {
+        alert('⚠️ تحذير حرج: ذاكرة المتصفح ممتلئة بالكامل بسبب حجم الملفات المرفقة! تم حفظ البيانات مؤقتاً ولكن يرجى تقليل حجم المرفقات أو حذف القديم لتجنب فقدان البيانات عند التحديث.');
+      }
+    }
     if (triggerCloudUpload) {
       pushToCloud(true); // Force push immediately for user actions
     }
@@ -476,8 +527,14 @@
   }
 
   function saveWMS(triggerCloudUpload = true) {
-    localStorage.setItem(WMS_STOCK_LOTS_KEY, JSON.stringify(stockLots));
-    localStorage.setItem(WMS_TRANSACTIONS_KEY, JSON.stringify(wmsTransactions));
+    try {
+      localStorage.setItem(WMS_STOCK_LOTS_KEY, JSON.stringify(stockLots));
+      localStorage.setItem(WMS_TRANSACTIONS_KEY, JSON.stringify(wmsTransactions));
+    } catch (e) {
+      if (e.name === 'QuotaExceededError' || e.code === 22) {
+        alert('⚠️ تحذير حرج: ذاكرة المتصفح ممتلئة بالكامل بسبب حجم الملفات المرفقة! تم حفظ البيانات مؤقتاً ولكن يرجى تقليل حجم المرفقات أو حذف القديم لتجنب فقدان البيانات عند التحديث.');
+      }
+    }
     if (triggerCloudUpload) {
       pushToCloud(true);
     }
@@ -1609,25 +1666,29 @@
           return;
         }
 
-        const reader = new FileReader();
-        reader.onload = function(evt) {
+        if (!file.type.startsWith('image/') && file.size > 250 * 1024) {
+          alert('حجم الملف المرفق أكبر من 250KB! لتفادي امتلاء ذاكرة المتصفح وتوقف النظام، يرجى اختيار ملف أصغر حجماً (مثل ملف PDF مضغوط أو صورة مضغوطة).');
+          visualReleaseFileInput.value = '';
+          return;
+        }
+
+        compressImageAndConvertToBase64(file, function(base64Data) {
           const batch = batches.find(b => String(b.id) === String(activeBatchId));
           if (!batch || !batch.stages) return;
           const stage = batch.stages[activeStageIndex];
           if (stage && stage.id === 'visual_inspection') {
             stage.releaseCertificate = {
               name: file.name,
-              type: file.type,
-              size: (file.size / 1024).toFixed(1) + ' KB',
-              data: evt.target.result
+              type: file.type.startsWith('image/') ? 'image/jpeg' : file.type,
+              size: (base64Data.length * 0.75 / 1024).toFixed(1) + ' KB',
+              data: base64Data
             };
             batch.version = (batch.version || 0) + 1;
             batch.updatedAt = Date.now();
             saveBatches(true);
             renderStageLogger(batch);
           }
-        };
-        reader.readAsDataURL(file);
+        });
       });
     }
 
@@ -7530,15 +7591,13 @@
       };
 
       if (file) {
-        if (file.size > 1024 * 1024) {
-          alert('حجم الملف المرفق أكبر من 1MB! يرجى اختيار ملف أصغر حجماً لتفادي امتلاء الذاكرة.');
+        if (!file.type.startsWith('image/') && file.size > 250 * 1024) {
+          alert('حجم الملف المرفق أكبر من 250KB! لتفادي امتلاء ذاكرة المتصفح وتوقف النظام، يرجى اختيار ملف أصغر حجماً (مثل ملف PDF مضغوط أو صورة مضغوطة).');
           return;
         }
-        const reader = new FileReader();
-        reader.onload = function(evt) {
-          finalizeRelease(evt.target.result, file.name);
-        };
-        reader.readAsDataURL(file);
+        compressImageAndConvertToBase64(file, function(base64Data) {
+          finalizeRelease(base64Data, file.name);
+        });
       } else {
         finalizeRelease();
       }
@@ -7575,6 +7634,11 @@
         return;
       }
 
+      if (!file.type.startsWith('image/') && file.size > 250 * 1024) {
+        alert('حجم الملف المرفق أكبر من 250KB! لتفادي امتلاء ذاكرة المتصفح وتوقف النظام، يرجى اختيار ملف أصغر حجماً (مثل ملف PDF مضغوط أو صورة مضغوطة).');
+        return;
+      }
+
       const oldStatus = lot.Status;
 
       const finalizeRejection = (attachmentBase64, attachmentName) => {
@@ -7607,11 +7671,9 @@
         }
       };
 
-      const reader = new FileReader();
-      reader.onload = function(evt) {
-        finalizeRejection(evt.target.result, file.name);
-      };
-      reader.readAsDataURL(file);
+      compressImageAndConvertToBase64(file, function(base64Data) {
+        finalizeRejection(base64Data, file.name);
+      });
     });
   }
 
