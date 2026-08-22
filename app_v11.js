@@ -2682,7 +2682,7 @@
           visualAttachmentContainer.classList.remove('hidden');
           if (stage.releaseCertificate) {
             if (visualAttachmentStatus) {
-              visualAttachmentStatus.innerHTML = `المستند المرفق لشهادة التحرير: <a href="#" onclick="downloadBatchStageReleaseCertificate('${batch.id}'); return false;" style="color: var(--cyan); text-decoration: underline;">${stage.releaseCertificate.name}</a> (${stage.releaseCertificate.size}) ${isReadOnlyView ? '' : ` | <span style="color: var(--rose); cursor: pointer; margin-right: 10px;" onclick="removeBatchStageReleaseCertificate('${batch.id}')">حذف المرفق ❌</span>`}`;
+              visualAttachmentStatus.innerHTML = `المستند المرفق لشهادة التحرير: <a href="#" onclick="downloadBatchStageReleaseCertificate('${batch.id}'); return false;" style="color: var(--cyan); text-decoration: underline;">${stage.releaseCertificate.name}</a> (${stage.releaseCertificate.size}) | <span style="color: var(--rose); cursor: pointer; margin-right: 10px;" onclick="removeBatchStageReleaseCertificate('${batch.id}')">حذف المرفق ❌</span>`;
             }
             if (visualAttachmentFile) {
               visualAttachmentFile.style.display = 'none';
@@ -2692,7 +2692,7 @@
             if (visualAttachmentFile) {
               visualAttachmentFile.style.display = 'block';
               visualAttachmentFile.value = '';
-              visualAttachmentFile.disabled = isReadOnlyView;
+              visualAttachmentFile.disabled = false; // Keep always enabled
             }
           }
         } else {
