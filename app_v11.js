@@ -7666,14 +7666,14 @@
       Lot_ID: lotId,
       Tx_Type: actionType === 'return' ? 'Return_To_Supplier' : 'Material_Destruction',
       Quantity: -qty,
-      Reference_ID: actionType === 'return' ? `إرجاع للمورد - تصفير رصيد مرفوض` : `إتلاف وتخلص من رصيد مرفوض`,
+      Reference_ID: actionType === 'return' ? `إرجاع للمورد (الكمية السابقة: ${qty} ${lot.Unit} ⬅️ الحالية: 0)` : `إتلاف وتخلص (الكمية السابقة: ${qty} ${lot.Unit} ⬅️ الحالية: 0)`,
       Performed_By: currentUserRole,
       Timestamp: Date.now()
     });
 
     saveWMS(true);
     
-    logUserActivity(actionType === 'return' ? 'إرجاع للمورد' : 'إتلاف مادة', `تم تصفير رصيد اللوت ${lot.Lot_Number} للمادة ${lot.Material_Name} (الكمية المصفرة: ${qty} ${lot.Unit}) عن طريق ${actionText}.`);
+    logUserActivity(actionType === 'return' ? 'إرجاع للمورد' : 'إتلاف مادة', `تم تصفير رصيد اللوت ${lot.Lot_Number} للمادة ${lot.Material_Name} عن طريق ${actionText}. (الكمية السابقة: ${qty} ${lot.Unit} ⬅️ الكمية الحالية: 0).`);
 
     renderWMSViews();
     if (window.showToast) {
