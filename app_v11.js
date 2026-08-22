@@ -2784,33 +2784,7 @@
         notifyContainer.innerHTML = '';
       }
 
-      // Render Visual Inspection Release Certificate Attachment UI
-      const visualAttachmentContainer = document.getElementById('visual-inspection-attachment-container');
-      const visualAttachmentStatus = document.getElementById('visual-release-attachment-status');
-      const visualAttachmentFile = document.getElementById('visual-release-attachment-file');
 
-      if (visualAttachmentContainer) {
-        if (stage.id === 'visual_inspection') {
-          visualAttachmentContainer.classList.remove('hidden');
-          if (stage.releaseCertificate) {
-            if (visualAttachmentStatus) {
-              visualAttachmentStatus.innerHTML = `المستند المرفق لشهادة التحرير: <a href="#" onclick="downloadBatchStageReleaseCertificate('${batch.id}'); return false;" style="color: var(--cyan); text-decoration: underline;">${stage.releaseCertificate.name}</a> (${stage.releaseCertificate.size}) | <span style="color: var(--rose); cursor: pointer; margin-right: 10px;" onclick="removeBatchStageReleaseCertificate('${batch.id}')">حذف المرفق ❌</span>`;
-            }
-            if (visualAttachmentFile) {
-              visualAttachmentFile.style.display = 'none';
-            }
-          } else {
-            if (visualAttachmentStatus) visualAttachmentStatus.innerHTML = '';
-            if (visualAttachmentFile) {
-              visualAttachmentFile.style.display = 'block';
-              visualAttachmentFile.value = '';
-              visualAttachmentFile.disabled = false; // Keep always enabled
-            }
-          }
-        } else {
-          visualAttachmentContainer.classList.add('hidden');
-        }
-      }
 
       // Render IPC (In-Process Control) Attachment UI
       const ipcContainer = document.getElementById('stage-ipc-attachment-container');
