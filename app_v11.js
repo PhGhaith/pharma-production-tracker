@@ -2367,24 +2367,6 @@
       if (elPackagingMaterialsContainer) elPackagingMaterialsContainer.classList.add('hidden');
     }
 
-    let maxAllowedTotal = batch.totalWeightKg;
-    if (activeStageIndex > 0) {
-      const prevStage = batch.stages[activeStageIndex - 1];
-      maxAllowedTotal = prevStage ? (prevStage.acceptedKg || 0) : 0;
-    }
-
-    let carryOverAlreadyAdded = false;
-    for (let idx = 0; idx < activeStageIndex; idx++) {
-      if (batch.stages[idx].carryOverAdded) {
-        carryOverAlreadyAdded = true;
-        break;
-      }
-    }
-
-    // First read the checkbox checked state BEFORE re-rendering (destroying) it
-    const chkCarryBefore = document.getElementById('chk-add-carry-over-progress');
-    const chkChecked = chkCarryBefore ? chkCarryBefore.checked : false;
-
     // Populate stage-carry-over-progress-container dynamically
     if (elStageCarryOverProgressContainer) {
       if (batch.carryOverKg > 0) {
@@ -2416,10 +2398,7 @@
     }
 
     // Now compute the dynamic limit
-    let currentLimit = maxAllowedTotal;
-    if (!carryOverAlreadyAdded && (stage.carryOverAdded || chkChecked)) {
-      currentLimit += batch.carryOverKg;
-    }
+
 
     const totalMath = PharmaMath.kgToBlistersAndLots(currentLimit, batch.isCoated, batch.preCoatingMg, batch.postCoatingMg, batch.unitsPerBlister, batch.totalWeightKg, batch.lotsCount);
 
