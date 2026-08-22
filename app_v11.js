@@ -1772,7 +1772,7 @@
           timestamp: Date.now(),
           isRead: false
         });
-        localStorage.setItem(NOTIFICATIONS_STORAGE_KEY, JSON.stringify(notificationsHistory));
+        localStorage.setItem('notifications_history', JSON.stringify(notificationsHistory));
         if (typeof updateNotificationsUI === 'function') updateNotificationsUI();
 
         // Log user activity
