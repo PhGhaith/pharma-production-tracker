@@ -2567,7 +2567,7 @@
         }
 
         let oldQtyForLot = 0;
-        if (isEditCorrectionMode && Array.isArray(stage.formulation)) {
+        if (Array.isArray(stage.formulation)) {
           const oldRow = stage.formulation.find(or => String(or.Lot_ID || or.lotId) === String(lotId));
           if (oldRow) {
             oldQtyForLot = oldRow.Quantity || oldRow.qty || 0; // stored in kg
@@ -2633,7 +2633,7 @@
           }
 
           let oldQtyForLot = 0;
-          if (isEditCorrectionMode && Array.isArray(stage.packaging_materials)) {
+          if (Array.isArray(stage.packaging_materials)) {
             const oldRow = stage.packaging_materials.find(or => String(or.Lot_ID || or.lotId) === String(lotId));
             if (oldRow) {
               oldQtyForLot = oldRow.Quantity || oldRow.qty || 0;
@@ -2651,6 +2651,208 @@
 
         if (!isValid) return;
       }
+    }
+
+    // ----------------------------------------------------
+    // Overwrite/Replacement Mode for Weighing and Packaging
+    // ----------------------------------------------------
+    if (activeStageIndex === 0) {
+      const totalFormulationKg = formulationRows.reduce((sum, r) => sum + r.qty, 0);
+      const chkCarryProgress = document.getElementById('chk-add-carry-over-progress');
+      const shouldAddCarryOver = chkCarryProgress ? chkCarryProgress.checked : false;
+      
+      let newAccKg = totalFormulationKg;
+      if (shouldAddCarryOver || stage.carryOverAdded) {
+        newAccKg += batch.carryOverKg;
+        stage.carryOverAdded = true;
+      }
+      
+      const stageLimit = batch.totalWeightKg + (stage.carryOverAdded ? batch.carryOverKg : 0);
+      
+      if (newAccKg > (stageLimit + 0.05)) {
+        alert(`الكمية الإجمالية للمواد الموزونة المصححة (${newAccKg.toFixed(2)} kg) لا يمكن أن تتجاوز وزن الباتش الكلي المسموح به (${stageLimit.toFixed(2)} kg).`);
+        return;
+      }
+      
+      // Revert old WMS stock deductions
+      if (stage.formulation && stage.formulation.length > 0) {
+        stage.formulation.forEach(oldRow => {
+          const lotId = oldRow.Lot_ID || oldRow.lotId;
+          const qty = oldRow.Quantity || oldRow.qty;
+          const lot = stockLots.find(l => l && String(l.Lot_ID) === String(lotId));
+          if (lot) {
+            const isGram = lot.Unit === 'g' || lot.Unit === 'غ' || lot.Unit === 'جرام';
+            const revertQty = isGram ? (qty * 1000) : qty;
+            lot.Current_Qty = parseFloat((lot.Current_Qty + revertQty).toFixed(3));
+            lot.updatedAt = Date.now();
+          }
+        });
+      }
+      
+      // Delete old transactions
+      wmsTransactions = wmsTransactions.filter(tx => tx && !(tx.Tx_Type === 'Dispense_Production' && tx.Reference_ID === `صرف لإنتاج تشغيلة ${batch.productName} (#${batch.batchNo})`));
+
+      // Save new formulation array
+      stage.formulation = formulationRows.map(r => ({ Lot_ID: r.lotId, Quantity: r.qty, userQty: r.userQty, userUnit: r.userUnit }));
+
+      // Deduct new stock and log transactions
+      formulationRows.forEach(row => {
+        const lot = stockLots.find(l => l && String(l.Lot_ID) === String(row.lotId));
+        if (lot) {
+          const isGram = lot.Unit === 'g' || lot.Unit === 'غ' || lot.Unit === 'جرام';
+          const dispenseQty = isGram ? (row.qty * 1000) : row.qty;
+          lot.Current_Qty = parseFloat((lot.Current_Qty - dispenseQty).toFixed(3));
+          lot.updatedAt = Date.now();
+        }
+
+        wmsTransactions.unshift({
+          Tx_ID: 'tx-' + Date.now() + '-' + Math.random().toString(36).substr(2, 4),
+          Lot_ID: row.lotId,
+          Tx_Type: 'Dispense_Production',
+          Quantity: -row.qty,
+          Reference_ID: `صرف لإنتاج تشغيلة ${batch.productName} (#${batch.batchNo})`,
+          Performed_By: currentUserRole,
+          Timestamp: Date.now()
+        });
+      });
+      saveWMS();
+
+      // Update stage state
+      stage.acceptedKg = newAccKg;
+      stage.rejectedKg = 0;
+      stage.doneKg = newAccKg;
+      
+      if (stage.doneKg >= (stageLimit - 0.05)) {
+        stage.status = 'completed';
+      } else if (stage.doneKg > 0) {
+        stage.status = 'in_progress';
+      } else {
+        stage.status = 'pending';
+      }
+
+      if (!Array.isArray(batch.logs)) batch.logs = [];
+      const uLabel = getUnitLabel(batch.pharmaForm);
+      const accBlisters = PharmaMath.kgToBlistersAndLots(newAccKg, batch.isCoated, batch.preCoatingMg, batch.postCoatingMg, batch.unitsPerBlister, batch.totalWeightKg, batch.lotsCount).totalBlisters;
+      
+      batch.logs.unshift({
+        time: new Date().toLocaleString('en-US'),
+        text: `تسجيل وزنات خلطة المواد الخام لإنتاج الباتش: (إجمالي الوزن المقبول: ${newAccKg.toFixed(2)} kg = ${PharmaMath.formatNumber(accBlisters)} ${uLabel}).`
+      });
+
+      isEditCorrectionMode = false;
+      batch.version = (batch.version || 0) + 1;
+      batch.updatedAt = Date.now();
+      
+      saveBatches(true);
+      renderWorkflowTimeline(batch);
+      renderStageLogger(batch);
+      renderHistoryList(batch);
+      renderApp();
+      return;
+    }
+
+    if (isPackagingStage) {
+      const totalPackagingKg = packagingRows.reduce((sum, r) => sum + r.qty, 0);
+      const chkCarryProgress = document.getElementById('chk-add-carry-over-progress');
+      const shouldAddCarryOver = chkCarryProgress ? chkCarryProgress.checked : false;
+      
+      let carryOverAlreadyAdded = false;
+      for (let idx = 0; idx < activeStageIndex; idx++) {
+        if (batch.stages[idx].carryOverAdded) {
+          carryOverAlreadyAdded = true;
+          break;
+        }
+      }
+      
+      let newAccKg = totalPackagingKg;
+      if (!carryOverAlreadyAdded && (shouldAddCarryOver || stage.carryOverAdded)) {
+        newAccKg += batch.carryOverKg;
+        stage.carryOverAdded = true;
+      }
+      
+      let maxAllowedTotal = batch.totalWeightKg;
+      if (activeStageIndex > 0) {
+        const prevStage = batch.stages[activeStageIndex - 1];
+        maxAllowedTotal = prevStage ? (prevStage.acceptedKg || 0) : 0;
+      }
+      const stageLimit = maxAllowedTotal + (stage.carryOverAdded ? batch.carryOverKg : 0);
+      
+      if (newAccKg > (stageLimit + 0.05)) {
+        alert(`الكمية الإجمالية لمواد التعبئة المصححة (${newAccKg.toFixed(2)} kg) لا يمكن أن تتجاوز الكمية المقبولة في المرحلة السابقة (${stageLimit.toFixed(2)} kg).`);
+        return;
+      }
+      
+      // Revert old WMS stock deductions
+      if (stage.packaging_materials && stage.packaging_materials.length > 0) {
+        stage.packaging_materials.forEach(oldRow => {
+          const lotId = oldRow.Lot_ID || oldRow.lotId;
+          const qty = oldRow.Quantity || oldRow.qty;
+          const lot = stockLots.find(l => l && String(l.Lot_ID) === String(lotId));
+          if (lot) {
+            lot.Current_Qty = parseFloat((lot.Current_Qty + qty).toFixed(3));
+            lot.updatedAt = Date.now();
+          }
+        });
+      }
+      
+      // Delete old transactions
+      wmsTransactions = wmsTransactions.filter(tx => tx && !(tx.Tx_Type === 'Dispense_Production' && tx.Reference_ID === `صرف للتعبئة والتغليف لإنتاج تشغيلة ${batch.productName} (#${batch.batchNo})`));
+
+      // Save new packaging array
+      stage.packaging_materials = packagingRows.map(r => ({ Lot_ID: r.lotId, Quantity: r.qty }));
+
+      // Deduct new stock and log transactions
+      packagingRows.forEach(row => {
+        const lot = stockLots.find(l => l && String(l.Lot_ID) === String(row.lotId));
+        if (lot) {
+          lot.Current_Qty = parseFloat((lot.Current_Qty - row.qty).toFixed(3));
+          lot.updatedAt = Date.now();
+        }
+
+        wmsTransactions.unshift({
+          Tx_ID: 'tx-' + Date.now() + '-' + Math.random().toString(36).substr(2, 4),
+          Lot_ID: row.lotId,
+          Tx_Type: 'Dispense_Production',
+          Quantity: -row.qty,
+          Reference_ID: `صرف للتعبئة والتغليف لإنتاج تشغيلة ${batch.productName} (#${batch.batchNo})`,
+          Performed_By: currentUserRole,
+          Timestamp: Date.now()
+        });
+      });
+      saveWMS();
+
+      // Update stage state
+      stage.acceptedKg = newAccKg;
+      stage.rejectedKg = 0;
+      stage.doneKg = newAccKg;
+      
+      if (stage.doneKg >= (stageLimit - 0.05)) {
+        stage.status = 'completed';
+      } else if (stage.doneKg > 0) {
+        stage.status = 'in_progress';
+      } else {
+        stage.status = 'pending';
+      }
+
+      if (!Array.isArray(batch.logs)) batch.logs = [];
+      const uLabel = getUnitLabel(batch.pharmaForm);
+      const accBlisters = PharmaMath.kgToBlistersAndLots(newAccKg, batch.isCoated, batch.preCoatingMg, batch.postCoatingMg, batch.unitsPerBlister, batch.totalWeightKg, batch.lotsCount).totalBlisters;
+      
+      batch.logs.unshift({
+        time: new Date().toLocaleString('en-US'),
+        text: `تسجيل استهلاك مواد التعبئة والتغليف للتشغيلة: (إجمالي الوزن المقبول: ${newAccKg.toFixed(2)} kg = ${PharmaMath.formatNumber(accBlisters)} ${uLabel}).`
+      });
+
+      isEditCorrectionMode = false;
+      batch.version = (batch.version || 0) + 1;
+      batch.updatedAt = Date.now();
+      
+      saveBatches(true);
+      renderWorkflowTimeline(batch);
+      renderStageLogger(batch);
+      renderHistoryList(batch);
+      renderApp();
+      return;
     }
 
     // QC Gate Validation Checks
