@@ -1584,6 +1584,41 @@
       });
     }
 
+    // Visual Inspection Attachment change listener
+    const visualReleaseFileInput = document.getElementById('visual-release-attachment-file');
+    if (visualReleaseFileInput) {
+      visualReleaseFileInput.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        if (file.size > 1024 * 1024) {
+          alert('حجم الملف المرفق أكبر من 1MB! يرجى اختيار ملف أصغر حجماً لتفادي امتلاء الذاكرة.');
+          visualReleaseFileInput.value = '';
+          return;
+        }
+
+        const reader = new FileReader();
+        reader.onload = function(evt) {
+          const batch = batches.find(b => String(b.id) === String(activeBatchId));
+          if (!batch || !batch.stages) return;
+          const stage = batch.stages[activeStageIndex];
+          if (stage && stage.id === 'visual_inspection') {
+            stage.releaseCertificate = {
+              name: file.name,
+              type: file.type,
+              size: (file.size / 1024).toFixed(1) + ' KB',
+              data: evt.target.result
+            };
+            batch.version = (batch.version || 0) + 1;
+            batch.updatedAt = Date.now();
+            saveBatches(true);
+            renderStageLogger(batch);
+          }
+        };
+        reader.readAsDataURL(file);
+      });
+    }
+
     // Admin Edit Batch Modal listeners
     const btnEditBatch = document.getElementById('btn-edit-batch');
     const modalEditBatch = document.getElementById('modal-edit-batch');
@@ -2636,6 +2671,35 @@
         notifyContainer.style.display = 'none';
         notifyContainer.innerHTML = '';
       }
+
+      // Render Visual Inspection Release Certificate Attachment UI
+      const visualAttachmentContainer = document.getElementById('visual-inspection-attachment-container');
+      const visualAttachmentStatus = document.getElementById('visual-release-attachment-status');
+      const visualAttachmentFile = document.getElementById('visual-release-attachment-file');
+
+      if (visualAttachmentContainer) {
+        if (stage.id === 'visual_inspection') {
+          visualAttachmentContainer.classList.remove('hidden');
+          if (stage.releaseCertificate) {
+            if (visualAttachmentStatus) {
+              visualAttachmentStatus.innerHTML = `المستند المرفق لشهادة التحرير: <a href="#" onclick="downloadBatchStageReleaseCertificate('${batch.id}'); return false;" style="color: var(--cyan); text-decoration: underline;">${stage.releaseCertificate.name}</a> (${stage.releaseCertificate.size}) ${isReadOnlyView ? '' : ` | <span style="color: var(--rose); cursor: pointer; margin-right: 10px;" onclick="removeBatchStageReleaseCertificate('${batch.id}')">حذف المرفق ❌</span>`}`;
+            }
+            if (visualAttachmentFile) {
+              visualAttachmentFile.style.display = 'none';
+            }
+          } else {
+            if (visualAttachmentStatus) visualAttachmentStatus.innerHTML = '';
+            if (visualAttachmentFile) {
+              visualAttachmentFile.style.display = 'block';
+              visualAttachmentFile.value = '';
+              visualAttachmentFile.disabled = isReadOnlyView;
+            }
+          }
+        } else {
+          visualAttachmentContainer.classList.add('hidden');
+        }
+      }
+
       if (window.lucide) window.lucide.createIcons();
     }
   }
@@ -3453,11 +3517,17 @@
 
     if (!section || !tbody) return;
 
-    // The Weighing stage is always stage index 0
     const weighingStage = batch.stages && batch.stages[0];
     const formulation = weighingStage && weighingStage.formulation;
 
-    if (!weighingStage || !Array.isArray(formulation) || formulation.length === 0) {
+    // Check if there are packaging materials
+    const packagingStage = batch.stages && batch.stages.find(s => s && (s.id === 'blistering' || s.id === 'filling' || s.id === 'packaging'));
+    const packagingMaterials = packagingStage && packagingStage.packaging_materials;
+
+    const hasFormulation = Array.isArray(formulation) && formulation.length > 0;
+    const hasPackaging = Array.isArray(packagingMaterials) && packagingMaterials.length > 0;
+
+    if (!hasFormulation && !hasPackaging) {
       section.classList.add('hidden');
       return;
     }
@@ -3466,15 +3536,12 @@
     invoiceBatchNo.textContent = batch.batchNo || '-';
     invoiceProductName.textContent = batch.productName || '-';
     
-    // Find the latest timestamp or date for the weighing logs
     let dateStr = 'قيد التحضير';
     if (batch.logs && batch.logs.length > 0) {
-      // Find the first log referencing the weighing stage
       const wLog = batch.logs.find(l => l && l.text && (l.text.includes('مرحلة [الوزن]') || l.text.includes('مرحلة [Weighing]') || l.text.includes('مرحلة [وزن]')));
       if (wLog) {
         dateStr = wLog.time;
       } else {
-        // Fallback to the latest log or batch creation date
         dateStr = batch.logs[batch.logs.length - 1].time;
       }
     }
@@ -3484,38 +3551,84 @@
     tbody.innerHTML = '';
     let totalQty = 0;
 
-    formulation.forEach(row => {
-      const lotId = row.Lot_ID || row.lotId;
-      const qtyVal = row.Quantity || row.qty || 0;
-      
-      const lot = stockLots.find(l => l && String(l.Lot_ID) === String(lotId));
-      const materialName = lot ? lot.Material_Name : 'مادة محذوفة/غير معروفة';
-      const lotNumber = lot ? lot.Lot_Number : '-';
-      
-      let displayQty = qtyVal;
-      let displayUnit = lot ? lot.Unit : 'kg';
-      
-      if (row.userQty !== undefined && row.userUnit !== undefined) {
-        displayQty = row.userQty;
-        displayUnit = row.userUnit;
-      } else {
-        const isGram = displayUnit === 'g' || displayUnit === 'غ' || displayUnit === 'جرام';
-        if (isGram) {
-          displayQty = qtyVal * 1000;
+    // 1. Raw Materials (Formulation)
+    if (hasFormulation) {
+      formulation.forEach(row => {
+        const lotId = row.Lot_ID || row.lotId;
+        const qtyVal = row.Quantity || row.qty || 0;
+        const lot = stockLots.find(l => l && String(l.Lot_ID) === String(lotId));
+        const materialName = lot ? lot.Material_Name : 'مادة محذوفة/غير معروفة';
+        const lotNumber = lot ? lot.Lot_Number : '-';
+        const supplier = lot ? (lot.Supplier || '-') : '-';
+        
+        let displayQty = qtyVal;
+        let displayUnit = lot ? lot.Unit : 'kg';
+        
+        if (row.userQty !== undefined && row.userUnit !== undefined) {
+          displayQty = row.userQty;
+          displayUnit = row.userUnit;
+        } else {
+          const isGram = displayUnit === 'g' || displayUnit === 'غ' || displayUnit === 'جرام';
+          if (isGram) {
+            displayQty = qtyVal * 1000;
+          }
         }
-      }
 
-      totalQty += qtyVal;
+        totalQty += qtyVal;
 
-      const tr = document.createElement('tr');
-      tr.style.borderBottom = '1px solid rgba(255, 255, 255, 0.05)';
-      tr.innerHTML = `
-        <td style="padding: 8px; font-weight: bold; color: var(--cyan); text-align: right;">${materialName}</td>
-        <td style="padding: 8px; text-align: center; color: var(--amber); font-family: monospace;">${lotNumber}</td>
-        <td style="padding: 8px; text-align: left; font-weight: bold; color: var(--emerald);">${displayQty.toFixed(3)} ${displayUnit}</td>
-      `;
-      tbody.appendChild(tr);
-    });
+        const tr = document.createElement('tr');
+        tr.style.borderBottom = '1px solid rgba(255, 255, 255, 0.05)';
+        tr.innerHTML = `
+          <td style="padding: 8px; color: var(--text-dim); text-align: right; font-size: 0.78rem;">مواد خام 🧪</td>
+          <td style="padding: 8px; font-weight: bold; color: var(--cyan); text-align: right;">${materialName}</td>
+          <td style="padding: 8px; text-align: center; color: var(--text-dim); font-size: 0.78rem;">${supplier}</td>
+          <td style="padding: 8px; text-align: center; color: var(--amber); font-family: monospace;">${lotNumber}</td>
+          <td style="padding: 8px; text-align: left; font-weight: bold; color: var(--emerald);">${displayQty.toFixed(3)} ${displayUnit}</td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    // 2. Packaging Materials
+    if (hasPackaging) {
+      packagingMaterials.forEach(row => {
+        const lotId = row.Lot_ID || row.lotId;
+        const qtyVal = row.Quantity || row.qty || 0;
+        const lot = stockLots.find(l => l && String(l.Lot_ID) === String(lotId));
+        const materialName = lot ? lot.Material_Name : 'مادة تغليف محذوفة';
+        const lotNumber = lot ? lot.Lot_Number : '-';
+        const supplier = lot ? (lot.Supplier || '-') : '-';
+        
+        let displayQty = qtyVal;
+        let displayUnit = lot ? lot.Unit : 'kg';
+        
+        if (row.userQty !== undefined && row.userUnit !== undefined) {
+          displayQty = row.userQty;
+          displayUnit = row.userUnit;
+        } else {
+          const isGram = displayUnit === 'g' || displayUnit === 'غ' || displayUnit === 'جرام';
+          if (isGram) {
+            displayQty = qtyVal * 1000;
+          }
+        }
+
+        const isWeight = displayUnit.toLowerCase() === 'kg' || displayUnit.toLowerCase() === 'g' || displayUnit === 'كغ' || displayUnit === 'غ';
+        if (isWeight) {
+          totalQty += (displayUnit.toLowerCase() === 'g' || displayUnit === 'غ') ? (displayQty / 1000) : displayQty;
+        }
+
+        const tr = document.createElement('tr');
+        tr.style.borderBottom = '1px solid rgba(255, 255, 255, 0.05)';
+        tr.innerHTML = `
+          <td style="padding: 8px; color: var(--cyan); text-align: right; font-size: 0.78rem;">مواد تغليف 📦</td>
+          <td style="padding: 8px; font-weight: bold; color: var(--cyan); text-align: right;">${materialName}</td>
+          <td style="padding: 8px; text-align: center; color: var(--text-dim); font-size: 0.78rem;">${supplier}</td>
+          <td style="padding: 8px; text-align: center; color: var(--amber); font-family: monospace;">${lotNumber}</td>
+          <td style="padding: 8px; text-align: left; font-weight: bold; color: var(--emerald);">${displayQty.toFixed(3)} ${displayUnit}</td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
 
     invoiceTotal.textContent = `${totalQty.toFixed(3)} kg`;
     section.classList.remove('hidden');
@@ -7255,6 +7368,33 @@
     document.body.removeChild(link);
   };
 
+  window.downloadBatchStageReleaseCertificate = function(batchId) {
+    const batch = batches.find(b => String(b.id) === String(batchId));
+    if (!batch || !batch.stages) return;
+    const visualStage = batch.stages.find(s => s && s.id === 'visual_inspection');
+    if (!visualStage || !visualStage.releaseCertificate || !visualStage.releaseCertificate.data) return;
+    const link = document.createElement('a');
+    link.href = visualStage.releaseCertificate.data;
+    link.download = visualStage.releaseCertificate.name || 'release_certificate';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  window.removeBatchStageReleaseCertificate = function(batchId) {
+    if (!confirm('هل أنت متأكد من حذف هذا المرفق؟')) return;
+    const batch = batches.find(b => String(b.id) === String(batchId));
+    if (!batch || !batch.stages) return;
+    const visualStage = batch.stages.find(s => s && s.id === 'visual_inspection');
+    if (visualStage) {
+      delete visualStage.releaseCertificate;
+      batch.version = (batch.version || 0) + 1;
+      batch.updatedAt = Date.now();
+      saveBatches(true);
+      renderStageLogger(batch);
+    }
+  };
+
   // =========================================================================
   // MATERIAL TRACEABILITY ENGINE
   // =========================================================================
@@ -7274,7 +7414,7 @@
     const query = searchInput ? searchInput.value.toLowerCase().trim() : '';
 
     if (!query) {
-      tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: var(--text-dim); padding: 20px;">الرجاء كتابة اسم المادة، كود المادة، أو رقم لوت المادة للبحث...</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="8" style="text-align: center; color: var(--text-dim); padding: 20px;">الرجاء كتابة اسم المادة، كود المادة، المورد، أو رقم لوت المادة للبحث...</td></tr>`;
       return;
     }
 
@@ -7284,32 +7424,80 @@
       if (!batch || !Array.isArray(batch.stages)) return;
 
       batch.stages.forEach(stage => {
-        if (!stage || !Array.isArray(stage.formulation)) return;
+        if (!stage) return;
 
-        stage.formulation.forEach(row => {
-          if (!row) return;
-          const matName = (row.Material_Name || row.name || '').toLowerCase();
-          const matCode = (row.Material_Code || row.code || '').toLowerCase();
-          const matLot = (row.Lot_Number || row.lotNum || row.lotNumber || '').toLowerCase();
+        // 1. Search formulation rows (Raw Materials)
+        if (Array.isArray(stage.formulation)) {
+          stage.formulation.forEach(row => {
+            if (!row) return;
+            const lotId = row.Lot_ID || row.lotId;
+            const lot = stockLots.find(l => l && String(l.Lot_ID) === String(lotId));
+            
+            const matName = lot ? (lot.Material_Name || '').toLowerCase() : '';
+            const matCode = lot ? (lot.Material_Code || '').toLowerCase() : '';
+            const matLot = lot ? (lot.Lot_Number || '').toLowerCase() : '';
+            const supplier = lot ? (lot.Supplier || '').toLowerCase() : '';
 
-          if (matName.includes(query) || matCode.includes(query) || matLot.includes(query)) {
-            matches.push({
-              code: row.Material_Code || row.code || '-',
-              name: row.Material_Name || row.name || '-',
-              lotNum: row.Lot_Number || row.lotNum || row.lotNumber || '-',
-              productName: batch.productName,
-              batchNo: batch.batchNo,
-              stageName: stage.name,
-              qty: row.Quantity || row.qty || 0,
-              unit: row.Unit || 'kg'
-            });
-          }
-        });
+            if (matName.includes(query) || matCode.includes(query) || matLot.includes(query) || supplier.includes(query)) {
+              let displayQty = row.Quantity || row.qty || 0;
+              let displayUnit = lot ? lot.Unit : 'kg';
+              if (row.userQty !== undefined && row.userUnit !== undefined) {
+                displayQty = row.userQty;
+                displayUnit = row.userUnit;
+              }
+              matches.push({
+                code: lot ? lot.Material_Code : '-',
+                name: lot ? lot.Material_Name : '-',
+                lotNum: lot ? lot.Lot_Number : '-',
+                productName: batch.productName,
+                batchNo: batch.batchNo,
+                stageName: stage.name,
+                qty: displayQty,
+                unit: displayUnit,
+                type: 'مواد خام 🧪'
+              });
+            }
+          });
+        }
+
+        // 2. Search packaging materials rows (Packaging)
+        if (Array.isArray(stage.packaging_materials)) {
+          stage.packaging_materials.forEach(row => {
+            if (!row) return;
+            const lotId = row.Lot_ID || row.lotId;
+            const lot = stockLots.find(l => l && String(l.Lot_ID) === String(lotId));
+            
+            const matName = lot ? (lot.Material_Name || '').toLowerCase() : '';
+            const matCode = lot ? (lot.Material_Code || '').toLowerCase() : '';
+            const matLot = lot ? (lot.Lot_Number || '').toLowerCase() : '';
+            const supplier = lot ? (lot.Supplier || '').toLowerCase() : '';
+
+            if (matName.includes(query) || matCode.includes(query) || matLot.includes(query) || supplier.includes(query)) {
+              let displayQty = row.Quantity || row.qty || 0;
+              let displayUnit = lot ? lot.Unit : 'kg';
+              if (row.userQty !== undefined && row.userUnit !== undefined) {
+                displayQty = row.userQty;
+                displayUnit = row.userUnit;
+              }
+              matches.push({
+                code: lot ? lot.Material_Code : '-',
+                name: lot ? lot.Material_Name : '-',
+                lotNum: lot ? lot.Lot_Number : '-',
+                productName: batch.productName,
+                batchNo: batch.batchNo,
+                stageName: stage.name,
+                qty: displayQty,
+                unit: displayUnit,
+                type: 'مواد تغليف 📦'
+              });
+            }
+          });
+        }
       });
     });
 
     if (matches.length === 0) {
-      tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: var(--text-dim); padding: 20px;">لم يتم العثور على أي نتائج تطابق البحث في المواد المستهلكة بالإنتاج.</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="8" style="text-align: center; color: var(--text-dim); padding: 20px;">لم يتم العثور على أي نتائج تطابق البحث في المواد المستهلكة بالإنتاج.</td></tr>`;
       return;
     }
 
@@ -7317,13 +7505,14 @@
       const tr = document.createElement('tr');
       tr.style.borderBottom = '1px solid rgba(255, 255, 255, 0.05)';
       tr.innerHTML = `
+        <td style="padding: 10px; color: var(--cyan);">${item.type}</td>
         <td style="padding: 10px;">${item.code}</td>
         <td style="padding: 10px; font-weight: bold;">${item.name}</td>
         <td style="padding: 10px;"><span style="color: var(--amber); font-weight: bold;">${item.lotNum}</span></td>
         <td style="padding: 10px; font-weight: bold; color: var(--cyan);">${item.productName}</td>
         <td style="padding: 10px;">${item.batchNo}</td>
         <td style="padding: 10px; font-size: 0.85rem;">${item.stageName}</td>
-        <td style="padding: 10px;">${item.qty} <small>${item.unit}</small></td>
+        <td style="padding: 10px;">${item.qty.toFixed(3)} <small>${item.unit}</small></td>
       `;
       tbody.appendChild(tr);
     });
