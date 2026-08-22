@@ -2129,10 +2129,26 @@
               lot.updatedAt = Date.now();
             }
           });
-          // Remove transaction logs
           wmsTransactions = wmsTransactions.filter(tx => tx && !(tx.Tx_Type === 'Dispense_Production' && tx.Reference_ID === `صرف لإنتاج تشغيلة ${batch.productName} (#${batch.batchNo})`));
-          saveWMS();
         }
+
+        // Revert packaging materials to stock
+        batch.stages.forEach(stage => {
+          if (stage && Array.isArray(stage.packaging_materials)) {
+            stage.packaging_materials.forEach(row => {
+              const lotId = row.Lot_ID || row.lotId;
+              const qty = row.Quantity || row.qty;
+              const lot = stockLots.find(l => l && String(l.Lot_ID) === String(lotId));
+              if (lot) {
+                lot.Current_Qty = parseFloat((lot.Current_Qty + qty).toFixed(3));
+                lot.updatedAt = Date.now();
+              }
+            });
+          }
+        });
+        wmsTransactions = wmsTransactions.filter(tx => tx && !(tx.Tx_Type === 'Dispense_Production' && tx.Reference_ID === `صرف للتعبئة والتغليف لإنتاج تشغيلة ${batch.productName} (#${batch.batchNo})`));
+
+        saveWMS();
 
         batch.deleted = true;
         batch.version = (batch.version || 0) + 1;
@@ -2179,7 +2195,7 @@
       card.className = `stage-step-card ${isSelected ? 'active' : ''} ${isCompleted ? 'completed' : ''}`;
       card.onclick = () => selectStage(idx);
 
-      let statusWeightHtml = `${stage.doneKg} / ${limitForStage} kg`;
+      let statusWeightHtml = `<span dir="ltr">${stage.doneKg} / ${limitForStage}</span> kg`;
       if (batch.carryOverKg > 0 && !carryAddedInPrior && !stage.carryOverAdded) {
         statusWeightHtml += ` <span style="color: var(--amber); font-weight: bold;">(+ ${batch.carryOverKg} kg منقولة)</span>`;
       }
