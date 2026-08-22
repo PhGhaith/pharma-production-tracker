@@ -1275,6 +1275,24 @@
               <!-- Logs injected dynamically -->
             </div>
           </div>
+
+          <!-- Batch-level Comments Section -->
+          <div class="workflow-section" style="margin-top: 1.5rem; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 1.5rem; direction: rtl;">
+            <h4 style="color: var(--cyan); font-size: 0.95rem; font-weight: bold; margin: 0 0 12px 0; display: flex; align-items: center; gap: 8px;">
+              <i data-lucide="message-square" style="width: 18px; height: 18px;"></i> ملاحظات وتعليقات التشغيلة المشتركة 💬
+            </h4>
+            
+            <div id="batch-comments-list" style="max-height: 200px; overflow-y: auto; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.05); padding: 12px; border-radius: 6px; margin-bottom: 12px; display: flex; flex-direction: column; gap: 8px;">
+              <!-- Comments will be rendered dynamically -->
+            </div>
+
+            <div style="display: flex; gap: 8px; align-items: stretch;">
+              <textarea id="batch-comment-input" placeholder="اكتب ملاحظة أو تعليقاً هنا... (سيتم حفظ اسمك وتوقيت التعليق)" style="flex: 1; min-height: 38px; height: 38px; resize: none; padding: 8px; border-radius: 4px; background: #1e293b; border: 1px solid rgba(255,255,255,0.15); color: #fff; font-size: 0.85rem; box-sizing: border-box; line-height: 1.4;"></textarea>
+              <button type="button" class="btn btn-primary" id="btn-add-batch-comment" style="padding: 0 16px; background: var(--primary); border-color: var(--primary); font-weight: bold; font-size: 0.85rem; display: flex; align-items: center; gap: 6px;">
+                <i data-lucide="send" style="width: 14px; height: 14px;"></i> تعليق
+              </button>
+            </div>
+          </div>
         </div>
 
         <div class="modal-footer space-between">

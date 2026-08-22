@@ -114,6 +114,7 @@
   let stockLots = [];
   let wmsTransactions = [];
   let temporaryProductFormula = [];
+  let temporaryCoatingFormula = [];
   let currentFormFilter = 'all';
   let searchQuery = '';
   let activeBatchId = null;
@@ -1346,13 +1347,139 @@
 
     window.openBatchDetail = openBatchDetail;
 
-    // Product Formula Modal logic
+    // Helper function to render core & coating formulas dynamically in editor modal
+    function renderFormulaEditor(isCoated, coreFormula, coatingFormula) {
+      const container = document.getElementById('product-formula-tables-container');
+      if (!container) return;
+
+      let html = '';
+      if (isCoated) {
+        html = `
+          <div style="margin-bottom: 20px;">
+            <h4 style="margin: 0 0 10px 0; color: var(--cyan); font-size: 0.9rem; font-weight: bold; border-bottom: 1px dashed rgba(6, 182, 212, 0.2); padding-bottom: 4px;">
+              💊 صيغة النواة / المضغوطة الأساسية (Core Formula)
+            </h4>
+            <table style="width: 100%; border-collapse: collapse; margin-bottom: 8px;">
+              <thead>
+                <tr style="border-bottom: 1px solid rgba(255,255,255,0.1); text-align: right;">
+                  <th style="padding: 6px 0; font-size: 0.8rem; color: var(--text-dim);">اسم المادة المكونة</th>
+                  <th style="padding: 6px 0; font-size: 0.8rem; color: var(--text-dim); width: 120px;">النسبة المئوية %</th>
+                  <th style="padding: 6px 0; font-size: 0.8rem; color: var(--text-dim); width: 40px; text-align: center;">إجراء</th>
+                </tr>
+              </thead>
+              <tbody id="product-formula-tbody"></tbody>
+            </table>
+            <button type="button" class="btn btn-secondary btn-sm" id="btn-add-core-row" style="border-color: var(--cyan); color: var(--cyan); background: none; font-size: 0.75rem; padding: 4px 10px;">
+              <i data-lucide="plus" style="width: 12px; height: 12px; display: inline-block;"></i> إضافة مادة للنواة
+            </button>
+          </div>
+
+          <div>
+            <h4 style="margin: 0 0 10px 0; color: #c084fc; font-size: 0.9rem; font-weight: bold; border-bottom: 1px dashed rgba(192, 132, 252, 0.2); padding-bottom: 4px;">
+              🧪 صيغة سائل التلبيس (Coating Liquid Formula)
+            </h4>
+            <table style="width: 100%; border-collapse: collapse; margin-bottom: 8px;">
+              <thead>
+                <tr style="border-bottom: 1px solid rgba(255,255,255,0.1); text-align: right;">
+                  <th style="padding: 6px 0; font-size: 0.8rem; color: var(--text-dim);">اسم مادة التلبيس</th>
+                  <th style="padding: 6px 0; font-size: 0.8rem; color: var(--text-dim); width: 120px;">النسبة المئوية %</th>
+                  <th style="padding: 6px 0; font-size: 0.8rem; color: var(--text-dim); width: 40px; text-align: center;">إجراء</th>
+                </tr>
+              </thead>
+              <tbody id="product-coating-tbody"></tbody>
+            </table>
+            <button type="button" class="btn btn-secondary btn-sm" id="btn-add-coating-row" style="border-color: #c084fc; color: #c084fc; background: none; font-size: 0.75rem; padding: 4px 10px;">
+              <i data-lucide="plus" style="width: 12px; height: 12px; display: inline-block;"></i> إضافة مادة للتلبيس
+            </button>
+          </div>
+        `;
+      } else {
+        html = `
+          <div>
+            <h4 style="margin: 0 0 10px 0; color: var(--cyan); font-size: 0.9rem; font-weight: bold; border-bottom: 1px dashed rgba(6, 182, 212, 0.2); padding-bottom: 4px;">
+              🧪 صيغة المنتج الصيدلاني المرجعية (Product Formula)
+            </h4>
+            <table style="width: 100%; border-collapse: collapse; margin-bottom: 8px;">
+              <thead>
+                <tr style="border-bottom: 1px solid rgba(255,255,255,0.1); text-align: right;">
+                  <th style="padding: 6px 0; font-size: 0.8rem; color: var(--text-dim);">اسم المادة المكونة</th>
+                  <th style="padding: 6px 0; font-size: 0.8rem; color: var(--text-dim); width: 120px;">النسبة المئوية %</th>
+                  <th style="padding: 6px 0; font-size: 0.8rem; color: var(--text-dim); width: 40px; text-align: center;">إجراء</th>
+                </tr>
+              </thead>
+              <tbody id="product-formula-tbody"></tbody>
+            </table>
+            <button type="button" class="btn btn-secondary btn-sm" id="btn-add-core-row" style="border-color: var(--cyan); color: var(--cyan); background: none; font-size: 0.75rem; padding: 4px 10px;">
+              <i data-lucide="plus" style="width: 12px; height: 12px; display: inline-block;"></i> إضافة مادة جديدة
+            </button>
+          </div>
+        `;
+      }
+
+      container.innerHTML = html;
+
+      const createRowHtml = (name = '', percentage = '') => {
+        const tr = document.createElement('tr');
+        tr.className = 'formula-row';
+        tr.innerHTML = `
+          <td style="padding: 6px 0;"><input type="text" class="formula-material-name" placeholder="مثال: Lactose" style="width: 95%; padding: 6px; background: #1e293b; border: 1px solid rgba(255,255,255,0.15); color:#fff; border-radius: 4px;" value="${name}"></td>
+          <td style="padding: 6px 0;"><input type="number" step="any" min="0" max="100" class="formula-material-percent" placeholder="مثال: 85%" style="width: 90%; padding: 6px; background: #1e293b; border: 1px solid rgba(255,255,255,0.15); color:#fff; border-radius: 4px;" value="${percentage}"></td>
+          <td style="padding: 6px 0; text-align: center;"><button type="button" class="btn btn-secondary btn-sm" onclick="this.closest('tr').remove()" style="border-color: var(--rose); color: var(--rose); padding: 4px 8px; font-weight: bold; background: none;">&times;</button></td>
+        `;
+        return tr;
+      };
+
+      const coreTbody = document.getElementById('product-formula-tbody');
+      const coatingTbody = document.getElementById('product-coating-tbody');
+
+      if (Array.isArray(coreFormula) && coreFormula.length > 0) {
+        coreFormula.forEach(item => {
+          coreTbody.appendChild(createRowHtml(item.name, item.percentage));
+        });
+      } else {
+        for (let i = 0; i < 3; i++) {
+          coreTbody.appendChild(createRowHtml());
+        }
+      }
+
+      if (isCoated && coatingTbody) {
+        if (Array.isArray(coatingFormula) && coatingFormula.length > 0) {
+          coatingFormula.forEach(item => {
+            coatingTbody.appendChild(createRowHtml(item.name, item.percentage));
+          });
+        } else {
+          for (let i = 0; i < 2; i++) {
+            coatingTbody.appendChild(createRowHtml());
+          }
+        }
+      }
+
+      const btnAddCore = document.getElementById('btn-add-core-row');
+      if (btnAddCore) {
+        btnAddCore.addEventListener('click', () => {
+          coreTbody.appendChild(createRowHtml());
+          if (window.lucide) window.lucide.createIcons();
+        });
+      }
+
+      const btnAddCoating = document.getElementById('btn-add-coating-row');
+      if (btnAddCoating) {
+        btnAddCoating.addEventListener('click', () => {
+          if (coatingTbody) {
+            coatingTbody.appendChild(createRowHtml());
+            if (window.lucide) window.lucide.createIcons();
+          }
+        });
+      }
+
+      if (window.lucide) window.lucide.createIcons();
+    }
+
+    // Modal controls definitions
     const btnProductFormula = document.getElementById('btn-product-formula');
     const modalProductFormula = document.getElementById('modal-product-formula');
     const closeProductFormulaBtn = document.getElementById('close-product-formula-modal');
     const cancelProductFormulaBtn = document.getElementById('btn-cancel-product-formula');
-    const btnAddFormulaRow = document.getElementById('btn-add-formula-row');
-    const formulaTbody = document.getElementById('product-formula-tbody');
     const formProductFormula = document.getElementById('form-product-formula');
 
     const closeProductFormulaModal = () => {
@@ -1364,110 +1491,63 @@
         const batch = batches.find(b => String(b.id) === String(activeBatchId));
         if (!batch) return;
 
-        if (formulaTbody) {
-          formulaTbody.innerHTML = '';
-          const existingFormula = Array.isArray(batch.productFormula) ? batch.productFormula : [];
-          
-          const createRowHtml = (name = '', percentage = '') => {
-            const tr = document.createElement('tr');
-            tr.className = 'formula-row';
-            tr.innerHTML = `
-              <td style="padding: 6px 0;"><input type="text" class="formula-material-name" placeholder="مثال: Lactose" style="width: 95%; padding: 6px; background: #1e293b; border: 1px solid rgba(255,255,255,0.15); color:#fff; border-radius: 4px;" value="${name}"></td>
-              <td style="padding: 6px 0;"><input type="number" step="any" min="0" max="100" class="formula-material-percent" placeholder="مثال: 85%" style="width: 90%; padding: 6px; background: #1e293b; border: 1px solid rgba(255,255,255,0.15); color:#fff; border-radius: 4px;" value="${percentage}"></td>
-              <td style="padding: 6px 0; text-align: center;"><button type="button" class="btn btn-secondary btn-sm" onclick="this.closest('tr').remove()" style="border-color: var(--rose); color: var(--rose); padding: 4px 8px; font-weight: bold; background: none;">&times;</button></td>
-            `;
-            return tr;
-          };
-
-          if (existingFormula.length > 0) {
-            existingFormula.forEach(item => {
-              formulaTbody.appendChild(createRowHtml(item.name, item.percentage));
-            });
-          } else {
-            // Render 3 blank rows by default
-            for (let i = 0; i < 3; i++) {
-              formulaTbody.appendChild(createRowHtml());
-            }
-          }
-        }
+        renderFormulaEditor(batch.isCoated, batch.productFormula, batch.coatingFormula);
 
         if (modalProductFormula) modalProductFormula.classList.remove('hidden');
-        if (window.lucide) window.lucide.createIcons();
       });
     }
 
     if (closeProductFormulaBtn) closeProductFormulaBtn.addEventListener('click', closeProductFormulaModal);
     if (cancelProductFormulaBtn) cancelProductFormulaBtn.addEventListener('click', closeProductFormulaModal);
 
-    if (btnAddFormulaRow) {
-      btnAddFormulaRow.addEventListener('click', () => {
-        if (formulaTbody) {
-          const tr = document.createElement('tr');
-          tr.className = 'formula-row';
-          tr.innerHTML = `
-            <td style="padding: 6px 0;"><input type="text" class="formula-material-name" placeholder="مثال: Lactose" style="width: 95%; padding: 6px; background: #1e293b; border: 1px solid rgba(255,255,255,0.15); color:#fff; border-radius: 4px;"></td>
-            <td style="padding: 6px 0;"><input type="number" step="any" min="0" max="100" class="formula-material-percent" placeholder="مثال: 85%" style="width: 90%; padding: 6px; background: #1e293b; border: 1px solid rgba(255,255,255,0.15); color:#fff; border-radius: 4px;"></td>
-            <td style="padding: 6px 0; text-align: center;"><button type="button" class="btn btn-secondary btn-sm" onclick="this.closest('tr').remove()" style="border-color: var(--rose); color: var(--rose); padding: 4px 8px; font-weight: bold; background: none;">&times;</button></td>
-          `;
-          formulaTbody.appendChild(tr);
-          if (window.lucide) window.lucide.createIcons();
-        }
-      });
-    }
-
     const btnNewBatchFormula = document.getElementById('btn-new-batch-formula');
     if (btnNewBatchFormula) {
       btnNewBatchFormula.addEventListener('click', () => {
         activeBatchId = null;
-        if (formulaTbody) {
-          formulaTbody.innerHTML = '';
-          const existingFormula = Array.isArray(temporaryProductFormula) ? temporaryProductFormula : [];
-          
-          const createRowHtml = (name = '', percentage = '') => {
-            const tr = document.createElement('tr');
-            tr.className = 'formula-row';
-            tr.innerHTML = `
-              <td style="padding: 6px 0;"><input type="text" class="formula-material-name" placeholder="مثال: Lactose" style="width: 95%; padding: 6px; background: #1e293b; border: 1px solid rgba(255,255,255,0.15); color:#fff; border-radius: 4px;" value="${name}"></td>
-              <td style="padding: 6px 0;"><input type="number" step="any" min="0" max="100" class="formula-material-percent" placeholder="مثال: 85%" style="width: 90%; padding: 6px; background: #1e293b; border: 1px solid rgba(255,255,255,0.15); color:#fff; border-radius: 4px;" value="${percentage}"></td>
-              <td style="padding: 6px 0; text-align: center;"><button type="button" class="btn btn-secondary btn-sm" onclick="this.closest('tr').remove()" style="border-color: var(--rose); color: var(--rose); padding: 4px 8px; font-weight: bold; background: none;">&times;</button></td>
-            `;
-            return tr;
-          };
+        const isCoated = document.getElementById('input-is-coated').value === 'true';
+        
+        renderFormulaEditor(isCoated, temporaryProductFormula, temporaryCoatingFormula);
 
-          if (existingFormula.length > 0) {
-            existingFormula.forEach(item => {
-              formulaTbody.appendChild(createRowHtml(item.name, item.percentage));
-            });
-          } else {
-            for (let i = 0; i < 3; i++) {
-              formulaTbody.appendChild(createRowHtml());
-            }
-          }
-        }
         if (modalProductFormula) modalProductFormula.classList.remove('hidden');
-        if (window.lucide) window.lucide.createIcons();
       });
     }
 
     if (formProductFormula) {
       formProductFormula.addEventListener('submit', (e) => {
         e.preventDefault();
-        const rows = formulaTbody.querySelectorAll('.formula-row');
-        const newFormula = [];
-        rows.forEach(row => {
+
+        // Parse Core Formula rows
+        const coreTbody = document.getElementById('product-formula-tbody');
+        const coreRows = coreTbody ? coreTbody.querySelectorAll('.formula-row') : [];
+        const newCoreFormula = [];
+        coreRows.forEach(row => {
           const nameInput = row.querySelector('.formula-material-name');
           const percentInput = row.querySelector('.formula-material-percent');
           const name = nameInput ? nameInput.value.trim() : '';
           const percentage = percentInput ? percentInput.value.trim() : '';
-
           if (name || percentage) {
-            newFormula.push({ name, percentage });
+            newCoreFormula.push({ name, percentage });
+          }
+        });
+
+        // Parse Coating Formula rows
+        const coatingTbody = document.getElementById('product-coating-tbody');
+        const coatingRows = coatingTbody ? coatingTbody.querySelectorAll('.formula-row') : [];
+        const newCoatingFormula = [];
+        coatingRows.forEach(row => {
+          const nameInput = row.querySelector('.formula-material-name');
+          const percentInput = row.querySelector('.formula-material-percent');
+          const name = nameInput ? nameInput.value.trim() : '';
+          const percentage = percentInput ? percentInput.value.trim() : '';
+          if (name || percentage) {
+            newCoatingFormula.push({ name, percentage });
           }
         });
 
         const batch = batches.find(b => String(b.id) === String(activeBatchId));
         if (!batch) {
-          temporaryProductFormula = newFormula;
+          temporaryProductFormula = newCoreFormula;
+          temporaryCoatingFormula = newCoatingFormula;
           closeProductFormulaModal();
           if (window.showToast) {
             window.showToast('تم إعداد وحفظ صيغة المنتج للتشغيلة الجديدة مؤقتاً 🧪', 'success');
@@ -1475,18 +1555,71 @@
           return;
         }
 
-        batch.productFormula = newFormula;
+        batch.productFormula = newCoreFormula;
+        batch.coatingFormula = newCoatingFormula;
         batch.version = (batch.version || 0) + 1;
         batch.updatedAt = Date.now();
 
         saveBatches(true);
-        logUserActivity('تعديل صيغة المنتج', `تم تحديث صيغة المنتج والمكونات المرجعية للتشغيلة [${batch.productName}] (الباتش: ${batch.batchNo}).`);
+        logUserActivity('تعديل صيغة المنتج', `تم تحديث صيغ المكونات للتشغيلة [${batch.productName}] (الباتش: ${batch.batchNo}).`);
 
         closeProductFormulaModal();
         openBatchDetail(batch.id);
 
         if (window.showToast) {
           window.showToast('تم حفظ وصيانة صيغة المنتج بنجاح 🧪📄', 'success');
+        }
+      });
+    }
+
+    // Add Batch Comment logic
+    const btnAddComment = document.getElementById('btn-add-batch-comment');
+    const commentInput = document.getElementById('batch-comment-input');
+    if (btnAddComment && commentInput) {
+      btnAddComment.addEventListener('click', () => {
+        const text = commentInput.value.trim();
+        if (!text) return;
+
+        const batch = batches.find(b => String(b.id) === String(activeBatchId));
+        if (!batch) return;
+
+        if (!Array.isArray(batch.comments)) batch.comments = [];
+
+        let roleText = 'مشغل';
+        if (currentUserRole === 'admin') roleText = 'مدير النظام';
+        else if (currentUserRole === 'qc') roleText = 'الرقابة النوعية';
+        else if (currentUserRole === 'wms') roleText = 'المستودع';
+
+        batch.comments.push({
+          id: 'comment-' + Date.now(),
+          text: text,
+          user: roleText,
+          role: currentUserRole,
+          timestamp: Date.now()
+        });
+
+        batch.version = (batch.version || 0) + 1;
+        batch.updatedAt = Date.now();
+        saveBatches(true);
+
+        logUserActivity('إضافة تعليق', `تم إضافة ملاحظة جديدة للتشغيلة [${batch.productName}] (الباتش: ${batch.batchNo}): ${text.substring(0, 30)}...`);
+
+        commentInput.value = '';
+        
+        // Re-render comments list immediately
+        const commentsList = document.getElementById('batch-comments-list');
+        if (commentsList) {
+          commentsList.innerHTML = batch.comments.map(c => `
+            <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.05); padding: 8px 12px; border-radius: 4px; font-size: 0.82rem; line-height: 1.4; direction: rtl;">
+              <div style="display: flex; justify-content: space-between; margin-bottom: 4px; font-size: 0.75rem;">
+                <strong style="color: var(--cyan);"><i data-lucide="user" style="width: 12px; height: 12px; display: inline-block; vertical-align: middle;"></i> ${c.user || 'مطلب'} (${c.role === 'admin' ? 'مدير النظام' : (c.role === 'qc' ? 'الرقابة النوعية' : (c.role === 'wms' ? 'المستودع' : 'مشغل الإنتاج'))})</strong>
+                <span style="color: var(--text-dim);">${new Date(c.timestamp).toLocaleString('ar-EG', { hour12: true })}</span>
+              </div>
+              <div style="color: #fff; white-space: pre-wrap; font-family: sans-serif;">${c.text}</div>
+            </div>
+          `).join('');
+          commentsList.scrollTop = commentsList.scrollHeight;
+          if (window.lucide) window.lucide.createIcons();
         }
       });
     }
@@ -2264,6 +2397,7 @@
     if (inputSecondaryPackQty) inputSecondaryPackQty.value = '20';
     toggleCoatingFields();
     temporaryProductFormula = [];
+    temporaryCoatingFormula = [];
 
     const today = new Date().toISOString().split('T')[0];
     const threeYearsLater = new Date();
@@ -2354,6 +2488,7 @@
       currentStageIndex: 0,
       qc_runs: [],
       productFormula: temporaryProductFormula || [],
+      coatingFormula: temporaryCoatingFormula || [],
       updatedAt: Date.now(),
       version: 1,
       deleted: false,
@@ -2464,6 +2599,26 @@
     renderHistoryList(batch);
     renderWeighingInvoice(batch);
 
+    // Render Batch-level Comments
+    const commentsList = document.getElementById('batch-comments-list');
+    if (commentsList) {
+      const list = Array.isArray(batch.comments) ? batch.comments : [];
+      if (list.length === 0) {
+        commentsList.innerHTML = `<div style="text-align: center; color: var(--text-dim); padding: 15px; font-size: 0.8rem;">لا توجد ملاحظات أو تعليقات للتشغيلة حالياً.</div>`;
+      } else {
+        commentsList.innerHTML = list.map(c => `
+          <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.05); padding: 8px 12px; border-radius: 4px; font-size: 0.82rem; line-height: 1.4; direction: rtl;">
+            <div style="display: flex; justify-content: space-between; margin-bottom: 4px; font-size: 0.75rem;">
+              <strong style="color: var(--cyan);"><i data-lucide="user" style="width: 12px; height: 12px; display: inline-block; vertical-align: middle;"></i> ${c.user || 'مطلب'} (${c.role === 'admin' ? 'مدير النظام' : (c.role === 'qc' ? 'الرقابة النوعية' : (c.role === 'wms' ? 'المستودع' : 'مشغل الإنتاج'))})</strong>
+              <span style="color: var(--text-dim);">${new Date(c.timestamp).toLocaleString('ar-EG', { hour12: true })}</span>
+            </div>
+            <div style="color: #fff; white-space: pre-wrap; font-family: sans-serif;">${c.text}</div>
+          </div>
+        `).join('');
+        commentsList.scrollTop = commentsList.scrollHeight;
+      }
+    }
+
     if (btnDeleteBatch) {
       if (currentUserRole === 'admin' || currentUserRole === 'production') {
         btnDeleteBatch.classList.remove('hidden');
@@ -2494,13 +2649,31 @@
     const formulaSection = document.getElementById('product-formula-section');
     const formulaContainer = document.getElementById('product-formula-display-container');
     if (formulaSection && formulaContainer) {
-      if (Array.isArray(batch.productFormula) && batch.productFormula.length > 0) {
+      const hasCore = Array.isArray(batch.productFormula) && batch.productFormula.length > 0;
+      const hasCoating = batch.isCoated && Array.isArray(batch.coatingFormula) && batch.coatingFormula.length > 0;
+
+      if (hasCore || hasCoating) {
         formulaSection.classList.remove('hidden');
-        formulaContainer.innerHTML = batch.productFormula.map(f => `
-          <span style="background: rgba(192, 132, 252, 0.15); color: #c084fc; border: 1px solid rgba(192, 132, 252, 0.3); padding: 4px 10px; border-radius: 20px; font-size: 0.8rem; font-weight: bold; display: flex; align-items: center; gap: 4px;">
-            <i data-lucide="beaker" style="width: 12px; height: 12px;"></i> ${f.name || '-'} (${f.percentage || '0'}%)
-          </span>
-        `).join('');
+        let html = '';
+        if (hasCore) {
+          if (batch.isCoated) {
+            html += `<div style="width: 100%; font-size: 0.8rem; color: var(--cyan); font-weight: bold; margin-bottom: 4px; margin-top: 4px;">💊 صيغة النواة الأساسية (Core Formula):</div>`;
+          }
+          html += batch.productFormula.map(f => `
+            <span style="background: rgba(6, 182, 212, 0.12); color: var(--cyan); border: 1px solid rgba(6, 182, 212, 0.25); padding: 4px 10px; border-radius: 20px; font-size: 0.78rem; font-weight: bold; display: inline-flex; align-items: center; gap: 4px; margin: 2px;">
+              <i data-lucide="beaker" style="width: 12px; height: 12px;"></i> ${f.name || '-'} (${f.percentage || '0'}%)
+            </span>
+          `).join('');
+        }
+        if (hasCoating) {
+          html += `<div style="width: 100%; font-size: 0.8rem; color: #c084fc; font-weight: bold; margin-top: 8px; margin-bottom: 4px;">🧪 صيغة سائل التلبيس (Coating Liquid Formula):</div>`;
+          html += batch.coatingFormula.map(f => `
+            <span style="background: rgba(192, 132, 252, 0.15); color: #c084fc; border: 1px solid rgba(192, 132, 252, 0.3); padding: 4px 10px; border-radius: 20px; font-size: 0.78rem; font-weight: bold; display: inline-flex; align-items: center; gap: 4px; margin: 2px;">
+              <i data-lucide="beaker" style="width: 12px; height: 12px;"></i> ${f.name || '-'} (${f.percentage || '0'}%)
+            </span>
+          `).join('');
+        }
+        formulaContainer.innerHTML = html;
       } else {
         formulaSection.classList.add('hidden');
         formulaContainer.innerHTML = '';
