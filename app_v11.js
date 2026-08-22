@@ -1365,7 +1365,19 @@
     }
 
     const btnWeightAddendum = document.getElementById('btn-weight-addendum');
-    if (btnWeightAddendum) {
+    const modalWeightAddendum = document.getElementById('modal-weight-addendum');
+    const closeWeightAddendumModal = document.getElementById('close-weight-addendum-modal');
+    const btnCancelWeightAddendum = document.getElementById('btn-cancel-weight-addendum');
+    const formWeightAddendum = document.getElementById('form-weight-addendum');
+    const addendumProductName = document.getElementById('addendum-product-name');
+    const addendumBatchNo = document.getElementById('addendum-batch-no');
+    const addendumLotSearch = document.getElementById('addendum-lot-search');
+    const addendumLotId = document.getElementById('addendum-lot-id');
+    const addendumLotDropdown = document.getElementById('addendum-lot-dropdown');
+    const addendumQty = document.getElementById('addendum-qty');
+    const addendumUnit = document.getElementById('addendum-unit');
+
+    if (btnWeightAddendum && modalWeightAddendum) {
       btnWeightAddendum.addEventListener('click', () => {
         if (currentUserRole !== 'admin') {
           alert('عذراً، هذا الإجراء مخصص لمدير النظام فقط.');
@@ -1373,246 +1385,201 @@
         }
         const batch = batches.find(b => String(b.id) === String(activeBatchId));
         if (!batch) return;
+
+        // Set batch info
+        if (addendumProductName) addendumProductName.textContent = batch.productName;
+        if (addendumBatchNo) addendumBatchNo.textContent = batch.batchNo;
+
+        // Reset inputs
+        if (addendumLotSearch) addendumLotSearch.value = '';
+        if (addendumLotId) addendumLotId.value = '';
+        if (addendumQty) addendumQty.value = '';
+        if (addendumUnit) addendumUnit.value = 'kg';
+        if (addendumLotDropdown) addendumLotDropdown.classList.add('hidden');
+
+        // Show modal
+        modalWeightAddendum.classList.remove('hidden');
+      });
+    }
+
+    // Close listeners
+    const hideWeightAddendumModal = () => {
+      if (modalWeightAddendum) modalWeightAddendum.classList.add('hidden');
+    };
+    if (closeWeightAddendumModal) closeWeightAddendumModal.addEventListener('click', hideWeightAddendumModal);
+    if (btnCancelWeightAddendum) btnCancelWeightAddendum.addEventListener('click', hideWeightAddendumModal);
+
+    // Searchable lot selection logic for weight addendum modal
+    if (addendumLotSearch && addendumLotDropdown) {
+      const isRawMaterial = lot => {
+        if (!lot || !lot.Unit) return false;
+        const u = lot.Unit.toLowerCase();
+        return u === 'kg' || u === 'g' || u === 'l' || u === 'كغ' || u === 'غ' || u === 'جرام' || u === 'لتر';
+      };
+
+      function populateAddendumDropdown(query = '') {
+        addendumLotDropdown.innerHTML = '';
+        const releasedRawLots = stockLots.filter(lot => {
+          if (!lot) return false;
+          if (lot.Status !== 'Released') return false;
+          if (lot.Current_Qty <= 0) return false;
+          const type = lot.Material_Type || (isRawMaterial(lot) ? 'raw' : 'ready');
+          return type === 'raw';
+        });
+
+        const filtered = releasedRawLots.filter(lot => {
+          const text = `${lot.Material_Name} ${lot.Material_Code} ${lot.Lot_Number}`.toLowerCase();
+          return text.includes(query.toLowerCase());
+        });
+
+        if (filtered.length === 0) {
+          addendumLotDropdown.innerHTML = '<div style="padding: 8px; color: var(--text-dim); text-align: center; font-size: 0.8rem;">لا توجد لوتات مفرجة مطابقة للبحث</div>';
+          return;
+        }
+
+        filtered.forEach(lot => {
+          const item = document.createElement('div');
+          item.style.padding = '8px';
+          item.style.cursor = 'pointer';
+          item.style.borderBottom = '1px solid rgba(255,255,255,0.05)';
+          item.style.fontSize = '0.78rem';
+          item.style.transition = 'background 0.2s';
+          item.innerHTML = `<strong>${lot.Material_Name}</strong> <span style="color: var(--text-dim);">[Code: ${lot.Material_Code}]</span><br><span style="color: var(--amber);">Lot: ${lot.Lot_Number}</span> <span style="color: var(--emerald); float: left;">الرصيد: ${lot.Current_Qty} ${lot.Unit}</span>`;
+          
+          item.addEventListener('mouseenter', () => {
+            item.style.background = 'rgba(6, 182, 212, 0.15)';
+          });
+          item.addEventListener('mouseleave', () => {
+            item.style.background = '';
+          });
+
+          item.addEventListener('mousedown', (e) => {
+            e.preventDefault();
+            addendumLotSearch.value = `${lot.Material_Name} [Code: ${lot.Material_Code}] - L: ${lot.Lot_Number} (الرصيد: ${lot.Current_Qty} ${lot.Unit})`;
+            if (addendumLotId) addendumLotId.value = lot.Lot_ID;
+            addendumLotDropdown.classList.add('hidden');
+          });
+
+          addendumLotDropdown.appendChild(item);
+        });
+      }
+
+      addendumLotSearch.addEventListener('focus', () => {
+        addendumLotDropdown.classList.remove('hidden');
+        populateAddendumDropdown(addendumLotSearch.value);
+      });
+
+      addendumLotSearch.addEventListener('blur', () => {
+        setTimeout(() => {
+          addendumLotDropdown.classList.add('hidden');
+        }, 200);
+      });
+
+      addendumLotSearch.addEventListener('input', (e) => {
+        if (addendumLotId) addendumLotId.value = '';
+        addendumLotDropdown.classList.remove('hidden');
+        populateAddendumDropdown(e.target.value);
+      });
+    }
+
+    // Submit handler for weight addendum modal
+    if (formWeightAddendum) {
+      formWeightAddendum.addEventListener('submit', (e) => {
+        e.preventDefault();
+        
+        const lotId = addendumLotId ? addendumLotId.value : '';
+        const qtyVal = parseFloat(addendumQty.value) || 0;
+        const unitVal = addendumUnit.value || 'kg';
+
+        if (!lotId || qtyVal <= 0) {
+          alert('يرجى اختيار مادة صالحة وتحديد كمية أكبر من الصفر!');
+          return;
+        }
+
+        const batch = batches.find(b => String(b.id) === String(activeBatchId));
+        if (!batch) return;
         const weighingStage = batch.stages && batch.stages[0];
         if (!weighingStage) return;
 
-        const formulation = weighingStage.formulation || [];
-        
-        const isRawMaterial = lot => {
-          if (!lot || !lot.Unit) return false;
-          const u = lot.Unit.toLowerCase();
-          return u === 'kg' || u === 'g' || u === 'l' || u === 'كغ' || u === 'غ' || u === 'جرام' || u === 'لتر';
-        };
+        const lot = stockLots.find(l => l && String(l.Lot_ID) === String(lotId));
+        if (!lot) {
+          alert('اللوت المرتبط بهذه المادة غير موجود بالمستودع!');
+          return;
+        }
 
-        let promptText = 'يرجى اختيار رقم المادة المراد إضافة ملحق وزن لها:\n';
-        promptText += '0 - [إضافة مادة خام جديدة بالكامل غير موجودة بالوصفة]\n';
-        
-        const materialsList = [];
-        formulation.forEach((row, index) => {
-          const lotId = row.Lot_ID || row.lotId;
-          const lot = stockLots.find(l => l && String(l.Lot_ID) === String(lotId));
-          const materialName = lot ? lot.Material_Name : 'مادة غير معروفة';
-          const lotNumber = lot ? lot.Lot_Number : '-';
-          materialsList.push({ index: index + 1, row, lot, materialName, lotNumber });
-          promptText += `${index + 1} - ${materialName} (لوت: ${lotNumber})\n`;
+        const addedQtyInKg = unitVal === 'g' ? (qtyVal / 1000) : qtyVal;
+        const isLotInGrams = lot.Unit === 'g' || lot.Unit === 'غ' || lot.Unit === 'جرام';
+        const lotQtyInKg = isLotInGrams ? (lot.Current_Qty / 1000) : lot.Current_Qty;
+
+        if (addedQtyInKg > lotQtyInKg) {
+          const displayMax = lotQtyInKg * (unitVal === 'g' ? 1000 : 1);
+          alert(`الرصيد المتاح في المخزن لهذه المادة هو ${displayMax.toFixed(3)} ${unitVal} فقط. لا يمكن صرف ${qtyVal} ${unitVal}!`);
+          return;
+        }
+
+        // Deduct stock
+        const dispenseQty = isLotInGrams ? (addedQtyInKg * 1000) : addedQtyInKg;
+        lot.Current_Qty = parseFloat((lot.Current_Qty - dispenseQty).toFixed(3));
+        lot.updatedAt = Date.now();
+
+        // Update formulation
+        if (!Array.isArray(weighingStage.formulation)) weighingStage.formulation = [];
+        const existingRow = weighingStage.formulation.find(row => String(row.Lot_ID || row.lotId) === String(lot.Lot_ID));
+        if (existingRow) {
+          const oldQty = existingRow.Quantity || existingRow.qty || 0;
+          existingRow.Quantity = parseFloat((oldQty + addedQtyInKg).toFixed(3));
+          existingRow.qty = existingRow.Quantity;
+          existingRow.userQty = existingRow.Quantity * (existingRow.userUnit === 'g' ? 1000 : 1);
+        } else {
+          weighingStage.formulation.push({
+            Lot_ID: lot.Lot_ID,
+            lotId: lot.Lot_ID,
+            Quantity: addedQtyInKg,
+            qty: addedQtyInKg,
+            userQty: qtyVal,
+            userUnit: unitVal
+          });
+        }
+
+        weighingStage.acceptedKg = parseFloat(((weighingStage.acceptedKg || 0) + addedQtyInKg).toFixed(3));
+        weighingStage.doneKg = weighingStage.acceptedKg;
+        if (weighingStage.doneKg > 0 && weighingStage.status === 'pending') {
+          weighingStage.status = 'in_progress';
+        }
+
+        // Transaction log
+        wmsTransactions.unshift({
+          Tx_ID: 'tx-' + Date.now() + '-' + Math.random().toString(36).substr(2, 4),
+          Lot_ID: lot.Lot_ID,
+          Tx_Type: 'Dispense_Production',
+          Quantity: -addedQtyInKg,
+          Reference_ID: `ملحق صرف إضافي (Admin) لتشغيلة ${batch.productName} (#${batch.batchNo})`,
+          Performed_By: currentUserRole,
+          Timestamp: Date.now()
         });
 
-        const selectionInput = prompt(promptText);
-        if (selectionInput === null) return;
-        
-        const selectionVal = selectionInput.trim();
-        if (selectionVal === '0') {
-          // Add completely new material
-          const releasedRawLots = stockLots.filter(lot => {
-            if (!lot) return false;
-            if (lot.Status !== 'Released') return false;
-            if (lot.Current_Qty <= 0) return false;
-            const type = lot.Material_Type || (isRawMaterial(lot) ? 'raw' : 'ready');
-            return type === 'raw';
-          });
+        if (!Array.isArray(batch.logs)) batch.logs = [];
+        batch.logs.unshift({
+          time: new Date().toLocaleString('en-US'),
+          text: `صرف ملحق وزن إضافي (بواسطة المشرف 👑): إضافة ${qtyVal} ${unitVal} للمادة [${lot.Material_Name}] (الباتش: ${lot.Lot_Number}).`
+        });
 
-          if (releasedRawLots.length === 0) {
-            alert('لا توجد مواد خام مفرجة ومتاحة بالمستودع!');
-            return;
-          }
+        saveWMS();
+        batch.version = (batch.version || 0) + 1;
+        batch.updatedAt = Date.now();
+        saveBatches(true);
 
-          let newPromptText = 'يرجى اختيار رقم المادة الخام الجديدة المراد صرفها كملحق وزن:\n';
-          releasedRawLots.forEach((lot, idx) => {
-            newPromptText += `${idx + 1} - ${lot.Material_Name} [Code: ${lot.Material_Code}] - L: ${lot.Lot_Number} (الرصيد: ${lot.Current_Qty} ${lot.Unit})\n`;
-          });
+        hideWeightAddendumModal();
+        renderWorkflowTimeline(batch);
+        renderStageLogger(batch);
+        renderHistoryList(batch);
+        renderWeighingInvoice(batch);
+        renderApp();
 
-          const lotSelectionInput = prompt(newPromptText);
-          if (lotSelectionInput === null) return;
-          const selectedLotIndex = parseInt(lotSelectionInput) - 1;
-          const selectedLot = releasedRawLots[selectedLotIndex];
-          if (!selectedLot) {
-            alert('اختيار غير صحيح!');
-            return;
-          }
-
-          const qtyInput = prompt(`الرجاء إدخال الكمية المراد صرفها للمادة [${selectedLot.Material_Name}]:\n(مثال: 500 g أو 1.5 kg)`);
-          if (qtyInput === null) return;
-
-          const match = qtyInput.match(/^\s*([0-9]*\.?[0-9]+)\s*(g|kg|غ|كغ)?\s*$/i);
-          if (!match) {
-            alert('تنسيق الكمية غير صحيح! يرجى إدخال رقم يليه الوحدة (kg أو g).');
-            return;
-          }
-
-          const value = parseFloat(match[1]);
-          let unit = (match[2] || 'kg').toLowerCase();
-          if (unit === 'غ') unit = 'g';
-          if (unit === 'كغ') unit = 'kg';
-
-          if (value <= 0) {
-            alert('الكمية يجب أن تكون أكبر من الصفر!');
-            return;
-          }
-
-          const addedQtyInKg = unit === 'g' ? (value / 1000) : value;
-          const isLotInGrams = selectedLot.Unit === 'g' || selectedLot.Unit === 'غ' || selectedLot.Unit === 'جرام';
-          const lotQtyInKg = isLotInGrams ? (selectedLot.Current_Qty / 1000) : selectedLot.Current_Qty;
-
-          if (addedQtyInKg > lotQtyInKg) {
-            const displayMax = lotQtyInKg * (unit === 'g' ? 1000 : 1);
-            alert(`الرصيد المتاح في المخزن لهذه المادة هو ${displayMax.toFixed(3)} ${unit} فقط. لا يمكن صرف ${value} ${unit}!`);
-            return;
-          }
-
-          // Deduct stock
-          const dispenseQty = isLotInGrams ? (addedQtyInKg * 1000) : addedQtyInKg;
-          selectedLot.Current_Qty = parseFloat((selectedLot.Current_Qty - dispenseQty).toFixed(3));
-          selectedLot.updatedAt = Date.now();
-
-          // Add to formulation array
-          if (!Array.isArray(weighingStage.formulation)) weighingStage.formulation = [];
-          const existingRow = weighingStage.formulation.find(row => String(row.Lot_ID || row.lotId) === String(selectedLot.Lot_ID));
-          if (existingRow) {
-            const oldQty = existingRow.Quantity || existingRow.qty || 0;
-            existingRow.Quantity = parseFloat((oldQty + addedQtyInKg).toFixed(3));
-            existingRow.qty = existingRow.Quantity;
-            existingRow.userQty = existingRow.Quantity * (existingRow.userUnit === 'g' ? 1000 : 1);
-          } else {
-            weighingStage.formulation.push({
-              Lot_ID: selectedLot.Lot_ID,
-              lotId: selectedLot.Lot_ID,
-              Quantity: addedQtyInKg,
-              qty: addedQtyInKg,
-              userQty: value,
-              userUnit: unit
-            });
-          }
-
-          weighingStage.acceptedKg = parseFloat(((weighingStage.acceptedKg || 0) + addedQtyInKg).toFixed(3));
-          weighingStage.doneKg = weighingStage.acceptedKg;
-          if (weighingStage.doneKg > 0 && weighingStage.status === 'pending') {
-            weighingStage.status = 'in_progress';
-          }
-
-          // Transaction log
-          wmsTransactions.unshift({
-            Tx_ID: 'tx-' + Date.now() + '-' + Math.random().toString(36).substr(2, 4),
-            Lot_ID: selectedLot.Lot_ID,
-            Tx_Type: 'Dispense_Production',
-            Quantity: -addedQtyInKg,
-            Reference_ID: `ملحق صرف إضافي (Admin) لتشغيلة ${batch.productName} (#${batch.batchNo})`,
-            Performed_By: currentUserRole,
-            Timestamp: Date.now()
-          });
-
-          if (!Array.isArray(batch.logs)) batch.logs = [];
-          batch.logs.unshift({
-            time: new Date().toLocaleString('en-US'),
-            text: `صرف ملحق وزن إضافي لمادة جديدة (بواسطة المشرف 👑): إضافة ${value} ${unit} للمادة [${selectedLot.Material_Name}] (الباتش: ${selectedLot.Lot_Number}).`
-          });
-
-          saveWMS();
-          batch.version = (batch.version || 0) + 1;
-          batch.updatedAt = Date.now();
-          saveBatches(true);
-
-          renderWorkflowTimeline(batch);
-          renderStageLogger(batch);
-          renderHistoryList(batch);
-          renderWeighingInvoice(batch);
-          renderApp();
-
-          if (window.showToast) {
-            window.showToast('تمت إضافة ملحق الوزن للمادة الجديدة بنجاح وخصم الرصيد من المستودع ⚖️🟢', 'success');
-          } else {
-            alert('تمت إضافة ملحق الوزن للمادة الجديدة بنجاح وخصم الرصيد من المستودع ⚖️🟢');
-          }
+        if (window.showToast) {
+          window.showToast('تمت إضافة ملحق الوزن بنجاح وخصم الرصيد من المستودع ⚖️🟢', 'success');
         } else {
-          // Add addendum to existing material
-          const selectedIndex = parseInt(selectionVal) - 1;
-          const selectedMaterial = materialsList[selectedIndex];
-          if (!selectedMaterial) {
-            alert('اختيار غير صحيح!');
-            return;
-          }
-
-          const qtyInput = prompt(`الرجاء إدخال الكمية الإضافية المراد صرفها للمادة [${selectedMaterial.materialName}]:\n(مثال: 500 g أو 1.5 kg)`);
-          if (qtyInput === null) return;
-
-          const match = qtyInput.match(/^\s*([0-9]*\.?[0-9]+)\s*(g|kg|غ|كغ)?\s*$/i);
-          if (!match) {
-            alert('تنسيق الكمية غير صحيح! يرجى إدخال رقم يليه الوحدة (kg أو g).');
-            return;
-          }
-
-          const value = parseFloat(match[1]);
-          let unit = (match[2] || 'kg').toLowerCase();
-          if (unit === 'غ') unit = 'g';
-          if (unit === 'كغ') unit = 'kg';
-
-          if (value <= 0) {
-            alert('الكمية يجب أن تكون أكبر من الصفر!');
-            return;
-          }
-
-          const addedQtyInKg = unit === 'g' ? (value / 1000) : value;
-          const lot = selectedMaterial.lot;
-          if (!lot) {
-            alert('اللوت المرتبط بهذه المادة لم يعد موجوداً بالمستودع!');
-            return;
-          }
-
-          const isLotInGrams = lot.Unit === 'g' || lot.Unit === 'غ' || lot.Unit === 'جرام';
-          const lotQtyInKg = isLotInGrams ? (lot.Current_Qty / 1000) : lot.Current_Qty;
-
-          if (addedQtyInKg > lotQtyInKg) {
-            const displayMax = lotQtyInKg * (unit === 'g' ? 1000 : 1);
-            alert(`الرصيد المتاح في المخزن لهذه المادة هو ${displayMax.toFixed(3)} ${unit} فقط. لا يمكن صرف ${value} ${unit}!`);
-            return;
-          }
-
-          const dispenseQty = isLotInGrams ? (addedQtyInKg * 1000) : addedQtyInKg;
-          lot.Current_Qty = parseFloat((lot.Current_Qty - dispenseQty).toFixed(3));
-          lot.updatedAt = Date.now();
-
-          selectedMaterial.row.Quantity = (selectedMaterial.row.Quantity || selectedMaterial.row.qty || 0) + addedQtyInKg;
-          if (selectedMaterial.row.userQty !== undefined && selectedMaterial.row.userUnit === unit) {
-            selectedMaterial.row.userQty += value;
-          } else {
-            selectedMaterial.row.userQty = selectedMaterial.row.Quantity;
-            selectedMaterial.row.userUnit = 'kg';
-          }
-
-          weighingStage.acceptedKg = (weighingStage.acceptedKg || 0) + addedQtyInKg;
-          weighingStage.doneKg = (weighingStage.acceptedKg || 0) + (weighingStage.rejectedKg || 0);
-
-          wmsTransactions.unshift({
-            Tx_ID: 'tx-' + Date.now() + '-' + Math.random().toString(36).substr(2, 4),
-            Lot_ID: lot.Lot_ID,
-            Tx_Type: 'Dispense_Production',
-            Quantity: -addedQtyInKg,
-            Reference_ID: `ملحق صرف إضافي (Admin) لتشغيلة ${batch.productName} (#${batch.batchNo})`,
-            Performed_By: currentUserRole,
-            Timestamp: Date.now()
-          });
-
-          if (!Array.isArray(batch.logs)) batch.logs = [];
-          batch.logs.unshift({
-            time: new Date().toLocaleString('en-US'),
-            text: `صرف ملحق وزن إضافي (بواسطة المشرف 👑): إضافة ${value} ${unit} للمادة [${selectedMaterial.materialName}] (الباتش: ${lot.Lot_Number}).`
-          });
-
-          saveWMS();
-          batch.version = (batch.version || 0) + 1;
-          batch.updatedAt = Date.now();
-          saveBatches(true);
-
-          renderWorkflowTimeline(batch);
-          renderStageLogger(batch);
-          renderHistoryList(batch);
-          renderWeighingInvoice(batch);
-          renderApp();
-
-          if (window.showToast) {
-            window.showToast('تمت إضافة ملحق الوزن بنجاح وخصم الرصيد من المستودع ⚖️🟢', 'success');
-          } else {
-            alert('تمت إضافة ملحق الوزن بنجاح وخصم الرصيد من المستودع ⚖️🟢');
-          }
+          alert('تمت إضافة ملحق الوزن بنجاح وخصم الرصيد من المستودع ⚖️🟢');
         }
       });
     }
