@@ -2236,6 +2236,30 @@
     const isVisualInspection = stage.id === 'visual_inspection';
     const unitLabel = getUnitLabel(batch.pharmaForm);
 
+    // Compute dynamic limit early for UI restrictions
+    let maxAllowedTotal = batch.totalWeightKg;
+    if (activeStageIndex > 0) {
+      const prevStage = batch.stages[activeStageIndex - 1];
+      maxAllowedTotal = prevStage ? (prevStage.acceptedKg || 0) : 0;
+    }
+    let carryOverAlreadyAdded = false;
+    for (let p = 0; p < activeStageIndex; p++) {
+      if (batch.stages[p].carryOverAdded) {
+        carryOverAlreadyAdded = true;
+        break;
+      }
+    }
+    const chkCarryBefore = document.getElementById('chk-add-carry-over-progress');
+    const chkChecked = chkCarryBefore ? chkCarryBefore.checked : false;
+    let currentLimit = maxAllowedTotal;
+    if (!carryOverAlreadyAdded && (stage.carryOverAdded || chkChecked)) {
+      currentLimit += batch.carryOverKg;
+    }
+
+    const isReadOnlyLogger = currentUserRole === 'qc' || currentUserRole === 'wms' || currentUserRole === 'observer';
+    const isCompleted = stage.status === 'completed' || (stage.doneKg || 0) >= (currentLimit - 0.05);
+    const isReadOnlyView = isReadOnlyLogger || (!isEditCorrectionMode && isCompleted);
+
     if (editModeBtnText) editModeBtnText.textContent = isEditCorrectionMode ? 'إلغاء وضع التصحيح' : 'تعديل وتصحيح الإنجاز المسجل';
     if (btnCancelEditMode) btnCancelEditMode.classList.toggle('hidden', !isEditCorrectionMode);
     if (submitStageBtnText) submitStageBtnText.textContent = isEditCorrectionMode ? 'حفظ وتأكيد التعديل والتصحيح' : 'تسجيل الإنجاز وتحديث الحجر';
@@ -2305,14 +2329,19 @@
         inputLogAcceptedKg.style.background = 'rgba(255,255,255,0.05)';
         inputLogAcceptedKg.style.cursor = 'not-allowed';
       }
+      
+      if (btnAddFormulationRow) {
+        btnAddFormulationRow.style.display = isReadOnlyView ? 'none' : 'flex';
+      }
+
       if (elWeighingFormulationTbody) {
         elWeighingFormulationTbody.innerHTML = '';
         if (stage.formulation && stage.formulation.length > 0) {
           stage.formulation.forEach(row => {
-            addWeighingFormulationRow(row.Lot_ID || row.lotId, row.userQty || row.Quantity || row.qty, row.userUnit || 'kg');
+            addWeighingFormulationRow(row.Lot_ID || row.lotId, row.userQty || row.Quantity || row.qty, row.userUnit || 'kg', isReadOnlyView);
           });
         } else {
-          addWeighingFormulationRow('', 0);
+          addWeighingFormulationRow('', 0, 'kg', isReadOnlyView);
         }
       }
       updateWeighingFormulationTotal();
@@ -2432,33 +2461,35 @@
     if (logStageRejectedKg) logStageRejectedKg.textContent = `${stageRejKg} kg`;
     if (logStageRejectedBlisters) logStageRejectedBlisters.textContent = `(${PharmaMath.formatNumber(rejMath.totalBlisters)} ${unitLabel} مرفوض/إعادة تشغيل)`;
 
-        // Role Authorization for Production Logger
-    const isReadOnlyLogger = currentUserRole === 'qc' || currentUserRole === 'wms' || currentUserRole === 'observer';
-    if (isReadOnlyLogger) {
-      if (inputLogAcceptedKg) inputLogAcceptedKg.disabled = true;
-      if (inputLogRejectedKg) inputLogRejectedKg.disabled = true;
-      if (btnSubmitStageLog) {
+    if (inputLogAcceptedKg) inputLogAcceptedKg.disabled = isReadOnlyView;
+    if (inputLogRejectedKg) inputLogRejectedKg.disabled = isReadOnlyView;
+    
+    // disable carry over progress checkbox if present
+    const chkCarry = document.getElementById('chk-add-carry-over-progress');
+    if (chkCarry) chkCarry.disabled = isReadOnlyView;
+
+    if (btnSubmitStageLog) {
+      if (isReadOnlyLogger) {
         btnSubmitStageLog.disabled = true;
         btnSubmitStageLog.style.opacity = '0.5';
         btnSubmitStageLog.title = 'تتطلب صلاحية إدارة الإنتاج أو المشرف';
-      }
-      if (btnToggleEditMode) {
-        btnToggleEditMode.disabled = true;
-        btnToggleEditMode.style.opacity = '0.5';
-        btnToggleEditMode.title = 'تتطلب صلاحية إدارة الإنتاج أو المشرف';
-      }
-      // disable carry over progress checkbox if present
-      const chkCarry = document.getElementById('chk-add-carry-over-progress');
-      if (chkCarry) chkCarry.disabled = true;
-    } else {
-      if (inputLogAcceptedKg) inputLogAcceptedKg.disabled = false;
-      if (inputLogRejectedKg) inputLogRejectedKg.disabled = false;
-      if (btnSubmitStageLog) {
+      } else if (!isEditCorrectionMode && isCompleted) {
+        btnSubmitStageLog.disabled = true;
+        btnSubmitStageLog.style.opacity = '0.5';
+        btnSubmitStageLog.title = 'هذه المرحلة مكتملة. يرجى الضغط على زر التعديل والتصحيح الأصفر للتعديل.';
+      } else {
         btnSubmitStageLog.disabled = false;
         btnSubmitStageLog.style.opacity = '1';
         btnSubmitStageLog.title = '';
       }
-      if (btnToggleEditMode) {
+    }
+
+    if (btnToggleEditMode) {
+      if (isReadOnlyLogger) {
+        btnToggleEditMode.disabled = true;
+        btnToggleEditMode.style.opacity = '0.5';
+        btnToggleEditMode.title = 'تتطلب صلاحية إدارة الإنتاج أو المشرف';
+      } else {
         btnToggleEditMode.disabled = false;
         btnToggleEditMode.style.opacity = '1';
         btnToggleEditMode.title = '';
@@ -6228,7 +6259,7 @@
     }
   }
 
-  function addWeighingFormulationRow(selectedLotId = '', qty = 0, selectedUnit = 'kg') {
+  function addWeighingFormulationRow(selectedLotId = '', qty = 0, selectedUnit = 'kg', isDisabled = false) {
     if (!elWeighingFormulationTbody) return;
     const tr = document.createElement('tr');
     tr.style.borderBottom = '1px solid rgba(255, 255, 255, 0.05)';
@@ -6244,13 +6275,17 @@
     inputSearch.className = 'wms-lot-search-input';
     inputSearch.placeholder = 'ابحث باسم المادة، كودها، أو رقم اللوت...';
     inputSearch.style.width = '100%';
-    inputSearch.style.background = '#1e293b';
+    inputSearch.style.background = isDisabled ? 'rgba(255,255,255,0.05)' : '#1e293b';
     inputSearch.style.color = '#fff';
     inputSearch.style.border = '1px solid rgba(255,255,255,0.15)';
     inputSearch.style.padding = '6px';
     inputSearch.style.borderRadius = '4px';
     inputSearch.style.boxSizing = 'border-box';
     inputSearch.autocomplete = 'off';
+    if (isDisabled) {
+      inputSearch.disabled = true;
+      inputSearch.style.cursor = 'not-allowed';
+    }
 
     const hiddenLotId = document.createElement('input');
     hiddenLotId.type = 'hidden';
@@ -6285,6 +6320,7 @@
     }
 
     function populateDropdown(query = '') {
+      if (isDisabled) return;
       dropdown.innerHTML = '';
       const filtered = releasedLots.filter(lot => {
         const text = `${lot.Material_Name} ${lot.Material_Code} ${lot.Lot_Number}`.toLowerCase();
@@ -6324,24 +6360,25 @@
       });
     }
 
-    inputSearch.addEventListener('focus', () => {
-      dropdown.classList.remove('hidden');
-      populateDropdown(inputSearch.value);
-    });
+    if (!isDisabled) {
+      inputSearch.addEventListener('focus', () => {
+        dropdown.classList.remove('hidden');
+        populateDropdown(inputSearch.value);
+      });
 
-    inputSearch.addEventListener('blur', () => {
-      // Delay closing dropdown slightly so that mousedown events can register
-      setTimeout(() => {
-        dropdown.classList.add('hidden');
-      }, 200);
-    });
+      inputSearch.addEventListener('blur', () => {
+        setTimeout(() => {
+          dropdown.classList.add('hidden');
+        }, 200);
+      });
 
-    inputSearch.addEventListener('input', (e) => {
-      hiddenLotId.value = ''; // Reset ID on manual modification until they select again
-      dropdown.classList.remove('hidden');
-      populateDropdown(e.target.value);
-      updateWeighingFormulationTotal();
-    });
+      inputSearch.addEventListener('input', (e) => {
+        hiddenLotId.value = '';
+        dropdown.classList.remove('hidden');
+        populateDropdown(e.target.value);
+        updateWeighingFormulationTotal();
+      });
+    }
 
     container.appendChild(inputSearch);
     container.appendChild(hiddenLotId);
@@ -6355,23 +6392,34 @@
     inputQty.placeholder = 'الكمية';
     inputQty.className = 'wms-qty-input';
     inputQty.style.width = '100%';
-    inputQty.style.background = '#1e293b';
+    inputQty.style.background = isDisabled ? 'rgba(255,255,255,0.05)' : '#1e293b';
     inputQty.style.color = '#fff';
     inputQty.style.border = '1px solid rgba(255,255,255,0.15)';
     inputQty.style.padding = '6px';
     inputQty.style.borderRadius = '4px';
     inputQty.style.boxSizing = 'border-box';
-    inputQty.addEventListener('input', updateWeighingFormulationTotal);
+    if (isDisabled) {
+      inputQty.disabled = true;
+      inputQty.style.cursor = 'not-allowed';
+    } else {
+      inputQty.addEventListener('input', updateWeighingFormulationTotal);
+    }
 
     const selectUnit = document.createElement('select');
     selectUnit.className = 'wms-row-unit-select';
     selectUnit.style.width = '100%';
-    selectUnit.style.background = '#1e293b';
+    selectUnit.style.background = isDisabled ? 'rgba(255,255,255,0.05)' : '#1e293b';
     selectUnit.style.color = '#fff';
     selectUnit.style.border = '1px solid rgba(255,255,255,0.15)';
     selectUnit.style.padding = '6px';
     selectUnit.style.borderRadius = '4px';
     selectUnit.style.boxSizing = 'border-box';
+    if (isDisabled) {
+      selectUnit.disabled = true;
+      selectUnit.style.cursor = 'not-allowed';
+    } else {
+      selectUnit.addEventListener('change', updateWeighingFormulationTotal);
+    }
     
     const optKg = document.createElement('option');
     optKg.value = 'kg';
@@ -6383,7 +6431,6 @@
     selectUnit.appendChild(optKg);
     selectUnit.appendChild(optG);
     selectUnit.value = selectedUnit;
-    selectUnit.addEventListener('change', updateWeighingFormulationTotal);
 
     const btnDel = document.createElement('button');
     btnDel.type = 'button';
@@ -6396,6 +6443,9 @@
       tr.remove();
       updateWeighingFormulationTotal();
     });
+    if (isDisabled) {
+      btnDel.style.display = 'none';
+    }
 
     const tdSelect = document.createElement('td');
     tdSelect.appendChild(container);
