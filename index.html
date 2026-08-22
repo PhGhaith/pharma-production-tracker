@@ -1338,22 +1338,9 @@
           </div>
 
           <form id="form-product-formula">
-            <table style="width: 100%; border-collapse: collapse; margin-bottom: 12px;">
-              <thead>
-                <tr style="border-bottom: 1px solid rgba(255,255,255,0.1); text-align: right;">
-                  <th style="padding: 6px 0; font-size: 0.85rem; color: var(--text-dim);">اسم المادة المكونة (اختياري)</th>
-                  <th style="padding: 6px 0; font-size: 0.85rem; color: var(--text-dim); width: 120px;">النسبة المئوية %</th>
-                  <th style="padding: 6px 0; font-size: 0.85rem; color: var(--text-dim); width: 40px; text-align: center;">إجراء</th>
-                </tr>
-              </thead>
-              <tbody id="product-formula-tbody">
-                <!-- Dynamic rows will be injected here -->
-              </tbody>
-            </table>
-
-            <button type="button" class="btn btn-secondary btn-sm" id="btn-add-formula-row" style="margin-bottom: 16px; border-color: var(--cyan); color: var(--cyan); background: none;">
-              <i data-lucide="plus"></i> إضافة مادة جديدة
-            </button>
+            <div id="product-formula-tables-container">
+              <!-- Dynamically rendered core and coating tables -->
+            </div>
 
             <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: 12px; padding: 12px 0 0 0; border-top: 1px solid rgba(255,255,255,0.05);">
               <button type="button" class="btn btn-secondary" id="btn-cancel-product-formula">إلغاء</button>
