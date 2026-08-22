@@ -2485,8 +2485,18 @@
       }
       updateWeighingFormulationTotal();
     } else {
-      if (inputLogAcceptedKg) inputLogAcceptedKg.required = true;
-      if (inputLogRejectedKg) inputLogRejectedKg.required = true;
+      if (inputLogAcceptedKg) {
+        inputLogAcceptedKg.required = true;
+        inputLogAcceptedKg.readOnly = false;
+        inputLogAcceptedKg.style.background = '';
+        inputLogAcceptedKg.style.cursor = '';
+      }
+      if (inputLogRejectedKg) {
+        inputLogRejectedKg.required = true;
+        inputLogRejectedKg.readOnly = false;
+        inputLogRejectedKg.style.background = '';
+        inputLogRejectedKg.style.cursor = '';
+      }
       if (formGrid) formGrid.classList.remove('hidden');
     }
 
