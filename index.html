@@ -625,6 +625,32 @@
               </button>
             </div>
           </form>
+
+          <!-- Dedicated Sales Dispatch Log -->
+          <div style="background: var(--bg-card); padding: 20px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.08); margin-top: 20px;">
+            <h3 style="margin: 0 0 12px 0; font-size: 1.1rem; color: #fff; display: flex; align-items: center; gap: 8px;">
+              <i data-lucide="history" style="width:18px;height:18px;color:var(--rose);"></i>
+              <span>سجل شحنات ومبيعات المنتجات الجاهزة المصروفة خارج المعمل 📜</span>
+            </h3>
+            <div class="table-container" style="overflow-x: auto; max-height: 300px; overflow-y: auto;">
+              <table class="pharma-table" style="width: 100%; border-collapse: collapse; text-align: right; font-size: 0.85rem;">
+                <thead>
+                  <tr style="background: rgba(255,255,255,0.02); border-bottom: 1px solid rgba(255,255,255,0.08);">
+                    <th style="padding: 10px; text-align: right;">رقم الحركة</th>
+                    <th style="padding: 10px; text-align: right;">المنتج التام</th>
+                    <th style="padding: 10px; text-align: right;">رقم اللوت (الباتش)</th>
+                    <th style="padding: 10px; text-align: right;">الكمية المشحونة</th>
+                    <th style="padding: 10px; text-align: right;">الجهة المستلمة / العميل</th>
+                    <th style="padding: 10px; text-align: right;">التاريخ والوقت</th>
+                    <th style="padding: 10px; text-align: right;">المسؤول</th>
+                  </tr>
+                </thead>
+                <tbody id="wms-sales-history-tbody">
+                  <!-- Injected dynamically -->
+                </tbody>
+              </table>
+            </div>
+          </div>
         </div>
 
         <!-- Sub-View 5: Transactions History Audit Trail -->
@@ -950,8 +976,8 @@
             </button>
           </div>
         </form>
+
       </div>
-    </div>
 
     <!-- Modal: Batch Detail & Stage Progress Tracker -->
     <div id="modal-batch-detail" class="modal-overlay hidden">

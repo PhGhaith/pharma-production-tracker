@@ -4942,14 +4942,7 @@
       tab.addEventListener('click', (e) => {
         currentWMSTab = tab.getAttribute('data-wms-tab') || e.currentTarget.getAttribute('data-wms-tab');
         if (currentWMSTab === 'sales') {
-          const searchInput = document.getElementById('wms-sales-product-search');
-          const hiddenProduct = document.getElementById('wms-sales-product');
-          const salesQty = document.getElementById('wms-sales-qty');
-          if (searchInput) searchInput.value = '';
-          if (hiddenProduct) hiddenProduct.value = '';
-          if (salesQty) salesQty.value = '';
-          const rec = document.getElementById('wms-fefo-recommendation');
-          if (rec) rec.classList.add('hidden');
+          populateSalesProductsDropdown();
         }
         renderWMSViews();
       });
@@ -5413,7 +5406,8 @@
     } else if (currentWMSTab === 'history') {
       renderTransactionsLog();
     } else if (currentWMSTab === 'sales') {
-      populateSalesProductsDropdown();
+      renderSalesInvoiceTable();
+      renderSalesHistory();
     } else if (currentWMSTab === 'trace') {
       renderTraceabilityView();
     }
@@ -6425,6 +6419,40 @@
     }
   };
 
+  function renderSalesHistory() {
+    const tbody = document.getElementById('wms-sales-history-tbody');
+    if (!tbody) return;
+    tbody.innerHTML = '';
+
+    const salesTx = wmsTransactions.filter(tx => tx && tx.Tx_Type === 'Sales_Dispatch');
+
+    if (salesTx.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: var(--text-dim); padding: 20px;">لا توجد مبيعات أو شحنات مسجلة حالياً.</td></tr>`;
+      return;
+    }
+
+    salesTx.forEach(tx => {
+      const lot = stockLots.find(l => l && String(l.Lot_ID) === String(tx.Lot_ID));
+      const materialName = lot ? lot.Material_Name : 'منتج محذوف';
+      const lotNumber = lot ? lot.Lot_Number : '-';
+      const unit = lot ? lot.Unit : 'عبوة';
+      const dateStr = new Date(tx.Timestamp).toLocaleString('en-US');
+
+      const tr = document.createElement('tr');
+      tr.style.borderBottom = '1px solid rgba(255, 255, 255, 0.05)';
+      tr.innerHTML = `
+        <td style="padding: 10px; font-family: monospace; font-size: 0.75rem; color: var(--text-dim);">${tx.Tx_ID}</td>
+        <td style="padding: 10px; font-weight: bold; color: var(--cyan);">${materialName}</td>
+        <td style="padding: 10px;"><strong style="color: var(--amber);">${lotNumber}</strong></td>
+        <td style="padding: 10px; font-weight: bold; color: var(--rose);">${Math.abs(tx.Quantity)} <small>${unit}</small></td>
+        <td style="padding: 10px; font-size: 0.85rem;">${tx.Reference_ID || '-'}</td>
+        <td style="padding: 10px; color: var(--text-dim); font-size: 0.8rem;">${dateStr}</td>
+        <td style="padding: 10px; color: var(--text-dim);">${tx.Performed_By}</td>
+      `;
+      tbody.appendChild(tr);
+    });
+  }
+
   function setupSalesAutocomplete() {
     const inputSearch = document.getElementById('wms-sales-product-search');
     const hiddenProduct = document.getElementById('wms-sales-product');
@@ -6667,6 +6695,7 @@
     window.currentSalesInvoiceItems = [];
     document.getElementById('wms-form-sales').reset();
     renderSalesInvoiceTable();
+  renderSalesHistory();
     
     // Clear line entry inputs
     const searchInput = document.getElementById('wms-sales-product-search');
