@@ -2045,12 +2045,19 @@
           batch.totalWeightKg,
           batch.lotsCount
         );
+        const totalBlisters = mathTotal.totalBlisters + carryMath.totalBlisters;
+        const boxes = Math.floor(totalBlisters / (batch.secondaryPackQty || 1));
         detailTotalBlisters.innerHTML = `
           ${PharmaMath.formatNumber(mathTotal.totalBlisters)} ${term.packName}
           <span style="color: var(--amber); font-weight: bold; margin-right: 5px;">+ ${PharmaMath.formatNumber(carryMath.totalBlisters)} ${term.packName} منقولة</span>
+          <div style="font-size: 0.78rem; font-weight: normal; color: var(--text-muted); margin-top: 2px;">(تعادل إجمالاً: ${PharmaMath.formatNumber(boxes)} علبة)</div>
         `;
       } else {
-        detailTotalBlisters.textContent = `${PharmaMath.formatNumber(mathTotal.totalBlisters)} ${term.packName}`;
+        const boxes = Math.floor(mathTotal.totalBlisters / (batch.secondaryPackQty || 1));
+        detailTotalBlisters.innerHTML = `
+          ${PharmaMath.formatNumber(mathTotal.totalBlisters)} ${term.packName}
+          <div style="font-size: 0.78rem; font-weight: normal; color: var(--text-muted); margin-top: 2px;">(تعادل: ${PharmaMath.formatNumber(boxes)} علبة)</div>
+        `;
       }
     }
 
@@ -5952,8 +5959,22 @@
     function getReleasedProducts() {
       const addedLotIds = (window.currentSalesInvoiceItems || []).map(item => String(item.lotId));
       
+      const isRawMaterial = lot => {
+        if (!lot || !lot.Unit) return false;
+        const u = lot.Unit.toLowerCase();
+        return u === 'kg' || u === 'g' || u === 'l' || u === 'كغ' || u === 'غ' || u === 'جرام' || u === 'لتر';
+      };
+
       return stockLots
-        .filter(lot => lot && lot.Status === 'Released' && lot.Current_Qty > 0 && lot.Material_Type === 'ready' && !addedLotIds.includes(String(lot.Lot_ID)))
+        .filter(lot => {
+          if (!lot) return false;
+          if (lot.Status !== 'Released') return false;
+          if (lot.Current_Qty <= 0) return false;
+          if (addedLotIds.includes(String(lot.Lot_ID))) return false;
+          
+          const type = lot.Material_Type || (isRawMaterial(lot) ? 'raw' : 'ready');
+          return type === 'ready';
+        })
         .map(lot => ({
           lotId: lot.Lot_ID,
           name: lot.Material_Name,
@@ -6188,7 +6209,7 @@
     }
   }
 
-  function addWeighingFormulationRow(selectedLotId = '', qty = 0) {
+  function addWeighingFormulationRow(selectedLotId = '', qty = 0, selectedUnit = 'kg') {
     if (!elWeighingFormulationTbody) return;
     const tr = document.createElement('tr');
     tr.style.borderBottom = '1px solid rgba(255, 255, 255, 0.05)';
@@ -6323,6 +6344,28 @@
     inputQty.style.boxSizing = 'border-box';
     inputQty.addEventListener('input', updateWeighingFormulationTotal);
 
+    const selectUnit = document.createElement('select');
+    selectUnit.className = 'wms-row-unit-select';
+    selectUnit.style.width = '100%';
+    selectUnit.style.background = '#1e293b';
+    selectUnit.style.color = '#fff';
+    selectUnit.style.border = '1px solid rgba(255,255,255,0.15)';
+    selectUnit.style.padding = '6px';
+    selectUnit.style.borderRadius = '4px';
+    selectUnit.style.boxSizing = 'border-box';
+    
+    const optKg = document.createElement('option');
+    optKg.value = 'kg';
+    optKg.textContent = 'kg';
+    const optG = document.createElement('option');
+    optG.value = 'g';
+    optG.textContent = 'g';
+    
+    selectUnit.appendChild(optKg);
+    selectUnit.appendChild(optG);
+    selectUnit.value = selectedUnit;
+    selectUnit.addEventListener('change', updateWeighingFormulationTotal);
+
     const btnDel = document.createElement('button');
     btnDel.type = 'button';
     btnDel.className = 'btn btn-secondary btn-sm';
@@ -6339,12 +6382,15 @@
     tdSelect.appendChild(container);
     const tdInput = document.createElement('td');
     tdInput.appendChild(inputQty);
+    const tdUnit = document.createElement('td');
+    tdUnit.appendChild(selectUnit);
     const tdAction = document.createElement('td');
     tdAction.style.textAlign = 'center';
     tdAction.appendChild(btnDel);
 
     tr.appendChild(tdSelect);
     tr.appendChild(tdInput);
+    tr.appendChild(tdUnit);
     tr.appendChild(tdAction);
 
     elWeighingFormulationTbody.appendChild(tr);
