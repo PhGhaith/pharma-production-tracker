@@ -1137,6 +1137,15 @@
                 <div id="visual-release-attachment-status" style="margin-top: 6px; font-size: 0.8rem; color: var(--emerald); font-weight: bold;"></div>
               </div>
 
+              <!-- In-Process Control (IPC) Document Attachment Container -->
+              <div id="stage-ipc-attachment-container" class="hidden" style="margin-top: 1rem; border: 1px dashed rgba(192, 132, 252, 0.3); padding: 12px; border-radius: 6px; background: rgba(192, 132, 252, 0.02); direction: rtl;">
+                <label style="font-weight: bold; margin-bottom: 6px; display: block; color: #c084fc;">
+                  <i data-lucide="beaker" style="width: 14px; height: 14px; display: inline-block; vertical-align: middle;"></i> إرفاق شهادة / تقرير المراقبة أثناء الإنتاج (IPC) للمختبر (PDF أو صورة)
+                </label>
+                <input type="file" id="stage-ipc-attachment-file" accept="image/*,application/pdf" style="width: 100%; box-sizing: border-box; padding: 6px; border-radius: 4px; background: #1e293b; border: 1px solid rgba(255,255,255,0.15); color: #fff; height: 38px;">
+                <div id="stage-ipc-attachment-status" style="margin-top: 6px; font-size: 0.8rem; color: #c084fc; font-weight: bold;"></div>
+              </div>
+
               <div style="margin-top: 1rem; display: flex; gap: 1rem; align-items: center;">
                 <button type="submit" class="btn btn-success" id="btn-submit-stage-log">
                   <i data-lucide="check-circle-2"></i>

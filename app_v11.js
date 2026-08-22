@@ -1692,6 +1692,45 @@
       });
     }
 
+    // IPC Document Attachment change listener
+    const stageIpcFileInput = document.getElementById('stage-ipc-attachment-file');
+    if (stageIpcFileInput) {
+      stageIpcFileInput.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        if (!file.type.startsWith('image/') && file.size > 250 * 1024) {
+          alert('حجم الملف المرفق أكبر من 250KB! لتفادي امتلاء ذاكرة المتصفح وتوقف النظام، يرجى اختيار ملف أصغر حجماً (مثل ملف PDF مضغوط أو صورة مضغوطة).');
+          stageIpcFileInput.value = '';
+          return;
+        }
+
+        if (currentUserRole !== 'admin' && currentUserRole !== 'qc') {
+          alert('عذراً، المختبر والرقابة النوعية أو مدير النظام هم فقط المخولون بإرفاق مستند الـ IPC!');
+          stageIpcFileInput.value = '';
+          return;
+        }
+
+        compressImageAndConvertToBase64(file, function(base64Data) {
+          const batch = batches.find(b => String(b.id) === String(activeBatchId));
+          if (!batch || !batch.stages) return;
+          const stage = batch.stages[activeStageIndex];
+          if (stage && stage.id !== 'weighing' && stage.id !== 'visual_inspection') {
+            stage.ipcAttachment = {
+              name: file.name,
+              type: file.type.startsWith('image/') ? 'image/jpeg' : file.type,
+              size: (base64Data.length * 0.75 / 1024).toFixed(1) + ' KB',
+              data: base64Data
+            };
+            batch.version = (batch.version || 0) + 1;
+            batch.updatedAt = Date.now();
+            saveBatches(true);
+            renderStageLogger(batch);
+          }
+        });
+      });
+    }
+
     // Admin Edit Batch Modal listeners
     const btnEditBatch = document.getElementById('btn-edit-batch');
     const modalEditBatch = document.getElementById('modal-edit-batch');
@@ -2770,6 +2809,36 @@
           }
         } else {
           visualAttachmentContainer.classList.add('hidden');
+        }
+      }
+
+      // Render IPC (In-Process Control) Attachment UI
+      const ipcContainer = document.getElementById('stage-ipc-attachment-container');
+      const ipcStatus = document.getElementById('stage-ipc-attachment-status');
+      const ipcFile = document.getElementById('stage-ipc-attachment-file');
+
+      if (ipcContainer) {
+        const isIPCStage = stage.id !== 'weighing' && stage.id !== 'visual_inspection';
+        if (isIPCStage) {
+          ipcContainer.classList.remove('hidden');
+          const canEditIPC = currentUserRole === 'admin' || currentUserRole === 'qc';
+          if (stage.ipcAttachment) {
+            if (ipcStatus) {
+              ipcStatus.innerHTML = `المستند المرفق للـ IPC: <a href="#" onclick="downloadBatchStageIPCAttachment('${batch.id}', '${stage.id}'); return false;" style="color: var(--cyan); text-decoration: underline;">${stage.ipcAttachment.name}</a> (${stage.ipcAttachment.size}) ${canEditIPC ? ` | <span style="color: var(--rose); cursor: pointer; margin-right: 10px;" onclick="removeBatchStageIPCAttachment('${batch.id}', '${stage.id}')">حذف المرفق ❌</span>` : ''}`;
+            }
+            if (ipcFile) {
+              ipcFile.style.display = 'none';
+            }
+          } else {
+            if (ipcStatus) ipcStatus.innerHTML = '';
+            if (ipcFile) {
+              ipcFile.style.display = 'block';
+              ipcFile.value = '';
+              ipcFile.disabled = !canEditIPC;
+            }
+          }
+        } else {
+          ipcContainer.classList.add('hidden');
         }
       }
 
@@ -7763,6 +7832,33 @@
     const visualStage = batch.stages.find(s => s && s.id === 'visual_inspection');
     if (visualStage) {
       delete visualStage.releaseCertificate;
+      batch.version = (batch.version || 0) + 1;
+      batch.updatedAt = Date.now();
+      saveBatches(true);
+      renderStageLogger(batch);
+    }
+  };
+
+  window.downloadBatchStageIPCAttachment = function(batchId, stageId) {
+    const batch = batches.find(b => String(b.id) === String(batchId));
+    if (!batch || !batch.stages) return;
+    const stage = batch.stages.find(s => s && s.id === stageId);
+    if (!stage || !stage.ipcAttachment || !stage.ipcAttachment.data) return;
+    const link = document.createElement('a');
+    link.href = stage.ipcAttachment.data;
+    link.download = stage.ipcAttachment.name || 'ipc_attachment';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  window.removeBatchStageIPCAttachment = function(batchId, stageId) {
+    if (!confirm('هل أنت متأكد من حذف مستند الـ IPC هذا؟')) return;
+    const batch = batches.find(b => String(b.id) === String(batchId));
+    if (!batch || !batch.stages) return;
+    const stage = batch.stages.find(s => s && s.id === stageId);
+    if (stage) {
+      delete stage.ipcAttachment;
       batch.version = (batch.version || 0) + 1;
       batch.updatedAt = Date.now();
       saveBatches(true);
