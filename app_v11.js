@@ -2452,12 +2452,21 @@
     }
 
     // Weighing Formulation Dynamic View toggle (Runs in both Edit and Normal Modes)
+    const formGrid = inputLogAcceptedKg ? inputLogAcceptedKg.closest('.form-grid') : null;
+
     if (activeStageIndex === 0) {
       if (elWeighingFormulationContainer) elWeighingFormulationContainer.classList.remove('hidden');
       if (inputLogAcceptedKg) {
         inputLogAcceptedKg.readOnly = true;
         inputLogAcceptedKg.style.background = 'rgba(255,255,255,0.05)';
         inputLogAcceptedKg.style.cursor = 'not-allowed';
+        inputLogAcceptedKg.required = false;
+      }
+      if (inputLogRejectedKg) {
+        inputLogRejectedKg.required = false;
+      }
+      if (formGrid) {
+        formGrid.classList.add('hidden');
       }
       
       if (btnAddFormulationRow) {
@@ -2475,6 +2484,10 @@
         }
       }
       updateWeighingFormulationTotal();
+    } else {
+      if (inputLogAcceptedKg) inputLogAcceptedKg.required = true;
+      if (inputLogRejectedKg) inputLogRejectedKg.required = true;
+      if (formGrid) formGrid.classList.remove('hidden');
     }
 
     // Primary Packaging consumption Dynamic View toggle (Runs in both Edit and Normal Modes)
