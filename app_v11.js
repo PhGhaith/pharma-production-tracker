@@ -7421,7 +7421,7 @@
     const matches = [];
 
     batches.forEach(batch => {
-      if (!batch || !Array.isArray(batch.stages)) return;
+      if (!batch || batch.deleted || !Array.isArray(batch.stages)) return;
 
       batch.stages.forEach(stage => {
         if (!stage) return;
