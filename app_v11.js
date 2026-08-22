@@ -913,6 +913,9 @@
       }
     }
 
+    renderProductionTrailLog();
+    renderQCTrailLog();
+
     if (window.lucide) window.lucide.createIcons();
   }
 
@@ -7090,6 +7093,9 @@
       userActivityLogs = userActivityLogs.slice(0, 1000);
     }
     saveActivityLogs();
+    renderProductionTrailLog();
+    renderQCTrailLog();
+    renderActivityLogsView();
   }
 
   function renderActivityLogsView() {
@@ -7110,6 +7116,66 @@
         <td style="padding: 10px; font-weight: bold;">${log.user}</td>
         <td style="padding: 10px;"><span class="wms-badge" style="background: rgba(255,255,255,0.05); color: #fff; padding: 4px 8px; border-radius: 4px; font-size: 0.8rem;">${log.actionType}</span></td>
         <td style="padding: 10px; font-size: 0.85rem;">${log.details}</td>
+      `;
+      tbody.appendChild(tr);
+    });
+  }
+
+  function renderProductionTrailLog() {
+    const tbody = document.getElementById('production-activity-tbody');
+    if (!tbody) return;
+    tbody.innerHTML = '';
+
+    const filteredLogs = userActivityLogs.filter(log => {
+      if (!log) return false;
+      return log.user !== 'أمين المستودع 📦' && log.user !== 'wms';
+    });
+
+    if (filteredLogs.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="5" style="text-align: center; color: var(--text-dim); padding: 20px;">سجل حركات الإنتاج فارغ حالياً.</td></tr>`;
+      return;
+    }
+
+    filteredLogs.forEach((log, idx) => {
+      const tr = document.createElement('tr');
+      tr.style.borderBottom = '1px solid rgba(255, 255, 255, 0.05)';
+      tr.innerHTML = `
+        <td style="padding: 10px; font-family: monospace; font-size: 0.75rem; color: var(--text-dim); text-align: right;">#${filteredLogs.length - idx}</td>
+        <td style="padding: 10px; font-weight: bold; text-align: right;">${log.user}</td>
+        <td style="padding: 10px; text-align: right;"><span class="wms-badge" style="background: rgba(6, 182, 212, 0.1); color: var(--cyan); padding: 4px 8px; border-radius: 4px; font-size: 0.8rem;">${log.actionType}</span></td>
+        <td style="padding: 10px; font-size: 0.85rem; text-align: right; color: #fff;">${log.details}</td>
+        <td style="padding: 10px; color: var(--text-dim); font-size: 0.82rem; text-align: left;">${log.timestamp}</td>
+      `;
+      tbody.appendChild(tr);
+    });
+  }
+
+  function renderQCTrailLog() {
+    const tbody = document.getElementById('qc-activity-tbody');
+    if (!tbody) return;
+    tbody.innerHTML = '';
+
+    const filteredLogs = userActivityLogs.filter(log => {
+      if (!log) return false;
+      const isQCRole = log.user === 'الرقابة النوعية QC 🧪' || log.user === 'qc';
+      const isQCAction = ['تعديل القرار الجودي', 'تعديل حالة لوت (QC)', 'تسجيل عينات (QC)', 'طلب تحليل QC', 'إفراج نهائي لمنتج', 'تنبيه جودة (QC)'].some(type => log.actionType.includes(type));
+      return isQCRole || isQCAction;
+    });
+
+    if (filteredLogs.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="5" style="text-align: center; color: var(--text-dim); padding: 20px;">سجل حركات الرقابة النوعية فارغ حالياً.</td></tr>`;
+      return;
+    }
+
+    filteredLogs.forEach((log, idx) => {
+      const tr = document.createElement('tr');
+      tr.style.borderBottom = '1px solid rgba(255, 255, 255, 0.05)';
+      tr.innerHTML = `
+        <td style="padding: 10px; font-family: monospace; font-size: 0.75rem; color: var(--text-dim); text-align: right;">#${filteredLogs.length - idx}</td>
+        <td style="padding: 10px; font-weight: bold; text-align: right;">${log.user}</td>
+        <td style="padding: 10px; text-align: right;"><span class="wms-badge" style="background: rgba(192, 132, 252, 0.1); color: #c084fc; padding: 4px 8px; border-radius: 4px; font-size: 0.8rem;">${log.actionType}</span></td>
+        <td style="padding: 10px; font-size: 0.85rem; text-align: right; color: #fff;">${log.details}</td>
+        <td style="padding: 10px; color: var(--text-dim); font-size: 0.82rem; text-align: left;">${log.timestamp}</td>
       `;
       tbody.appendChild(tr);
     });
