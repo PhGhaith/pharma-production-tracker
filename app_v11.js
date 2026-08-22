@@ -113,6 +113,7 @@
   let batches = [];
   let stockLots = [];
   let wmsTransactions = [];
+  let temporaryProductFormula = [];
   let currentFormFilter = 'all';
   let searchQuery = '';
   let activeBatchId = null;
@@ -1414,12 +1415,43 @@
       });
     }
 
+    const btnNewBatchFormula = document.getElementById('btn-new-batch-formula');
+    if (btnNewBatchFormula) {
+      btnNewBatchFormula.addEventListener('click', () => {
+        activeBatchId = null;
+        if (formulaTbody) {
+          formulaTbody.innerHTML = '';
+          const existingFormula = Array.isArray(temporaryProductFormula) ? temporaryProductFormula : [];
+          
+          const createRowHtml = (name = '', percentage = '') => {
+            const tr = document.createElement('tr');
+            tr.className = 'formula-row';
+            tr.innerHTML = `
+              <td style="padding: 6px 0;"><input type="text" class="formula-material-name" placeholder="مثال: Lactose" style="width: 95%; padding: 6px; background: #1e293b; border: 1px solid rgba(255,255,255,0.15); color:#fff; border-radius: 4px;" value="${name}"></td>
+              <td style="padding: 6px 0;"><input type="number" step="any" min="0" max="100" class="formula-material-percent" placeholder="مثال: 85%" style="width: 90%; padding: 6px; background: #1e293b; border: 1px solid rgba(255,255,255,0.15); color:#fff; border-radius: 4px;" value="${percentage}"></td>
+              <td style="padding: 6px 0; text-align: center;"><button type="button" class="btn btn-secondary btn-sm" onclick="this.closest('tr').remove()" style="border-color: var(--rose); color: var(--rose); padding: 4px 8px; font-weight: bold; background: none;">&times;</button></td>
+            `;
+            return tr;
+          };
+
+          if (existingFormula.length > 0) {
+            existingFormula.forEach(item => {
+              formulaTbody.appendChild(createRowHtml(item.name, item.percentage));
+            });
+          } else {
+            for (let i = 0; i < 3; i++) {
+              formulaTbody.appendChild(createRowHtml());
+            }
+          }
+        }
+        if (modalProductFormula) modalProductFormula.classList.remove('hidden');
+        if (window.lucide) window.lucide.createIcons();
+      });
+    }
+
     if (formProductFormula) {
       formProductFormula.addEventListener('submit', (e) => {
         e.preventDefault();
-        const batch = batches.find(b => String(b.id) === String(activeBatchId));
-        if (!batch) return;
-
         const rows = formulaTbody.querySelectorAll('.formula-row');
         const newFormula = [];
         rows.forEach(row => {
@@ -1432,6 +1464,16 @@
             newFormula.push({ name, percentage });
           }
         });
+
+        const batch = batches.find(b => String(b.id) === String(activeBatchId));
+        if (!batch) {
+          temporaryProductFormula = newFormula;
+          closeProductFormulaModal();
+          if (window.showToast) {
+            window.showToast('تم إعداد وحفظ صيغة المنتج للتشغيلة الجديدة مؤقتاً 🧪', 'success');
+          }
+          return;
+        }
 
         batch.productFormula = newFormula;
         batch.version = (batch.version || 0) + 1;
@@ -2221,6 +2263,7 @@
     if (inputLotsCount) inputLotsCount.value = '';
     if (inputSecondaryPackQty) inputSecondaryPackQty.value = '20';
     toggleCoatingFields();
+    temporaryProductFormula = [];
 
     const today = new Date().toISOString().split('T')[0];
     const threeYearsLater = new Date();
@@ -2310,6 +2353,7 @@
       stages: initialStages,
       currentStageIndex: 0,
       qc_runs: [],
+      productFormula: temporaryProductFormula || [],
       updatedAt: Date.now(),
       version: 1,
       deleted: false,
