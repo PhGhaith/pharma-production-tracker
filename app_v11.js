@@ -2907,7 +2907,12 @@
     }
 
     if (isPackagingStage) {
-      const totalPackagingKg = packagingRows.reduce((sum, r) => sum + r.qty, 0);
+      const newAccBlisters = parseFloat(inputLogAcceptedKg.value) || 0;
+      const newRejBlisters = parseFloat(inputLogRejectedKg.value) || 0;
+
+      const newAccKg = PharmaMath.blistersToKg(newAccBlisters, batch.isCoated, batch.preCoatingMg, batch.postCoatingMg, batch.unitsPerBlister);
+      const newRejKg = PharmaMath.blistersToKg(newRejBlisters, batch.isCoated, batch.preCoatingMg, batch.postCoatingMg, batch.unitsPerBlister);
+
       const chkCarryProgress = document.getElementById('chk-add-carry-over-progress');
       const shouldAddCarryOver = chkCarryProgress ? chkCarryProgress.checked : false;
       
@@ -2919,9 +2924,9 @@
         }
       }
       
-      let newAccKg = totalPackagingKg;
+      let finalAccKg = newAccKg;
       if (!carryOverAlreadyAdded && (shouldAddCarryOver || stage.carryOverAdded)) {
-        newAccKg += (batch.carryOverKg || 0);
+        finalAccKg += (batch.carryOverKg || 0);
         stage.carryOverAdded = true;
       }
       
@@ -2932,8 +2937,8 @@
       }
       const stageLimit = maxAllowedTotal + (stage.carryOverAdded ? (batch.carryOverKg || 0) : 0);
       
-      if (newAccKg > (stageLimit + 0.05)) {
-        alert(`الكمية الإجمالية لمواد التعبئة المصححة (${newAccKg.toFixed(2)} kg) لا يمكن أن تتجاوز الكمية المقبولة في المرحلة السابقة (${stageLimit.toFixed(2)} kg).`);
+      if ((finalAccKg + newRejKg) > (stageLimit + 0.05)) {
+        alert(`الكمية الإجمالية المحسوبة للمرحلة (${(finalAccKg + newRejKg).toFixed(2)} kg) لا يمكن أن تتجاوز الكمية المقبولة في المرحلة السابقة (${stageLimit.toFixed(2)} kg).`);
         return;
       }
       
@@ -2953,7 +2958,7 @@
       // Delete old transactions
       wmsTransactions = wmsTransactions.filter(tx => tx && !(tx.Tx_Type === 'Dispense_Production' && tx.Reference_ID === `صرف للتعبئة والتغليف لإنتاج تشغيلة ${batch.productName} (#${batch.batchNo})`));
 
-      // Save new packaging array
+      // Save new packaging array (Documentation/Traceability only)
       stage.packaging_materials = packagingRows.map(r => ({ Lot_ID: r.lotId, Quantity: r.qty }));
 
       // Deduct new stock and log transactions
@@ -2977,9 +2982,12 @@
       saveWMS();
 
       // Update stage state
-      stage.acceptedKg = newAccKg;
-      stage.rejectedKg = 0;
-      stage.doneKg = newAccKg;
+      stage.acceptedKg = finalAccKg;
+      stage.rejectedKg = newRejKg;
+      stage.doneKg = finalAccKg + newRejKg;
+      stage.acceptedBlisters = newAccBlisters;
+      stage.rejectedBlisters = newRejBlisters;
+      stage.yieldPercent = (newAccBlisters + newRejBlisters) > 0 ? (newAccBlisters / (newAccBlisters + newRejBlisters)) * 100 : 100;
       
       if (stage.doneKg >= (stageLimit - 0.05)) {
         stage.status = 'completed';
@@ -2991,11 +2999,10 @@
 
       if (!Array.isArray(batch.logs)) batch.logs = [];
       const uLabel = getUnitLabel(batch.pharmaForm);
-      const accBlisters = PharmaMath.kgToBlistersAndLots(newAccKg, batch.isCoated, batch.preCoatingMg, batch.postCoatingMg, batch.unitsPerBlister, batch.totalWeightKg, batch.lotsCount).totalBlisters;
       
       batch.logs.unshift({
         time: new Date().toLocaleString('en-US'),
-        text: `تسجيل استهلاك مواد التعبئة والتغليف للتشغيلة: (إجمالي الوزن المقبول: ${newAccKg.toFixed(2)} kg = ${PharmaMath.formatNumber(accBlisters)} ${uLabel}).`
+        text: `تسجيل إنتاج مرحلة التعبئة النهائية: (إجمالي المقبول: ${newAccBlisters} ${uLabel} = ${finalAccKg.toFixed(2)} kg).`
       });
 
       isEditCorrectionMode = false;
