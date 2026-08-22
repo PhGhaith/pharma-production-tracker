@@ -1344,6 +1344,110 @@
     }
 
     window.openBatchDetail = openBatchDetail;
+
+    // Product Formula Modal logic
+    const btnProductFormula = document.getElementById('btn-product-formula');
+    const modalProductFormula = document.getElementById('modal-product-formula');
+    const closeProductFormulaBtn = document.getElementById('close-product-formula-modal');
+    const cancelProductFormulaBtn = document.getElementById('btn-cancel-product-formula');
+    const btnAddFormulaRow = document.getElementById('btn-add-formula-row');
+    const formulaTbody = document.getElementById('product-formula-tbody');
+    const formProductFormula = document.getElementById('form-product-formula');
+
+    const closeProductFormulaModal = () => {
+      if (modalProductFormula) modalProductFormula.classList.add('hidden');
+    };
+
+    if (btnProductFormula) {
+      btnProductFormula.addEventListener('click', () => {
+        const batch = batches.find(b => String(b.id) === String(activeBatchId));
+        if (!batch) return;
+
+        if (formulaTbody) {
+          formulaTbody.innerHTML = '';
+          const existingFormula = Array.isArray(batch.productFormula) ? batch.productFormula : [];
+          
+          const createRowHtml = (name = '', percentage = '') => {
+            const tr = document.createElement('tr');
+            tr.className = 'formula-row';
+            tr.innerHTML = `
+              <td style="padding: 6px 0;"><input type="text" class="formula-material-name" placeholder="مثال: Lactose" style="width: 95%; padding: 6px; background: #1e293b; border: 1px solid rgba(255,255,255,0.15); color:#fff; border-radius: 4px;" value="${name}"></td>
+              <td style="padding: 6px 0;"><input type="number" step="any" min="0" max="100" class="formula-material-percent" placeholder="مثال: 85%" style="width: 90%; padding: 6px; background: #1e293b; border: 1px solid rgba(255,255,255,0.15); color:#fff; border-radius: 4px;" value="${percentage}"></td>
+              <td style="padding: 6px 0; text-align: center;"><button type="button" class="btn btn-secondary btn-sm" onclick="this.closest('tr').remove()" style="border-color: var(--rose); color: var(--rose); padding: 4px 8px; font-weight: bold; background: none;">&times;</button></td>
+            `;
+            return tr;
+          };
+
+          if (existingFormula.length > 0) {
+            existingFormula.forEach(item => {
+              formulaTbody.appendChild(createRowHtml(item.name, item.percentage));
+            });
+          } else {
+            // Render 3 blank rows by default
+            for (let i = 0; i < 3; i++) {
+              formulaTbody.appendChild(createRowHtml());
+            }
+          }
+        }
+
+        if (modalProductFormula) modalProductFormula.classList.remove('hidden');
+        if (window.lucide) window.lucide.createIcons();
+      });
+    }
+
+    if (closeProductFormulaBtn) closeProductFormulaBtn.addEventListener('click', closeProductFormulaModal);
+    if (cancelProductFormulaBtn) cancelProductFormulaBtn.addEventListener('click', closeProductFormulaModal);
+
+    if (btnAddFormulaRow) {
+      btnAddFormulaRow.addEventListener('click', () => {
+        if (formulaTbody) {
+          const tr = document.createElement('tr');
+          tr.className = 'formula-row';
+          tr.innerHTML = `
+            <td style="padding: 6px 0;"><input type="text" class="formula-material-name" placeholder="مثال: Lactose" style="width: 95%; padding: 6px; background: #1e293b; border: 1px solid rgba(255,255,255,0.15); color:#fff; border-radius: 4px;"></td>
+            <td style="padding: 6px 0;"><input type="number" step="any" min="0" max="100" class="formula-material-percent" placeholder="مثال: 85%" style="width: 90%; padding: 6px; background: #1e293b; border: 1px solid rgba(255,255,255,0.15); color:#fff; border-radius: 4px;"></td>
+            <td style="padding: 6px 0; text-align: center;"><button type="button" class="btn btn-secondary btn-sm" onclick="this.closest('tr').remove()" style="border-color: var(--rose); color: var(--rose); padding: 4px 8px; font-weight: bold; background: none;">&times;</button></td>
+          `;
+          formulaTbody.appendChild(tr);
+          if (window.lucide) window.lucide.createIcons();
+        }
+      });
+    }
+
+    if (formProductFormula) {
+      formProductFormula.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const batch = batches.find(b => String(b.id) === String(activeBatchId));
+        if (!batch) return;
+
+        const rows = formulaTbody.querySelectorAll('.formula-row');
+        const newFormula = [];
+        rows.forEach(row => {
+          const nameInput = row.querySelector('.formula-material-name');
+          const percentInput = row.querySelector('.formula-material-percent');
+          const name = nameInput ? nameInput.value.trim() : '';
+          const percentage = percentInput ? percentInput.value.trim() : '';
+
+          if (name || percentage) {
+            newFormula.push({ name, percentage });
+          }
+        });
+
+        batch.productFormula = newFormula;
+        batch.version = (batch.version || 0) + 1;
+        batch.updatedAt = Date.now();
+
+        saveBatches(true);
+        logUserActivity('تعديل صيغة المنتج', `تم تحديث صيغة المنتج والمكونات المرجعية للتشغيلة [${batch.productName}] (الباتش: ${batch.batchNo}).`);
+
+        closeProductFormulaModal();
+        openBatchDetail(batch.id);
+
+        if (window.showToast) {
+          window.showToast('تم حفظ وصيانة صيغة المنتج بنجاح 🧪📄', 'success');
+        }
+      });
+    }
     if (btnExportBackup) btnExportBackup.addEventListener('click', exportBackupData);
     if (btnImportBackup) btnImportBackup.addEventListener('click', () => inputBackupFile.click());
     if (inputBackupFile) inputBackupFile.addEventListener('change', importBackupData);
@@ -2339,6 +2443,23 @@
         btnEditBatch.classList.remove('hidden');
       } else {
         btnEditBatch.classList.add('hidden');
+      }
+    }
+
+    // Render Saved Product Formula Pills in Detail Modal
+    const formulaSection = document.getElementById('product-formula-section');
+    const formulaContainer = document.getElementById('product-formula-display-container');
+    if (formulaSection && formulaContainer) {
+      if (Array.isArray(batch.productFormula) && batch.productFormula.length > 0) {
+        formulaSection.classList.remove('hidden');
+        formulaContainer.innerHTML = batch.productFormula.map(f => `
+          <span style="background: rgba(192, 132, 252, 0.15); color: #c084fc; border: 1px solid rgba(192, 132, 252, 0.3); padding: 4px 10px; border-radius: 20px; font-size: 0.8rem; font-weight: bold; display: flex; align-items: center; gap: 4px;">
+            <i data-lucide="beaker" style="width: 12px; height: 12px;"></i> ${f.name || '-'} (${f.percentage || '0'}%)
+          </span>
+        `).join('');
+      } else {
+        formulaSection.classList.add('hidden');
+        formulaContainer.innerHTML = '';
       }
     }
 

@@ -1027,6 +1027,16 @@
             </div>
           </div>
 
+          <!-- Product Formula Section -->
+          <div id="product-formula-section" class="workflow-section hidden" style="margin-top: 1rem; border: 1px solid rgba(192, 132, 252, 0.2); background: rgba(192, 132, 252, 0.02); padding: 12px; border-radius: 6px; direction: rtl;">
+            <h4 style="margin: 0 0 10px 0; color: #c084fc; font-size: 0.95rem; font-weight: bold; display: flex; align-items: center; gap: 6px;">
+              <i data-lucide="beaker" style="width: 16px; height: 16px;"></i> صيغة المكونات والنسب المرجعية للباتش 🧪
+            </h4>
+            <div id="product-formula-display-container" style="display: flex; flex-wrap: wrap; gap: 8px;">
+              <!-- Formula pills will be injected dynamically -->
+            </div>
+          </div>
+
           <!-- Workflow Stages Timeline -->
           <div class="workflow-section">
             <h4><i data-lucide="route"></i> مسار العملية الإنتاجية الحالية</h4>
@@ -1274,12 +1284,63 @@
               <i data-lucide="scale"></i>
               <span>إضافة ملحق وزن (Admin) ⚖️</span>
             </button>
+            <button type="button" class="btn btn-secondary" id="btn-product-formula" style="border-color: #c084fc; color: #c084fc;">
+              <i data-lucide="beaker"></i>
+              <span>صيغة المنتج 🧪</span>
+            </button>
             <button type="button" class="btn btn-primary" id="btn-edit-batch" style="background: var(--cyan); border-color: var(--cyan); color: #0f172a;">
               <i data-lucide="edit"></i>
               <span>تعديل الإضبارة 📄</span>
             </button>
           </div>
           <button type="button" class="btn btn-secondary" id="close-detail-btn">إغلاق الشاشة</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal: Product Formula Documentation -->
+    <div id="modal-product-formula" class="modal-overlay hidden">
+      <div class="modal-card" style="max-width: 550px;">
+        <div class="modal-header">
+          <div class="modal-title" style="display: flex; align-items: center; gap: 8px;">
+            <i data-lucide="beaker" style="color: #c084fc; width: 22px; height: 22px;"></i>
+            <div>
+              <h3 style="margin: 0; font-size: 1.05rem; font-weight: bold; color: #fff;">صيغة المنتج الصيدلاني 🧪</h3>
+              <p style="margin: 0; font-size: 0.75rem; color: var(--text-dim);">إدراج نسب المكونات والمواد الفعالة وغير الفعالة للتوثيق فقط</p>
+            </div>
+          </div>
+          <button class="btn-close-modal" id="close-product-formula-modal" style="font-size: 1.5rem; background: none; border: none; color: #fff; cursor: pointer;">&times;</button>
+        </div>
+        <div class="modal-body" style="direction: rtl;">
+          <div style="background: rgba(192, 132, 252, 0.05); border: 1px solid rgba(192, 132, 252, 0.15); border-radius: 6px; padding: 10px; font-size: 0.8rem; color: #fff; margin-bottom: 16px; line-height: 1.4;">
+            ⚠️ <strong>تنبيه توثيقي:</strong> جميع الحقول اختيارية وتستخدم فقط لغرض الأرشفة والتوثيق المرجعي للتشغيلة، ولا تتدخل في حسابات الإنتاج والمستودعات الفعلية.
+          </div>
+
+          <form id="form-product-formula">
+            <table style="width: 100%; border-collapse: collapse; margin-bottom: 12px;">
+              <thead>
+                <tr style="border-bottom: 1px solid rgba(255,255,255,0.1); text-align: right;">
+                  <th style="padding: 6px 0; font-size: 0.85rem; color: var(--text-dim);">اسم المادة المكونة (اختياري)</th>
+                  <th style="padding: 6px 0; font-size: 0.85rem; color: var(--text-dim); width: 120px;">النسبة المئوية %</th>
+                  <th style="padding: 6px 0; font-size: 0.85rem; color: var(--text-dim); width: 40px; text-align: center;">إجراء</th>
+                </tr>
+              </thead>
+              <tbody id="product-formula-tbody">
+                <!-- Dynamic rows will be injected here -->
+              </tbody>
+            </table>
+
+            <button type="button" class="btn btn-secondary btn-sm" id="btn-add-formula-row" style="margin-bottom: 16px; border-color: var(--cyan); color: var(--cyan); background: none;">
+              <i data-lucide="plus"></i> إضافة مادة جديدة
+            </button>
+
+            <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: 12px; padding: 12px 0 0 0; border-top: 1px solid rgba(255,255,255,0.05);">
+              <button type="button" class="btn btn-secondary" id="btn-cancel-product-formula">إلغاء</button>
+              <button type="submit" class="btn btn-primary" style="background: #c084fc; border-color: #c084fc; color: #0f172a;">
+                <i data-lucide="save"></i> حفظ وصيانة الصيغة 💾
+              </button>
+            </div>
+          </form>
         </div>
       </div>
     </div>
