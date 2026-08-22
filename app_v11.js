@@ -2464,6 +2464,7 @@
       }
       if (inputLogRejectedKg) {
         inputLogRejectedKg.required = false;
+        inputLogRejectedKg.value = '0';
       }
       if (formGrid) {
         formGrid.classList.add('hidden');
@@ -2816,11 +2817,11 @@
       
       let newAccKg = totalFormulationKg;
       if (shouldAddCarryOver || stage.carryOverAdded) {
-        newAccKg += batch.carryOverKg;
+        newAccKg += (batch.carryOverKg || 0);
         stage.carryOverAdded = true;
       }
       
-      const stageLimit = batch.totalWeightKg + (stage.carryOverAdded ? batch.carryOverKg : 0);
+      const stageLimit = batch.totalWeightKg + (stage.carryOverAdded ? (batch.carryOverKg || 0) : 0);
       
       if (newAccKg > (stageLimit + 0.05)) {
         alert(`الكمية الإجمالية للمواد الموزونة المصححة (${newAccKg.toFixed(2)} kg) لا يمكن أن تتجاوز وزن الباتش الكلي المسموح به (${stageLimit.toFixed(2)} kg).`);
@@ -2919,7 +2920,7 @@
       
       let newAccKg = totalPackagingKg;
       if (!carryOverAlreadyAdded && (shouldAddCarryOver || stage.carryOverAdded)) {
-        newAccKg += batch.carryOverKg;
+        newAccKg += (batch.carryOverKg || 0);
         stage.carryOverAdded = true;
       }
       
@@ -2928,7 +2929,7 @@
         const prevStage = batch.stages[activeStageIndex - 1];
         maxAllowedTotal = prevStage ? (prevStage.acceptedKg || 0) : 0;
       }
-      const stageLimit = maxAllowedTotal + (stage.carryOverAdded ? batch.carryOverKg : 0);
+      const stageLimit = maxAllowedTotal + (stage.carryOverAdded ? (batch.carryOverKg || 0) : 0);
       
       if (newAccKg > (stageLimit + 0.05)) {
         alert(`الكمية الإجمالية لمواد التعبئة المصححة (${newAccKg.toFixed(2)} kg) لا يمكن أن تتجاوز الكمية المقبولة في المرحلة السابقة (${stageLimit.toFixed(2)} kg).`);
