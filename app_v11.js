@@ -2486,6 +2486,7 @@
       }
       updateWeighingFormulationTotal();
     } else {
+      if (elWeighingFormulationContainer) elWeighingFormulationContainer.classList.add('hidden');
       if (inputLogAcceptedKg) {
         inputLogAcceptedKg.required = true;
         inputLogAcceptedKg.readOnly = false;
