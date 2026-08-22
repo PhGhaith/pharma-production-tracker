@@ -167,6 +167,7 @@
   const detailTabletWeights = document.getElementById('detail-tablet-weights');
   const detailUnitsPerBlister = document.getElementById('detail-units-per-blister');
   const detailTotalBlisters = document.getElementById('detail-total-blisters');
+  const detailTotalBoxes = document.getElementById('detail-total-boxes');
   const stagesTimeline = document.getElementById('stages-timeline');
 
   // Stage Logger Elements
@@ -2045,19 +2046,21 @@
           batch.totalWeightKg,
           batch.lotsCount
         );
-        const totalBlisters = mathTotal.totalBlisters + carryMath.totalBlisters;
-        const boxes = Math.floor(totalBlisters / (batch.secondaryPackQty || 1));
         detailTotalBlisters.innerHTML = `
           ${PharmaMath.formatNumber(mathTotal.totalBlisters)} ${term.packName}
           <span style="color: var(--amber); font-weight: bold; margin-right: 5px;">+ ${PharmaMath.formatNumber(carryMath.totalBlisters)} ${term.packName} منقولة</span>
-          <div style="font-size: 0.78rem; font-weight: normal; color: var(--text-muted); margin-top: 2px;">(تعادل إجمالاً: ${PharmaMath.formatNumber(boxes)} علبة)</div>
         `;
+        const totalBlisters = mathTotal.totalBlisters + carryMath.totalBlisters;
+        const boxes = Math.floor(totalBlisters / (batch.secondaryPackQty || 1));
+        if (detailTotalBoxes) {
+          detailTotalBoxes.textContent = `${PharmaMath.formatNumber(boxes)} علبة`;
+        }
       } else {
+        detailTotalBlisters.textContent = `${PharmaMath.formatNumber(mathTotal.totalBlisters)} ${term.packName}`;
         const boxes = Math.floor(mathTotal.totalBlisters / (batch.secondaryPackQty || 1));
-        detailTotalBlisters.innerHTML = `
-          ${PharmaMath.formatNumber(mathTotal.totalBlisters)} ${term.packName}
-          <div style="font-size: 0.78rem; font-weight: normal; color: var(--text-muted); margin-top: 2px;">(تعادل: ${PharmaMath.formatNumber(boxes)} علبة)</div>
-        `;
+        if (detailTotalBoxes) {
+          detailTotalBoxes.textContent = `${PharmaMath.formatNumber(boxes)} علبة`;
+        }
       }
     }
 
